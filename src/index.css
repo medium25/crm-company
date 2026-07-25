@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background: theme('colors.bg');
+  color: theme('colors.text');
+  font-family: theme('fontFamily.sans');
+}
+
+* {
+  font-variant-numeric: tabular-nums;
+}
