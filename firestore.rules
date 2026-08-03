@@ -48,7 +48,10 @@ service cloud.firestore {
     }
 
     match /groups/{id} {
-      allow read:  if inBranch(resource.data.branchId);
+      // read не по branchId — проверка «группа использует курс/учителя/
+      // кабинет» перед архивацией фильтрует по courseId/teacherId/roomId,
+      // тот же случай, что enrollments/lessons выше.
+      allow read:  if request.auth != null;
       allow write: if isAdmin() && inBranch(request.resource.data.branchId);
     }
 
@@ -65,10 +68,23 @@ service cloud.firestore {
       }
     }
 
+    // Отдельное правило для collectionGroup('attendance') — вложенное правило
+    // выше действует только для прямого пути /lessons/{id}/attendance/{sid},
+    // Firestore не применяет его к collection-group запросам (AttendanceTab,
+    // reports.js фильтруют по groupId+month через collectionGroup).
+    match /{path=**}/attendance/{studentId} {
+      allow read: if request.auth != null;
+    }
+
     match /transactions/{id} {
       allow read:   if isFinance() || isAdmin();
       allow create: if isFinance() || (isAdmin() && request.resource.data.type == 'payment');
-      allow update, delete: if false;
+      allow delete: if (isFinance() || isAdmin()) && resource.data.type == 'payment';
+      // Транзакции неизменяемы по сумме/типу — единственный разрешённый
+      // update это сторно (reverseTransaction), которое помечает исходную
+      // запись isReversed/reversedBy, саму запись не меняя.
+      allow update: if (isFinance() || isAdmin()) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isReversed', 'reversedBy']);
     }
 
     match /enrollments/{id} {

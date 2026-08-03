@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutGrid,
-  UserPlus,
   CircleUserRound,
   Layers,
   GraduationCap,
@@ -22,7 +21,6 @@ const STORAGE_KEY = 'icon-crm:sidebar-collapsed';
  */
 const ITEMS = [
   { key: 'dashboard', to: '/', label: 'Дашборд', icon: LayoutGrid },
-  { key: 'leads', to: '/leads', label: 'Лиды', icon: UserPlus, badgeKey: 'leads' },
   { key: 'students', to: '/students', label: 'Студенты', icon: CircleUserRound },
   { key: 'groups', to: '/groups', label: 'Группы', icon: Layers },
   { key: 'teachers', to: '/teachers', label: 'Учителя', icon: GraduationCap },
@@ -33,8 +31,8 @@ const ITEMS = [
 
 /** [достроено] грубая матрица видимости пунктов меню по роли, уточняется по ходу фаз 1-8. */
 const ROLE_ITEM_KEYS = {
-  owner: ['dashboard', 'leads', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
-  admin: ['dashboard', 'leads', 'students', 'groups', 'teachers', 'payments', 'reports'],
+  owner: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
+  admin: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports'],
   accountant: ['dashboard', 'students', 'payments', 'reports'],
   teacher: ['dashboard', 'groups'],
 };
@@ -61,7 +59,7 @@ export function Sidebar({ leadsCount }) {
   return (
     <aside
       className={`flex h-full shrink-0 flex-col border-r border-border bg-surface transition-[width] ${
-        collapsed ? 'w-16' : 'w-60'
+        collapsed ? 'w-16' : 'w-28'
       }`}
     >
       <div className="flex h-16 items-center justify-center border-b border-border px-4 text-lg font-extrabold text-navy">
@@ -79,16 +77,27 @@ export function Sidebar({ leadsCount }) {
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `mx-2 mb-1 flex items-center gap-3 rounded-field px-3 py-2.5 text-[15px] transition-colors ${
-                  isActive ? 'bg-navy text-white' : 'text-text hover:bg-surface-alt'
+                `group relative flex flex-col items-center gap-1.5 border-l-[3px] py-3.5 text-center text-[13px] leading-tight transition-colors ${
+                  collapsed ? 'px-2' : 'px-3'
+                } ${
+                  isActive
+                    ? 'border-l-navy bg-orange-soft/40 font-bold text-navy'
+                    : 'border-l-transparent text-muted hover:bg-surface-alt hover:text-text'
                 }`
               }
             >
-              <Icon className="h-5 w-5 shrink-0" />
-              {!collapsed && <span className="flex-1 truncate">{label}</span>}
-              {!collapsed && Boolean(badge) && (
-                <span className="rounded-full bg-orange px-1.5 py-0.5 text-[11px] font-bold text-white">
-                  {badge}
+              <span className="relative">
+                <Icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+                {Boolean(badge) && (
+                  <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange px-1 text-[10px] font-bold text-white">
+                    {badge}
+                  </span>
+                )}
+              </span>
+              {!collapsed && <span>{label}</span>}
+              {collapsed && (
+                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-field bg-navy px-2.5 py-1.5 text-[13px] font-normal text-white opacity-0 shadow-hover transition-opacity group-hover:opacity-100">
+                  {label}
                 </span>
               )}
             </NavLink>

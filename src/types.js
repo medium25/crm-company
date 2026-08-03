@@ -207,7 +207,7 @@
  */
 
 /**
- * @typedef {'cash' | 'click' | 'payme' | 'uzum' | 'card' | 'transfer'} PaymentMethod
+ * @typedef {'cash' | 'click' | 'payme' | 'uzum' | 'uzcard' | 'humo' | 'card' | 'transfer'} PaymentMethod
  */
 
 /**

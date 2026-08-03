@@ -1,0 +1,50 @@
+04.03.2026	Dinora Turdimurodova	840 000 UZS	Click	MS KRISTINA	R4	Mr Abduganiev	04.03.2026 15:31:36
+04.03.2026	Madina Avlayeva	790 000 UZS	UZCARD	MS KAMILLA	R19	Muqaddas Jo'rayeva	04.03.2026 15:29:36
+04.03.2026	Azamat Ergashev	750 000 UZS	Cash	MR SANJAR	I5	Muqaddas Jo'rayeva	04.03.2026 15:28:01
+04.03.2026	Mirazim Mirjalolov	297 000 UZS	Click	MR SANJAR	I5	Muqaddas Jo'rayeva	04.03.2026 15:18:58
+04.03.2026	Omina Mirsamatova	375 000 UZS	Click	MS KRISTINA	R4	Muqaddas Jo'rayeva	04.03.2026 14:25:48
+04.03.2026	Ruhshona Saidova	140 000 UZS	Click	MS KRISTINA	R5	Muqaddas Jo'rayeva	04.03.2026 14:17:55
+04.03.2026	Azizbek Oripov	840 000 UZS	Click	MS ZIYODA (BETA)	R29	Muqaddas Jo'rayeva	04.03.2026 14:14:51
+04.03.2026	Shirinoy Bahtiyorova	840 000 UZS	Click	MS KRISTINA	R4	Muqaddas Jo'rayeva	04.03.2026 14:11:38
+03.03.2026	Laziz Shapog'atov	840 000 UZS	Click	MS KRISTINA	R7	Muqaddas Jo'rayeva	03.03.2026 20:30:58
+03.03.2026	Safar Nishonaliyev	840 000 UZS	Click	MS SHAXZODA	R42	Muqaddas Jo'rayeva	03.03.2026 20:28:49
+03.03.2026	Izzat Maturazov	840 000 UZS	UZCARD	MS KRISTINA	R14	Muqaddas Jo'rayeva	03.03.2026 20:20:12
+03.03.2026	Marjona Gulimmatova	839 000 UZS	Click	MS SHAXZODA	R41	Muqaddas Jo'rayeva	03.03.2026 19:51:54
+03.03.2026	Behruzbek Bahronov	420 000 UZS	Click	MS KRISTINA	R14	Muqaddas Jo'rayeva	03.03.2026 18:36:46
+03.03.2026	Madina Xayitova	600 000 UZS	Click	MS SHAXZODA	R41	Muqaddas Jo'rayeva	03.03.2026 16:44:49
+03.03.2026	Elzod Mirjalolov	100 000 UZS	Cash		I11	Muqaddas Jo'rayeva	03.03.2026 15:46:34
+03.03.2026	Eldorbek Xoshimjonov	840 000 UZS	UZCARD	MS KRISTINA	R11	Muqaddas Jo'rayeva	03.03.2026 15:30:19
+03.03.2026	Shahrizoda Abdumaliyeva	840 000 UZS	Click	MS KRISTINA	R11	Muqaddas Jo'rayeva	03.03.2026 15:28:25
+03.03.2026	Shaxzoda Mirzaaxmatova	890 000 UZS	Cash	MR SANJAR	I12	Muqaddas Jo'rayeva	03.03.2026 15:28:06
+03.03.2026	Muhammadozod Abdulazizov	890 000 UZS	Click	MR SANJAR	I7	Muqaddas Jo'rayeva	03.03.2026 15:09:15
+03.03.2026	Jasurbek Rahmonov	515 000 UZS	Click	MR SANJAR	I13	Muqaddas Jo'rayeva	03.03.2026 14:57:57
+03.03.2026	Madinabonu G'ulomova	138 000 UZS	Click	MR SANJAR	I4	Muqaddas Jo'rayeva	03.03.2026 14:37:08
+02.03.2026	Sevinch Murodjonova	840 000 UZS	Click	MS KAMILLA	R21	Doniyor Shavkatov	02.03.2026 21:18:47
+02.03.2026	Ro'za Boliyeva	200 000 UZS	Click	MS KAMILLA	R20	Doniyor Shavkatov	02.03.2026 21:16:50
+02.03.2026	Yangiboyeva Iroda	320 000 UZS	Click	MS KRISTINA	R7	Muqaddas Jo'rayeva	02.03.2026 20:18:14
+02.03.2026	Yangiboyeva Iroda	420 000 UZS	Click	MS KRISTINA	R7	Muqaddas Jo'rayeva	02.03.2026 20:15:41
+02.03.2026	Nusratulla Botirov	90 000 UZS	Click	MS KRISTINA	R7	Muqaddas Jo'rayeva	02.03.2026 19:59:11
+02.03.2026	Nusratulla Botirov	750 000 UZS	Click	MS KRISTINA	R7	Muqaddas Jo'rayeva	02.03.2026 19:58:59
+02.03.2026	Shohrux Saydullayev	840 000 UZS	Click	MS KRISTINA	R7	Muqaddas Jo'rayeva	02.03.2026 19:56:20
+02.03.2026	Sevara Sho'ldasova	700 000 UZS	Click	MS KRISTINA	R6	Muqaddas Jo'rayeva	02.03.2026 18:43:20
+02.03.2026	Madina Avlayeva	50 000 UZS	Cash	MS KAMILLA	R19	Muqaddas Jo'rayeva	02.03.2026 18:12:43
+02.03.2026	Fazliddin Ochilov	240 000 UZS	Click	MS KRISTINA	R4	Muqaddas Jo'rayeva	02.03.2026 17:49:53
+02.03.2026	Amirxon Baxtbayev	890 000 UZS	Click	MR SANJAR	I5	Muqaddas Jo'rayeva	02.03.2026 17:02:27
+02.03.2026	Shokirjon Shuhratjonov	840 000 UZS	UZCARD	MS KRISTINA	R6	Muqaddas Jo'rayeva	02.03.2026 16:25:20
+02.03.2026	Akobir Abdullaev	890 000 UZS	Cash	MR SANJAR	I5	Muqaddas Jo'rayeva	02.03.2026 15:40:10
+02.03.2026	Gavhar Nigmatkhadjayeva	770 000 UZS	Click	MS SHAXZODA	R39	Muqaddas Jo'rayeva	02.03.2026 15:08:31
+02.03.2026	Abdulloh Dilmurodov	650 000 UZS	Click		I40	Muqaddas Jo'rayeva	02.03.2026 15:04:08
+02.03.2026	Muslima Dilmurodova	816 000 UZS	Click		I40	Muqaddas Jo'rayeva	02.03.2026 15:02:30
+02.03.2026	Donoxon Nasrullayeva	1 500 000 UZS	Click		I36(SOLO)	Muqaddas Jo'rayeva	02.03.2026 14:57:31
+28.02.2026	Shahzod Kamolov	210 000 UZS	Click	MS KRISTINA	R14	Muqaddas Jo'rayeva	28.02.2026 20:00:29
+28.02.2026	Aziza Qurbonova	400 000 UZS	Cash	MS SHAXZODA	R42	Muqaddas Jo'rayeva	28.02.2026 19:56:27
+28.02.2026	Fazliddin Ochilov	50 000 UZS	Click	MS KRISTINA	R4	Muqaddas Jo'rayeva	28.02.2026 19:43:03
+28.02.2026	Zulfiya Safarova	490 000 UZS	Click	MS KRISTINA	R13	Muqaddas Jo'rayeva	28.02.2026 18:58:55
+28.02.2026	Zulfiya Safarova	350 000 UZS	Cash	MS KRISTINA	R13	Muqaddas Jo'rayeva	28.02.2026 18:58:18
+28.02.2026	Dilnura Hakimjonova	223 000 UZS	Click		I35	Muqaddas Jo'rayeva	28.02.2026 17:51:46
+28.02.2026	Zuhra Yusufjonova	890 000 UZS	UZCARD	MR SANJAR	I13	Muqaddas Jo'rayeva	28.02.2026 16:58:30
+28.02.2026	Laylo Sadullayeva	840 000 UZS	Click	MS SHAXZODA	R41	Muqaddas Jo'rayeva	28.02.2026 16:55:42
+28.02.2026	Samandar Soliyev	900 000 UZS	Cash	MR SANJAR	I13	Muqaddas Jo'rayeva	28.02.2026 16:54:13
+28.02.2026	Abdusalim Zoirov	40 000 UZS	Click	MS KRISTINA	R12	Muqaddas Jo'rayeva	28.02.2026 15:24:56
+28.02.2026	Abdusalim Zoirov	600 000 UZS	Cash	MS KRISTINA	R12	Muqaddas Jo'rayeva	28.02.2026 15:22:39
+27.02.2026	Mustafo Xudoyberdiyev	296 000 UZS	Click		I41 (GE)	Muqaddas Jo'rayeva	27.02.2026 19:32:59

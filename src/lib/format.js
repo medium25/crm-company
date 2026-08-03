@@ -1,4 +1,4 @@
-import { format as formatDateFns } from 'date-fns';
+import { format as formatDateFns, differenceInMonths, differenceInCalendarDays, addMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 /**
@@ -69,6 +69,16 @@ export function formatMonth(month) {
   return formatDateFns(new Date(year, m - 1, 1), 'LLLL yyyy', { locale: ru });
 }
 
+/**
+ * Короткая форма для подписей оси X графика выручки.
+ * @param {string} month "2026-07"
+ * @returns {string} "июль 26"
+ */
+export function formatMonthShort(month) {
+  const [year, m] = month.split('-').map(Number);
+  return formatDateFns(new Date(year, m - 1, 1), 'LLL yy', { locale: ru });
+}
+
 const SCHEDULE_TYPE_LABELS = {
   even: 'Чётные дни',
   odd: 'Нечётные дни',
@@ -81,6 +91,65 @@ const SCHEDULE_TYPE_LABELS = {
  */
 export function formatScheduleType(type) {
   return SCHEDULE_TYPE_LABELS[type] ?? type;
+}
+
+/**
+ * Сколько учится — «X месяцев Y дней» от даты добавления до даты окончания
+ * (по умолчанию — сегодня; для ушедших передавать `leftAt`).
+ * @param {import('firebase/firestore').Timestamp} fromTs
+ * @param {import('firebase/firestore').Timestamp|null} [toTs] по умолчанию — сейчас
+ * @returns {string} "1 год 3 месяца 12 дней" | "18 дней" | "—"
+ */
+export function formatDuration(fromTs, toTs) {
+  if (!fromTs) return '—';
+  const from = fromTs.toDate();
+  const to = toTs ? toTs.toDate() : new Date();
+  if (to <= from) return '0 дней';
+
+  // differenceInMonths — точное число ПОЛНЫХ месяцев (учитывает день месяца,
+  // не только пересечение календарных границ), иначе остаток в днях после
+  // addMonths(from, totalMonths) мог уйти в отрицательные числа и обнулиться.
+  const totalMonths = Math.max(0, differenceInMonths(to, from));
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  const days = Math.max(0, differenceInCalendarDays(to, addMonths(from, totalMonths)));
+
+  const parts = [];
+  if (years > 0) parts.push(`${years} ${pluralize(years, ['год', 'года', 'лет'])}`);
+  if (months > 0) parts.push(`${months} ${pluralize(months, ['месяц', 'месяца', 'месяцев'])}`);
+  if (days > 0 || parts.length === 0) parts.push(`${days} ${pluralize(days, ['день', 'дня', 'дней'])}`);
+  return parts.join(' ');
+}
+
+/**
+ * Число полных месяцев обучения (для усреднения по списку студентов).
+ * @param {import('firebase/firestore').Timestamp} fromTs
+ * @param {import('firebase/firestore').Timestamp|null} [toTs] по умолчанию — сейчас
+ * @returns {number}
+ */
+export function monthsElapsed(fromTs, toTs) {
+  if (!fromTs) return 0;
+  const from = fromTs.toDate();
+  const to = toTs ? toTs.toDate() : new Date();
+  return Math.max(0, differenceInMonths(to, from));
+}
+
+/**
+ * Среднее число месяцев обучения по списку студентов — "5.3 месяца".
+ * Студенты, которые учатся у нас больше 12 месяцев, в среднее не входят —
+ * после года они переходят на бесплатное обучение и не характеризуют
+ * обычный срок обучения.
+ * @param {Array<{createdAt: import('firebase/firestore').Timestamp, leftAt?: import('firebase/firestore').Timestamp|null}>} students
+ * @returns {string} "5.3 месяца" | "—" (пустой список или все — больше 12 месяцев)
+ */
+export function formatAvgMonths(students) {
+  if (!students || students.length === 0) return '—';
+  const eligible = students.filter((st) => monthsElapsed(st.createdAt, st.leftAt ?? null) <= 12);
+  if (eligible.length === 0) return '—';
+  const total = eligible.reduce((sum, st) => sum + monthsElapsed(st.createdAt, st.leftAt ?? null), 0);
+  const avg = total / eligible.length;
+  const rounded = Math.round(avg * 10) / 10;
+  return `${rounded} ${pluralize(Math.round(avg), ['месяц', 'месяца', 'месяцев'])}`;
 }
 
 /**

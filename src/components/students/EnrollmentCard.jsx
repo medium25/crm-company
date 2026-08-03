@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { doc } from 'firebase/firestore';
-import { Pause, Ghost } from 'lucide-react';
+import { Pause, Ghost, CheckCircle } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useDoc } from '../../hooks/useDoc.js';
 import { Badge } from '../ui/Badge.jsx';
@@ -13,8 +14,10 @@ import { formatDate, formatMoney, formatScheduleType } from '../../lib/format.js
  * @param {Object} props.enrollment
  * @param {(enrollment: Object) => void} props.onFreeze
  * @param {(enrollment: Object) => void} props.onLeave
+ * @param {(enrollment: Object) => void} props.onActivate
  */
-export function EnrollmentCard({ enrollment, onFreeze, onLeave }) {
+export function EnrollmentCard({ enrollment, onFreeze, onLeave, onActivate }) {
+  const navigate = useNavigate();
   const groupRef = useMemo(() => (db ? doc(db, 'groups', enrollment.groupId) : null), [enrollment.groupId]);
   const { data: group } = useDoc(groupRef);
 
@@ -23,11 +26,15 @@ export function EnrollmentCard({ enrollment, onFreeze, onLeave }) {
   return (
     <div className="rounded-card border border-border bg-surface p-5">
       <div className="mb-3 flex items-start justify-between">
-        <div>
+        <button
+          type="button"
+          onClick={() => navigate(`/groups/${enrollment.groupId}`)}
+          className="text-left hover:opacity-80"
+        >
           <Badge variant="group-code">{enrollment.groupCode}</Badge>
-          <p className="mt-2 font-bold text-text">{enrollment.courseName}</p>
+          <p className="mt-2 font-bold text-link">{enrollment.courseName}</p>
           <p className="text-[15px] text-muted">{enrollment.teacherName}</p>
-        </div>
+        </button>
         {group && (
           <div className="text-right text-[13px] text-muted">
             <p>
@@ -43,19 +50,26 @@ export function EnrollmentCard({ enrollment, onFreeze, onLeave }) {
       <div className="border-t border-border pt-3">
         <div className="mb-1 flex items-center justify-between">
           <span className="text-[15px] text-text">Статус: {enrollment.statusLabel}</span>
-          {canAct && enrollment.status !== 'paused' && (
-            <Button variant="icon-round" tone="warning" onClick={() => onFreeze(enrollment)} aria-label="Заморозить">
-              <Pause className="h-4 w-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {enrollment.status === 'trial' && (
+              <Button variant="icon-round" tone="navy" onClick={() => onActivate(enrollment)} aria-label="Активировать">
+                <CheckCircle className="h-4 w-4" />
+              </Button>
+            )}
+            {canAct && enrollment.status !== 'paused' && (
+              <Button variant="icon-round" tone="warning" onClick={() => onFreeze(enrollment)} aria-label="Заморозить">
+                <Pause className="h-4 w-4" />
+              </Button>
+            )}
+            {canAct && (
+              <Button variant="icon-round" tone="danger" onClick={() => onLeave(enrollment)} aria-label="Вывести из группы">
+                <Ghost className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="mb-1 flex items-center justify-between">
+        <div className="mb-1">
           <span className="text-[15px] text-muted">Дата добавления: {formatDate(enrollment.addedAt)}</span>
-          {canAct && (
-            <Button variant="icon-round" tone="danger" onClick={() => onLeave(enrollment)} aria-label="Вывести из группы">
-              <Ghost className="h-4 w-4" />
-            </Button>
-          )}
         </div>
         {enrollment.activatedAt && (
           <p className="text-[15px] text-muted">Дата активации: {formatDate(enrollment.activatedAt)}</p>

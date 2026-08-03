@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatMoney, formatMonth } from '../../lib/format.js';
+import { formatMoney, formatMonth, formatMonthShort } from '../../lib/format.js';
 
 const PERIOD_OPTIONS = [
   { value: 12, label: '12 мес' },
@@ -55,10 +55,10 @@ export function RevenueChart({ data }) {
       <div className="h-[420px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filtered} margin={{ top: 10, right: 20, bottom: 40, left: 10 }}>
-            <CartesianGrid stroke="#E9EBEF" vertical={false} />
+            <CartesianGrid stroke="#E9EBEF" />
             <XAxis
               dataKey="month"
-              tickFormatter={(m) => formatMonth(m)}
+              tickFormatter={(m) => formatMonthShort(m)}
               angle={-45}
               textAnchor="end"
               interval={1}

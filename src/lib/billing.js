@@ -379,6 +379,53 @@ export async function reverseTransaction(db, original, user) {
 }
 
 /**
+ * Удаляет платёж навсегда — без компенсирующей записи. Откатывает эффект
+ * на `students.balance`, `monthlyBalances` и (для type=payment) `monthlyRevenue`
+ * тем же батчем. Только для type === 'payment'.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {Object} original исходная транзакция
+ * @returns {Promise<void>}
+ */
+export async function deletePayment(db, original) {
+  const { id, studentId, amount, month, type, branchId } = original;
+  const batch = writeBatch(db);
+
+  batch.delete(doc(db, 'transactions', id));
+
+  if (studentId) {
+    batch.update(doc(db, 'students', studentId), {
+      balance: increment(-amount),
+      balanceUpdatedAt: serverTimestamp(),
+    });
+
+    batch.set(
+      doc(db, 'monthlyBalances', `${studentId}_${month}`),
+      {
+        charges: increment(amount < 0 ? -amount : 0),
+        payments: increment(amount > 0 ? -amount : 0),
+        balance: increment(-amount),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+
+  if (type === 'payment' && branchId) {
+    batch.set(
+      doc(db, 'monthlyRevenue', `${branchId}_${month}`),
+      {
+        amount: increment(-amount),
+        paymentsCount: increment(-1),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+
+  await batch.commit();
+}
+
+/**
  * «Пересчитать баланс» — пересуммирует все транзакции студента и чинит
  * расхождение денормализованного `students.balance`.
  * @param {import('firebase/firestore').Firestore} db

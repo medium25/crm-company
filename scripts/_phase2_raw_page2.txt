@@ -1,0 +1,50 @@
+10.07.2026	Sanjar Akbarov	148 000 UZS	Click	MR SANJAR	I14	Mr Abduganiev	10.07.2026 16:28:29
+10.07.2026	Munisa Nazirova	100 000 UZS	Click	MS KRISTINA	R4	Mr Abduganiev	10.07.2026 15:37:36
+10.07.2026	Munisa Nazirova	740 000 UZS	Cash	MS KRISTINA	R4	Mr Abduganiev	10.07.2026 15:37:22
+10.07.2026	Elbek Uchqunov	140 000 UZS	Click	MS ZIYODA (BETA)	R29	Mr Abduganiev	10.07.2026 10:51:18
+10.07.2026	Dilnoza Rihsiboyeva	420 000 UZS	Cash	MS ZIYODA (BETA)	R30	Mr Abduganiev	10.07.2026 10:16:03
+09.07.2026	Oybek Shavkatov	890 000 UZS	Cash	MR SANJAR	I14	Mr Abduganiev	09.07.2026 19:49:01
+09.07.2026	Hayrulla Abdukamolov	840 000 UZS	Click	MS SHAXZODA	R42	Mr Abduganiev	09.07.2026 18:56:03
+09.07.2026	Farzona Raxmatullayeva	70 000 UZS	Click	MS KRISTINA	R12	Mr Abduganiev	09.07.2026 18:40:22
+09.07.2026	Shohjaxon Erkinov	840 000 UZS	Cash	MS SHAXZODA	R42	Mr Abduganiev	09.07.2026 18:28:37
+09.07.2026	Sindor Allanazarov	890 000 UZS	Click	MR SANJAR	I13	Mr Abduganiev	09.07.2026 17:40:24
+09.07.2026	Abror Alijonov	770 000 UZS	Click	MS SHAXZODA	R33	Mr Abduganiev	09.07.2026 17:21:41
+09.07.2026	Lobar Tadjimirzayeva	400 000 UZS	Cash	MS SHAXZODA	R40	Mr Abduganiev	09.07.2026 15:07:50
+09.07.2026	Muxlisa Tolipova	140 000 UZS	Click	MS ZIYODA (BETA)	R37	Mr Abduganiev	09.07.2026 14:27:26
+09.07.2026	Mubina Yaqubhajjayeva	840 000 UZS	Click	MS KRISTINA	R11	Mr Abduganiev	09.07.2026 14:24:36
+08.07.2026	Diyorbek Yursunov	280 000 UZS	Click	MS KRISTINA	R7	Mr Abduganiev	08.07.2026 20:12:17
+08.07.2026	Muslima Azamatova	835 000 UZS	Click	MR SANJAR	I6	Mr Abduganiev	08.07.2026 20:03:38
+08.07.2026	Javohir Tulanov	840 000 UZS	Click	MS SHAXZODA	R34	Mr Abduganiev	08.07.2026 18:59:24
+08.07.2026	Roziya Bahodirova	630 000 UZS	UZCARD	MS KRISTINA	R14	Mr Abduganiev	08.07.2026 18:51:00
+08.07.2026	Robiya Saidganiyeva	840 000 UZS	Cash	MS KAMILLA	R19	Mr Abduganiev	08.07.2026 18:44:47
+08.07.2026	Asilbek Ro'ziboyev	640 000 UZS	Cash	MS SHAXZODA	R34	Mr Abduganiev	08.07.2026 17:52:52
+08.07.2026	Asilbek Ro'ziboyev	200 000 UZS	Click	MS SHAXZODA	R34	Mr Abduganiev	08.07.2026 17:52:19
+08.07.2026	Shahrizoda Xasanova	840 000 UZS	Cash	MS ZIYODA (BETA)	R30	Mr Abduganiev	08.07.2026 17:35:00
+08.07.2026	Lazizbek Xusanboyev	890 000 UZS	Click	MR SANJAR	I7	Mr Abduganiev	08.07.2026 17:03:06
+08.07.2026	Maryam	64 000 UZS	Cash	MR SANJAR	I6	Mr Abduganiev	08.07.2026 16:59:39
+08.07.2026	Madina Sharipova	840 000 UZS	Cash	MS KRISTINA	R5	Mr Abduganiev	08.07.2026 16:14:59
+08.07.2026	Shahriyor Kamoliddinov	840 000 UZS	Click	MS KRISTINA	R4	Mr Abduganiev	08.07.2026 15:56:32
+08.07.2026	Ziyoda Yo'ldosheva	840 000 UZS	Cash	MS ZIYODA (BETA)	R29	Muqaddas Jo'rayeva	08.07.2026 14:18:09
+08.07.2026	Habiba To'xtasinova	840 000 UZS	Cash	MS KAMILLA	R18	Muqaddas Jo'rayeva	08.07.2026 13:42:23
+08.07.2026	Sarvar Nuraliyev	350 000 UZS	Cash	MS ZIYODA (BETA)	R30	Muqaddas Jo'rayeva	08.07.2026 12:29:27
+08.07.2026	Muslima G'ofurova	840 000 UZS	Click	MS ZIYODA (BETA)	R37	Muqaddas Jo'rayeva	08.07.2026 12:02:23
+07.07.2026	Fayzulloh Axrorov	840 000 UZS	Cash	MS KRISTINA	R13	Mr Abduganiev	07.07.2026 19:17:41
+07.07.2026	Komila Egamberdiyeva	490 000 UZS	Cash	MS SHAXZODA	R42	Mr Abduganiev	07.07.2026 18:26:39
+07.07.2026	E'zoza Usmanova	280 000 UZS	Click	MS SHAXZODA	R41	Mr Abduganiev	07.07.2026 17:06:54
+07.07.2026	Samandar Ermatov	840 000 UZS	Click	MS SHAXZODA	R40	Mr Abduganiev	07.07.2026 16:17:04
+07.07.2026	Maftuna Ixtiyarova	840 000 UZS	Click	MS KRISTINA	R13	Muqaddas Jo'rayeva	07.07.2026 16:13:35
+07.07.2026	Foziljon Ozodov	890 000 UZS	Click	MR SANJAR	I12	Mr Abduganiev	07.07.2026 16:10:36
+07.07.2026	Munisa Ammonova	840 000 UZS	Click	MS KRISTINA	R13	Muqaddas Jo'rayeva	07.07.2026 16:01:19
+07.07.2026	Mohinur Abdug'afforova	890 000 UZS	UZCARD	MR SANJAR	I12	Mr Abduganiev	07.07.2026 15:46:13
+07.07.2026	Robiya Abdug'aniyeva	140 000 UZS	Cash	MS SHAXZODA	R39	Mr Abduganiev	07.07.2026 14:37:27
+07.07.2026	Sevinch Muxammadiyeva	840 000 UZS	Cash	MS SHAXZODA	R39	Mr Abduganiev	07.07.2026 14:28:39
+07.07.2026	Muslima Saidova	840 000 UZS	Cash	MS SHAXZODA	R39	Mr Abduganiev	07.07.2026 14:01:57
+07.07.2026	Sojida Umarova	840 000 UZS	Cash	MS SHAXZODA	R39	Mr Abduganiev	07.07.2026 14:01:42
+07.07.2026	Mohinur Mansurova	840 000 UZS	UZCARD			Muqaddas Jo'rayeva	07.07.2026 12:48:24
+07.07.2026	Nodirxo'ja Muzaffarov	840 000 UZS	Cash	MS ZIYODA (BETA)	R36	Muqaddas Jo'rayeva	07.07.2026 12:39:58
+06.07.2026	Sitora Egamberdiyeva	70 000 UZS	Click	MS KRISTINA	R7	Mr Abduganiev	07.07.2026 16:44:07
+06.07.2026	Baxrom Musulmonov	700 000 UZS	Click	MS KRISTINA	R14	Mr Abduganiev	06.07.2026 20:06:34
+06.07.2026	Tohir Toirjonov	290 000 UZS	Click	MS KRISTINA	R14	Mr Abduganiev	06.07.2026 20:00:59
+06.07.2026	Fazliddin Lutfullayev	890 000 UZS	UZCARD	MR SANJAR	I7	Mr Abduganiev	06.07.2026 19:14:07
+06.07.2026	Sitora Egamberdiyeva	430 000 UZS	Cash	MS KRISTINA	R7	Mr Abduganiev	06.07.2026 19:10:46
+06.07.2026	Muslima Erkinjonova	630 000 UZS	UZCARD	MS KRISTINA	R6	Mr Abduganiev	06.07.2026 18:39:58

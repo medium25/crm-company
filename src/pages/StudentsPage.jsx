@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { Plus, CircleUserRound, MessageSquare, Download } from 'lucide-react';
+import { collection, doc, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
+import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -9,6 +9,7 @@ import { useCollection } from '../hooks/useCollection.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { FilterBar } from '../components/layout/FilterBar.jsx';
+import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Select } from '../components/ui/Select.jsx';
 import { Input } from '../components/ui/Input.jsx';
@@ -18,7 +19,8 @@ import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
-import { formatPhone, formatMoney, formatDate } from '../lib/format.js';
+import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.jsx';
+import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
 const STATUS_OPTIONS = [
@@ -28,6 +30,15 @@ const STATUS_OPTIONS = [
   { value: 'paused', label: 'Заморожены' },
   { value: 'left', label: 'Ушли' },
   { value: 'archived', label: 'Архив' },
+];
+
+const SECTION_TABS = [
+  { key: 'all', label: 'Все ученики', description: 'Полный список, статус, баланс, срок обучения', icon: CircleUserRound },
+  { key: 'debtors', label: 'Должники', description: 'Активные студенты с отрицательным балансом', icon: Wallet },
+  { key: 'attendance', label: 'Посещаемость', description: 'По учителям — их студенты сразу по всем группам', icon: CalendarCheck },
+  { key: 'paused', label: 'Замороженные', description: 'Студенты на паузе', icon: Snowflake },
+  { key: 'trial', label: 'На пробном уроке', description: 'Пробные, сгруппированы по учителям', icon: GraduationCap },
+  { key: 'left', label: 'Покинувшие', description: 'Кто ушёл и сколько успел проучиться', icon: UserX },
 ];
 
 const PAGE_SIZE = 25;
@@ -42,10 +53,22 @@ export function StudentsPage() {
   const [selected, setSelected] = useState(() => new Set());
   const [smsOpen, setSmsOpen] = useState(false);
 
+  const section = searchParams.get('section') || null;
   const search = searchParams.get('q') || '';
   const status = searchParams.get('status') || 'all';
   const onlyDebtors = searchParams.get('debtors') === '1';
   const page = Math.max(1, Number(searchParams.get('page') || 1));
+
+  // «Должники»/«Покинувшие»/«Замороженные»/«На пробном» — отдельные секции
+  // с фиксированным фильтром статуса; общий фильтр «Статус» из «Все ученики»
+  // на них не влияет.
+  const effectiveStatus =
+    section === 'debtors' ? 'active' :
+    section === 'left' ? 'left' :
+    section === 'paused' ? 'paused' :
+    section === 'trial' ? 'trial' :
+    status;
+  const effectiveOnlyDebtors = section === 'debtors' ? true : onlyDebtors;
 
   const setFilter = (patch) => {
     const next = new URLSearchParams(searchParams);
@@ -53,6 +76,18 @@ export function StudentsPage() {
       if (value) next.set(key, value);
       else next.delete(key);
     }
+    next.delete('page');
+    setSearchParams(next);
+  };
+  const setSection = (key) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('section', key);
+    next.delete('page');
+    setSearchParams(next);
+  };
+  const goToLanding = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('section');
     next.delete('page');
     setSearchParams(next);
   };
@@ -65,11 +100,12 @@ export function StudentsPage() {
 
   const studentsQuery = useMemo(() => {
     if (!db || !activeBranchId) return null;
-    const clauses = [where('branchId', '==', activeBranchId), where('isArchived', '==', status === 'archived')];
-    if (status !== 'all' && status !== 'archived') clauses.push(where('status', '==', status));
+    const clauses = [where('branchId', '==', activeBranchId), where('isArchived', '==', effectiveStatus === 'archived')];
+    if (effectiveStatus !== 'all' && effectiveStatus !== 'archived') clauses.push(where('status', '==', effectiveStatus));
     return query(collection(db, 'students'), ...clauses, orderBy('fullName'));
-  }, [activeBranchId, status]);
-  const { data: rawStudents, loading, error } = useCollection(studentsQuery);
+  }, [activeBranchId, effectiveStatus]);
+  const showTable = section === 'all' || section === 'debtors' || section === 'left' || section === 'paused' || section === 'trial';
+  const { data: rawStudents, loading, error } = useCollection(showTable ? studentsQuery : null);
 
   const enrollmentsQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
@@ -79,7 +115,12 @@ export function StudentsPage() {
 
   const enrollmentsByStudent = useMemo(() => {
     const map = new Map();
+    // "Убрать из группы"/"Вывести" ставит status: 'left'/'archived', но не
+    // isArchived — запись остаётся в выборке (isArchived==false), поэтому
+    // в бейджах групп и колонке «Учителя» нужно ещё раз отсеять её отдельно,
+    // иначе студент выглядит числящимся в группе, из которой его убрали.
     for (const e of enrollments) {
+      if (e.status === 'left' || e.status === 'archived') continue;
       if (!map.has(e.studentId)) map.set(e.studentId, []);
       map.get(e.studentId).push(e);
     }
@@ -92,9 +133,23 @@ export function StudentsPage() {
       const s = search.trim().toLowerCase();
       list = list.filter((st) => st.fullName.toLowerCase().includes(s) || st.phone.includes(s));
     }
-    if (onlyDebtors) list = list.filter((st) => st.balance < 0);
+    if (effectiveOnlyDebtors) list = list.filter((st) => st.balance < 0);
     return list;
-  }, [rawStudents, search, onlyDebtors]);
+  }, [rawStudents, search, effectiveOnlyDebtors]);
+
+  // «На пробном уроке» — не таблица, а список по учителям (обычно 1-2
+  // пробных на учителя, пагинация тут не нужна).
+  const trialByTeacher = useMemo(() => {
+    if (section !== 'trial') return [];
+    const map = new Map();
+    for (const st of filtered) {
+      const teacherNames = [...new Set((enrollmentsByStudent.get(st.id) ?? []).map((e) => e.teacherName))];
+      const key = teacherNames[0] || 'Без учителя';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(st);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [section, filtered, enrollmentsByStudent]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages);
@@ -113,6 +168,7 @@ export function StudentsPage() {
     if (selected.size === 0) return;
     try {
       const batch = writeBatch(db);
+      const groupsToDecrement = new Set();
       for (const id of selected) {
         batch.update(doc(db, 'students', id), {
           isArchived: true,
@@ -120,6 +176,23 @@ export function StudentsPage() {
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
         });
+        // Архивация студента должна убирать его из ростеров групп — иначе
+        // группа продолжает показывать давно архивного студента.
+        for (const e of enrollments) {
+          if (e.studentId !== id) continue;
+          batch.update(doc(db, 'enrollments', e.id), {
+            status: 'archived',
+            isArchived: true,
+            updatedAt: serverTimestamp(),
+            updatedBy: user.uid,
+          });
+          if (e.status === 'active' || e.status === 'trial' || e.status === 'paused') {
+            groupsToDecrement.add(e.groupId);
+          }
+        }
+      }
+      for (const groupId of groupsToDecrement) {
+        batch.update(doc(db, 'groups', groupId), { studentsCount: increment(-1) });
       }
       await batch.commit();
       showToast(`В архив: ${selected.size}.`);
@@ -147,6 +220,7 @@ export function StudentsPage() {
     {
       key: '__select',
       label: '',
+      width: '48px',
       render: (st) => (
         <input
           type="checkbox"
@@ -159,6 +233,7 @@ export function StudentsPage() {
     {
       key: 'fullName',
       label: 'Имя',
+      width: 'minmax(220px, 1.5fr)',
       render: (st) => (
         <span className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-alt text-[13px] font-bold text-muted">
@@ -201,79 +276,165 @@ export function StudentsPage() {
       label: 'Дата добавления',
       render: (st) => formatDate(st.createdAt),
     },
+    ...(section === 'all' || section === 'left' || section === 'paused'
+      ? [
+          {
+            key: 'duration',
+            label: 'Обучается',
+            render: (st) => formatDuration(st.createdAt, section === 'left' ? st.leftAt : null),
+          },
+        ]
+      : []),
     {
       key: 'balance',
       label: 'Баланс',
-      render: (st) => <span className={st.balance < 0 ? 'text-danger' : 'text-success'}>{formatMoney(st.balance)}</span>,
+      render: (st) => <span className={st.balance > 0 ? 'text-success' : 'text-danger'}>{formatMoney(st.balance)}</span>,
     },
   ];
+  const trialColumns = columns.filter((c) => c.key !== 'teachers');
+
+  if (!section) {
+    return (
+      <>
+        <PageHeader title="Студенты" />
+        <div className="flex flex-col gap-3">
+          {SECTION_TABS.map((t) => {
+            const Icon = t.icon;
+            return (
+              <Card
+                key={t.key}
+                hoverable
+                className="flex cursor-pointer items-center gap-4 p-5"
+                onClick={() => setSection(t.key)}
+              >
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
+                  <Icon className="h-6 w-6" strokeWidth={1.75} />
+                </span>
+                <span className="flex-1">
+                  <span className="block text-[17px] font-bold text-text">{t.label}</span>
+                  <span className="block text-[13px] text-muted">{t.description}</span>
+                </span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
+              </Card>
+            );
+          })}
+        </div>
+
+        <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} />
+      </>
+    );
+  }
 
   return (
     <>
       <PageHeader
         title="Студенты"
-        count={filtered.length}
+        count={section === 'attendance' ? undefined : filtered.length}
         actions={
-          <>
-            {selected.size > 0 && (
-              <>
-                <Button variant="secondary" onClick={() => setSmsOpen(true)}>
-                  <MessageSquare className="h-4 w-4" /> SMS ({selected.size})
-                </Button>
-                <Button variant="danger" onClick={bulkArchive}>
-                  В архив ({selected.size})
-                </Button>
-              </>
-            )}
-            <Button variant="secondary" onClick={exportSelected} disabled={filtered.length === 0}>
-              <Download className="h-4 w-4" /> Экспорт{selected.size > 0 ? ` (${selected.size})` : ''}
-            </Button>
-            <Button onClick={() => setModalStudent({})}>
-              <Plus className="h-4 w-4" /> Добавить
-            </Button>
-          </>
+          section === 'attendance' ? null : (
+            <>
+              {selected.size > 0 && (
+                <>
+                  <Button variant="secondary" onClick={() => setSmsOpen(true)}>
+                    <MessageSquare className="h-4 w-4" /> SMS ({selected.size})
+                  </Button>
+                  <Button variant="danger" onClick={bulkArchive}>
+                    В архив ({selected.size})
+                  </Button>
+                </>
+              )}
+              <Button variant="secondary" onClick={exportSelected} disabled={filtered.length === 0}>
+                <Download className="h-4 w-4" /> Экспорт{selected.size > 0 ? ` (${selected.size})` : ''}
+              </Button>
+              <Button onClick={() => setModalStudent({})}>
+                <Plus className="h-4 w-4" /> Добавить
+              </Button>
+            </>
+          )
         }
       />
 
-      <FilterBar onReset={resetFilters}>
-        <Input placeholder="Поиск по имени или телефону" value={search} onChange={(e) => setFilter({ q: e.target.value })} className="w-64" />
-        <Select options={STATUS_OPTIONS} value={status} onChange={(e) => setFilter({ status: e.target.value })} className="w-44" />
-        <label className="flex h-11 items-center gap-2 rounded-field border border-border-strong px-3 text-[15px] text-text">
-          <input type="checkbox" checked={onlyDebtors} onChange={(e) => setFilter({ debtors: e.target.checked ? '1' : '' })} />
-          Только должники
-        </label>
-      </FilterBar>
+      <button type="button" onClick={goToLanding} className="mb-6 flex items-center gap-1 text-[15px] text-link">
+        <ArrowLeft className="h-4 w-4" /> Все разделы
+      </button>
 
-      {loading && (
-        <div className="flex flex-col gap-2">
-          <SkeletonRow columns={6} />
-          <SkeletonRow columns={6} />
-          <SkeletonRow columns={6} />
-        </div>
-      )}
-
-      {error && <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>}
-
-      {!loading && !error && filtered.length === 0 && (
-        <EmptyState icon={CircleUserRound} title="Пока нет ни одного студента" actionLabel="Добавить" onAction={() => setModalStudent({})} />
-      )}
-
-      {!loading && !error && filtered.length > 0 && (
+      {section === 'attendance' ? (
+        <AttendanceByTeacher />
+      ) : (
         <>
-          <Table columns={columns} rows={pageRows} onRowClick={(st) => navigate(`/students/${st.id}`)} />
-          {totalPages > 1 && (
-            <div className="mt-4 flex justify-center gap-2">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPage(n)}
-                  className={`h-9 w-9 rounded-full text-[15px] ${n === pageClamped ? 'bg-navy text-white' : 'text-text hover:bg-surface-alt'}`}
-                >
-                  {n}
-                </button>
+          <FilterBar onReset={resetFilters}>
+            <Input placeholder="Поиск по имени или телефону" value={search} onChange={(e) => setFilter({ q: e.target.value })} className="w-64" />
+            {section === 'all' && (
+              <>
+                <Select options={STATUS_OPTIONS} value={status} onChange={(e) => setFilter({ status: e.target.value })} className="w-44" />
+                <label className="flex h-11 items-center gap-2 rounded-field border border-border-strong px-3 text-[15px] text-text">
+                  <input type="checkbox" checked={onlyDebtors} onChange={(e) => setFilter({ debtors: e.target.checked ? '1' : '' })} />
+                  Только должники
+                </label>
+              </>
+            )}
+          </FilterBar>
+
+          {section === 'all' && !loading && filtered.length > 0 && (
+            <p className="mb-3 text-[13px] text-muted">
+              Средний срок обучения: <span className="font-bold text-text">{formatAvgMonths(filtered)}</span>
+            </p>
+          )}
+
+          {loading && (
+            <div className="flex flex-col gap-2">
+              <SkeletonRow columns={6} />
+              <SkeletonRow columns={6} />
+              <SkeletonRow columns={6} />
+            </div>
+          )}
+
+          {error && <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>}
+
+          {!loading && !error && filtered.length === 0 && (
+            <EmptyState
+              icon={section === 'paused' ? Snowflake : section === 'trial' ? GraduationCap : CircleUserRound}
+              title={
+                section === 'debtors' ? 'Должников нет' :
+                section === 'left' ? 'Никто не уходил' :
+                section === 'paused' ? 'Замороженных нет' :
+                section === 'trial' ? 'Никого нет на пробном' :
+                'Пока нет ни одного студента'
+              }
+              actionLabel={section === 'all' ? 'Добавить' : undefined}
+              onAction={section === 'all' ? () => setModalStudent({}) : undefined}
+            />
+          )}
+
+          {!loading && !error && filtered.length > 0 && section === 'trial' && (
+            <div className="flex flex-col gap-6">
+              {trialByTeacher.map(([teacherName, students]) => (
+                <Card key={teacherName}>
+                  <h3 className="mb-4 text-[15px] font-bold text-text">{teacherName}</h3>
+                  <Table columns={trialColumns} rows={students} onRowClick={(st) => navigate(`/students/${st.id}`)} />
+                </Card>
               ))}
             </div>
+          )}
+
+          {!loading && !error && filtered.length > 0 && section !== 'trial' && (
+            <>
+              <Table columns={columns} rows={pageRows} onRowClick={(st) => navigate(`/students/${st.id}`)} />
+              {totalPages > 1 && (
+                <div className="mt-4 flex justify-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setPage(n)}
+                      className={`h-9 w-9 rounded-full text-[15px] ${n === pageClamped ? 'bg-navy text-white' : 'text-text hover:bg-surface-alt'}`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </>
       )}

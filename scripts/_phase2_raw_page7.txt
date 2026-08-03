@@ -1,0 +1,50 @@
+05.06.2026	Muxlisa Mahmudova	840 000 UZS	Click	MS KAMILLA	R20	Doniyor Shavkatov	05.06.2026 17:14:05
+05.06.2026	Asadbek Ergashev	840 000 UZS	Click	MS KRISTINA	R6	Doniyor Shavkatov	05.06.2026 17:12:13
+05.06.2026	Osiyo Oltoyxodjaeva	372 000 UZS	Cash		I34	Doniyor Shavkatov	05.06.2026 16:01:38
+05.06.2026	Asadbek Habibullayev	670 000 UZS	Cash	MR SANJAR	I4	Doniyor Shavkatov	05.06.2026 15:45:26
+05.06.2026	Habiba To'xtasinova	840 000 UZS	Cash	MS KAMILLA	R18	Muqaddas Jo'rayeva	05.06.2026 14:45:57
+05.06.2026	Komiljon Dilmurodov	840 000 UZS	Click	MS KRISTINA	R4	Muqaddas Jo'rayeva	05.06.2026 14:21:06
+05.06.2026	Omina Mirsamatova	840 000 UZS	Cash	MS KRISTINA	R4	Muqaddas Jo'rayeva	05.06.2026 13:21:35
+04.06.2026	Aydin Adilova	800 000 UZS	Click	MS KRISTINA	R6	Doniyor Shavkatov	05.06.2026 15:08:24
+04.06.2026	Oybek Shavkatov	890 000 UZS	Cash	MR SANJAR	I14	Doniyor Shavkatov	04.06.2026 20:21:07
+04.06.2026	Hadicha Gafurova	370 000 UZS	Cash	MR SANJAR	I7	Doniyor Shavkatov	04.06.2026 20:16:49
+04.06.2026	Shohjahon Axmatov	70 000 UZS	Click	MS KRISTINA	R14	Doniyor Shavkatov	04.06.2026 20:03:46
+04.06.2026	Xadicha Abdunosirova	840 000 UZS	Cash	MS KRISTINA	R9	Doniyor Shavkatov	04.06.2026 20:00:28
+04.06.2026	Mamura Mamatova	20 000 UZS	Cash	MS SHAXZODA	R42	Doniyor Shavkatov	04.06.2026 19:11:05
+04.06.2026	Dilsora Xabibullayeva	840 000 UZS	Cash	MS SHAXZODA	R41	Doniyor Shavkatov	04.06.2026 18:57:08
+04.06.2026	Mirazim Mirjalolov	890 000 UZS	Cash	MR SANJAR	I13	Doniyor Shavkatov	04.06.2026 18:44:05
+04.06.2026	Sanjar Akbarov	890 000 UZS	Click	MR SANJAR	I14	Doniyor Shavkatov	04.06.2026 18:01:32
+04.06.2026	Gulnora Rozimboyeva	840 000 UZS	Click	MR SANJAR	I13	Doniyor Shavkatov	04.06.2026 16:56:45
+04.06.2026	Shohruh Qudratov	840 000 UZS	Click	MS KRISTINA	R9	Doniyor Shavkatov	04.06.2026 15:55:37
+04.06.2026	Azamat Ergashev	140 000 UZS	Cash	MR SANJAR	I12	Doniyor Shavkatov	04.06.2026 15:42:55
+04.06.2026	Bekjan Sadibekov	400 000 UZS	Cash	MS SHAXZODA	R40	Doniyor Shavkatov	04.06.2026 15:33:36
+04.06.2026	Zulfiya Safarova	840 000 UZS	Click	MS KRISTINA	R13	Doniyor Shavkatov	04.06.2026 15:23:02
+04.06.2026	Saidafzal Mirzayev	840 000 UZS	Click	MS KRISTINA	R11	Doniyor Shavkatov	04.06.2026 14:45:29
+04.06.2026	Mubina Yaqubhajjayeva	840 000 UZS	UZCARD	MS KRISTINA	R11	Doniyor Shavkatov	04.06.2026 14:38:10
+03.06.2026	Jafar Sayfiddinov	450 000 UZS	Cash			Doniyor Shavkatov	03.06.2026 18:32:31
+03.06.2026	Sevinch Muxammadiyeva	840 000 UZS	Cash	MS KRISTINA	R5	Doniyor Shavkatov	03.06.2026 17:35:26
+03.06.2026	Sobirjonov Muhammadali	890 000 UZS	Cash	MR SANJAR	I5	Doniyor Shavkatov	03.06.2026 17:05:23
+03.06.2026	Kamron Kenjayev	890 000 UZS	Cash		I42	Muqaddas Jo'rayeva	03.06.2026 16:53:44
+03.06.2026	Zebunisiso Axmedova	100 000 UZS	Click	MS KAMILLA	R20	Doniyor Shavkatov	03.06.2026 16:48:03
+03.06.2026	Malika Anvarova	500 000 UZS	Click	MS KRISTINA	R12	Doniyor Shavkatov	03.06.2026 16:46:28
+03.06.2026	Diyorbek Komiljonov	840 000 UZS	Click	MS ZIYODA (BETA)	R30	Muqaddas Jo'rayeva	03.06.2026 11:21:51
+03.06.2026	Nodirxo'ja Muzaffarov	840 000 UZS	Cash	MS ZIYODA (BETA)	R29	Muqaddas Jo'rayeva	03.06.2026 11:07:56
+03.06.2026	Muslima Dilmurodova	890 000 UZS	Click		I40	Muqaddas Jo'rayeva	03.06.2026 10:21:53
+02.06.2026	Ixtiyor Sultonov	840 000 UZS	Click	MS KRISTINA	R7	Doniyor Shavkatov	02.06.2026 19:25:53
+02.06.2026	Mamura Mamatova	820 000 UZS	Cash	MS SHAXZODA	R42	Doniyor Shavkatov	02.06.2026 18:52:07
+02.06.2026	Muhammadziyo Abdulxamidov	840 000 UZS	UZCARD	MS SHAXZODA	R42	Doniyor Shavkatov	02.06.2026 18:41:48
+02.06.2026	Komila Egamberdiyeva	420 000 UZS	Click	MS SHAXZODA	R42	Doniyor Shavkatov	02.06.2026 18:27:37
+02.06.2026	Nodir Yodgorov	750 000 UZS	Click	MR SANJAR	I5	Doniyor Shavkatov	02.06.2026 17:19:15
+02.06.2026	Saidabror G`aniyev	890 000 UZS	Click	MR SANJAR	I13	Doniyor Shavkatov	02.06.2026 17:07:09
+02.06.2026	Zebunisiso Axmedova	600 000 UZS	Cash	MS KAMILLA	R20	Doniyor Shavkatov	02.06.2026 16:56:38
+02.06.2026	Azamat Ergashev	750 000 UZS	Cash	MR SANJAR	I12	Muqaddas Jo'rayeva	02.06.2026 15:14:06
+02.06.2026	Bobur Sirojiddinov	840 000 UZS	Cash	MS ZIYODA (BETA)	R29	Muqaddas Jo'rayeva	02.06.2026 12:22:37
+02.06.2026	Yunus Hamdamov	840 000 UZS	Click	MS KRISTINA	R9	Muqaddas Jo'rayeva	02.06.2026 10:50:51
+01.06.2026	Bahodir Aripov	840 000 UZS	Click	MS KRISTINA	R11	Doniyor Shavkatov	01.06.2026 20:06:56
+01.06.2026	Azim Beginqulov	850 000 UZS	Cash	MS KRISTINA	R7	Doniyor Shavkatov	01.06.2026 19:13:21
+01.06.2026	Zubayr Ochilov	420 000 UZS	Click	MS KRISTINA	R6	Doniyor Shavkatov	01.06.2026 18:44:28
+01.06.2026	Munisa Karimova	840 000 UZS	Click	MS KRISTINA	R4	Muqaddas Jo'rayeva	01.06.2026 15:40:14
+01.06.2026	Robiya Abdug'aniyeva	840 000 UZS	Cash	MS KRISTINA	R4	Muqaddas Jo'rayeva	01.06.2026 15:31:22
+01.06.2026	Jahongir G`oyibov	840 000 UZS	Cash	MS KRISTINA	R6	Muqaddas Jo'rayeva	01.06.2026 15:23:47
+01.06.2026	Munisa Norboyeva	220 000 UZS	Click	MS ZIYODA (BETA)	R30	Muqaddas Jo'rayeva	01.06.2026 12:36:14
+01.06.2026	Dilnora Nomozova	420 000 UZS	Cash	MS ZIYODA (BETA)	R30	Muqaddas Jo'rayeva	01.06.2026 12:34:52

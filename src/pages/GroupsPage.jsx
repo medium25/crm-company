@@ -217,7 +217,7 @@ export function GroupsPage() {
   };
 
   const columns = [
-    { key: '__index', label: '№', render: (_g, i) => (pageClamped - 1) * PAGE_SIZE + i + 1 },
+    { key: '__index', label: '№', width: '48px', render: (_g, i) => (pageClamped - 1) * PAGE_SIZE + i + 1 },
     ...ALL_COLUMNS.filter((c) => visibleColumns.includes(c.key)).map((c) => ({ ...c, render: renderers[c.key] })),
   ];
 

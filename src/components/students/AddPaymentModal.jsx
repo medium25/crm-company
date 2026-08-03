@@ -17,8 +17,10 @@ const METHOD_OPTIONS = [
   { value: 'click', label: 'Click' },
   { value: 'payme', label: 'Payme' },
   { value: 'uzum', label: 'Uzum' },
+  { value: 'uzcard', label: 'Uzcard' },
+  { value: 'humo', label: 'Humo' },
   { value: 'card', label: 'Карта' },
-  { value: 'transfer', label: 'Перечисление' },
+  { value: 'transfer', label: 'Банковский перевод' },
 ];
 
 /**

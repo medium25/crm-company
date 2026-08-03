@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, ChevronDown } from 'lucide-react';
 
 /**
- * Меню ⋮ в строках таблиц и карточках (Учителя, Группы, Студенты).
+ * Меню ⋮ в строках таблиц и карточках (Учителя, Группы, Студенты). Триггер
+ * по умолчанию — круглая кнопка с ⋮; для сплит-кнопок (карточка студента)
+ * передаётся `variant="chevron"` — узкая стрелка ▾, встраиваемая вплотную
+ * к основной кнопке в общую пилюлю.
  * @param {Object} props
  * @param {Array<{label: string, onClick: () => void, danger?: boolean}>} props.items
+ * @param {'icon'|'chevron'} [props.variant]
  */
-export function DropdownMenu({ items }) {
+export function DropdownMenu({ items, variant = 'icon' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -31,13 +35,17 @@ export function DropdownMenu({ items }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+        className={
+          variant === 'chevron'
+            ? 'flex h-11 w-9 items-center justify-center border-l border-navy text-navy hover:bg-orange-soft/40'
+            : 'flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt'
+        }
         aria-label="Действия"
       >
-        <MoreVertical className="h-4 w-4" />
+        {variant === 'chevron' ? <ChevronDown className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-10 w-52 rounded-field border border-border bg-surface py-2 shadow-hover">
+        <div className="absolute right-0 top-11 z-10 w-52 rounded-field border border-border bg-surface py-2 shadow-hover">
           {items.map((item) => (
             <button
               key={item.label}

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { collection, doc, query, where, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { ArrowLeft, Pencil, Mail, Archive, History, Flag, FolderPlus, Wallet, CircleUserRound, RefreshCw } from 'lucide-react';
+import { collection, doc, query, where, orderBy, updateDoc, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
+import { ArrowLeft, Pencil, Mail, Archive, History, Flag, FolderPlus, Wallet, CircleUserRound, RefreshCw, Trash2, Image as ImageIcon } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useRole } from '../hooks/useRole.js';
+import { useBranch } from '../hooks/useBranch.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { useCollection } from '../hooks/useCollection.js';
 import { useToast } from '../components/ui/Toast.jsx';
@@ -22,13 +23,15 @@ import { AddToGroupModal } from '../components/students/AddToGroupModal.jsx';
 import { EnrollmentCard } from '../components/students/EnrollmentCard.jsx';
 import { FreezeEnrollmentModal } from '../components/students/FreezeEnrollmentModal.jsx';
 import { LeaveGroupModal } from '../components/students/LeaveGroupModal.jsx';
+import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
 import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
 import { ManualChargeModal } from '../components/students/ManualChargeModal.jsx';
 import { ReverseTransactionModal } from '../components/students/ReverseTransactionModal.jsx';
+import { EditChargeModal } from '../components/students/EditChargeModal.jsx';
 import { CommentsTab } from '../components/shared/CommentsTab.jsx';
 import { HistoryTab } from '../components/shared/HistoryTab.jsx';
 import { CallLogsTab } from '../components/students/CallLogsTab.jsx';
-import { recalcBalance } from '../lib/billing.js';
+import { recalcBalance, reverseTransaction, deletePayment } from '../lib/billing.js';
 import { formatDateLong, formatDate, formatMoney, formatMoneySigned, formatMonth, formatPhone } from '../lib/format.js';
 
 const TABS = [
@@ -48,8 +51,9 @@ function BalanceBadge({ balance }) {
 export function StudentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, staff } = useAuth();
   const { isFinance } = useRole();
+  const { branches } = useBranch();
   const { showToast } = useToast();
 
   const studentRef = useMemo(() => (db ? doc(db, 'students', id) : null), [id]);
@@ -78,6 +82,7 @@ export function StudentDetailPage() {
   const [addToGroupOpen, setAddToGroupOpen] = useState(false);
   const [freezeTarget, setFreezeTarget] = useState(null);
   const [leaveTarget, setLeaveTarget] = useState(null);
+  const [activateTarget, setActivateTarget] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [note, setNote] = useState('');
@@ -85,6 +90,9 @@ export function StudentDetailPage() {
   const [manualChargeOpen, setManualChargeOpen] = useState(false);
   const [reverseOpen, setReverseOpen] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [editTxTarget, setEditTxTarget] = useState(null);
 
   if (loading) {
     return (
@@ -98,6 +106,7 @@ export function StudentDetailPage() {
   if (!student) return <EmptyState icon={CircleUserRound} title="Студент не найден" />;
 
   const noteValue = note || student.note || '';
+  const branchName = branches.find((b) => b.id === student.branchId)?.name ?? student.branchId;
 
   const saveNote = async () => {
     if (noteValue === student.note) return;
@@ -128,15 +137,49 @@ export function StudentDetailPage() {
     }
   };
 
+  const confirmDeletePayment = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deletePayment(db, deleteTarget);
+      showToast('Платёж удалён.');
+    } catch {
+      showToast('Не удалось удалить платёж.', { type: 'error' });
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
   const confirmArchive = async () => {
     setArchiving(true);
     try {
-      await updateDoc(doc(db, 'students', id), {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'students', id), {
         isArchived: true,
         archivedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });
+      // Архивация студента должна убирать его из ростеров групп — иначе
+      // группа продолжает показывать давно архивного студента (enrollment
+      // сам по себе не архивируется вместе со студентом).
+      const groupsToDecrement = new Set();
+      for (const e of enrollments) {
+        batch.update(doc(db, 'enrollments', e.id), {
+          status: 'archived',
+          isArchived: true,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        });
+        if (e.status === 'active' || e.status === 'trial' || e.status === 'paused') {
+          groupsToDecrement.add(e.groupId);
+        }
+      }
+      for (const groupId of groupsToDecrement) {
+        batch.update(doc(db, 'groups', groupId), { studentsCount: increment(-1) });
+      }
+      await batch.commit();
       showToast('Студент перенесён в архив.');
       navigate('/students');
     } catch {
@@ -155,17 +198,17 @@ export function StudentDetailPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
         <Card className="flex flex-col gap-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-alt text-2xl font-bold text-muted">
-                {student.fullName[0]}
+          <div className="flex items-stretch justify-between">
+            <div className="flex flex-col items-start gap-3">
+              <span className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-alt text-muted">
+                <ImageIcon className="h-8 w-8" strokeWidth={1.5} />
               </span>
               <div>
                 <p className="text-[20px] font-bold text-text">{student.fullName}</p>
                 <p className="text-[13px] text-muted">(id: {student.publicId})</p>
               </div>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col justify-between">
               <Button variant="icon-round" tone="navy" onClick={() => setEditing(true)} aria-label="Редактировать">
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -183,55 +226,70 @@ export function StudentDetailPage() {
 
           <div className="flex items-center gap-2">
             <BalanceBadge balance={student.balance} />
+            <span className="text-[15px] text-muted">баланс</span>
             <Button variant="icon-round" tone="navy" onClick={handleRecalcBalance} loading={recalculating} aria-label="Пересчитать баланс">
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
 
           <div>
-            <span className="block text-[13px] text-muted">Телефон</span>
+            <span className="text-[13px] text-muted">Телефон: </span>
             <a href={`tel:+${student.phone}`} className="text-[15px] text-link">
               {formatPhone(student.phone)}
             </a>
           </div>
           <div>
-            <span className="block text-[13px] text-muted">Дата добавления</span>
+            <span className="text-[13px] text-muted">Дата добавления: </span>
             <span className="text-[15px] text-text">{formatDateLong(student.createdAt)}</span>
           </div>
-          <div>
-            <span className="block text-[13px] text-muted">Филиалы</span>
-            <span className="text-[15px] text-text">{student.branchId}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-muted">Филиалы: </span>
+            <Badge variant="group-code">{branchName}</Badge>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1">
-            <Button variant="secondary" onClick={() => setAddToGroupOpen(true)}>
+          <div className="flex w-fit items-stretch overflow-hidden rounded-full border border-navy">
+            <button
+              type="button"
+              onClick={() => setAddToGroupOpen(true)}
+              className="flex items-center gap-2 px-4 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+            >
               <FolderPlus className="h-4 w-4" /> Добавить в группу
-            </Button>
+            </button>
             <DropdownMenu
+              variant="chevron"
               items={[
                 { label: 'В существующую группу', onClick: () => setAddToGroupOpen(true) },
                 { label: 'Создать новую группу', onClick: () => navigate('/groups') },
               ]}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-1">
-            <Button variant="secondary" onClick={() => setPaymentOpen(true)}>
+          <div className="flex w-fit items-stretch overflow-hidden rounded-full border border-navy">
+            <button
+              type="button"
+              onClick={() => setPaymentOpen(true)}
+              className="flex items-center gap-2 px-4 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+            >
               <Wallet className="h-4 w-4" /> Добавить оплату
-            </Button>
+            </button>
             <DropdownMenu
+              variant="chevron"
               items={[
                 { label: 'Оплата', onClick: () => setPaymentOpen(true) },
-                ...(isFinance
-                  ? [
-                      { label: 'Ручное списание', onClick: () => setManualChargeOpen(true) },
-                      { label: 'Сторно', onClick: () => setReverseOpen(true) },
-                    ]
-                  : []),
+                ...(isFinance ? [{ label: 'Сторно', onClick: () => setReverseOpen(true) }] : []),
               ]}
             />
           </div>
+          {isFinance && (
+            <button
+              type="button"
+              onClick={() => setManualChargeOpen(true)}
+              className="flex w-fit items-center gap-2 rounded-full border border-navy px-4 py-2 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+            >
+              <Wallet className="h-4 w-4" /> Ручное списание
+            </button>
+          )}
 
-          <div>
+          <div className="rounded-r-field border-l-4 border-l-navy bg-surface-alt/40 py-2 pl-3 pr-2">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-[13px] text-muted">Заметка</span>
               <button type="button" onClick={toggleFlag} aria-label="На контроле">
@@ -239,7 +297,7 @@ export function StudentDetailPage() {
               </button>
             </div>
             <textarea
-              className="min-h-20 w-full rounded-field border border-border-strong p-2 text-[15px] focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
+              className="min-h-20 w-full resize-none bg-transparent text-[15px] text-text focus:outline-none"
               value={noteValue}
               onChange={(e) => setNote(e.target.value)}
               onBlur={saveNote}
@@ -258,7 +316,13 @@ export function StudentDetailPage() {
                   ) : (
                     <div className="flex flex-col gap-4">
                       {enrollments.map((e) => (
-                        <EnrollmentCard key={e.id} enrollment={e} onFreeze={setFreezeTarget} onLeave={setLeaveTarget} />
+                        <EnrollmentCard
+                          key={e.id}
+                          enrollment={e}
+                          onFreeze={setFreezeTarget}
+                          onLeave={setLeaveTarget}
+                          onActivate={setActivateTarget}
+                        />
                       ))}
                     </div>
                   )}
@@ -273,11 +337,11 @@ export function StudentDetailPage() {
                           <div
                             key={mb.id}
                             className={`min-w-32 shrink-0 rounded-field border p-3 text-center ${
-                              mb.balance < 0 ? 'border-danger' : 'border-success'
+                              mb.balance > 0 ? 'border-success' : 'border-danger'
                             }`}
                           >
                             <p className="text-[13px] text-muted">{formatMonth(mb.month)}</p>
-                            <p className={`text-[15px] font-bold ${mb.balance < 0 ? 'text-danger' : 'text-success'}`}>
+                            <p className={`text-[15px] font-bold ${mb.balance > 0 ? 'text-success' : 'text-danger'}`}>
                               {formatMoney(mb.balance)}
                             </p>
                           </div>
@@ -331,6 +395,42 @@ export function StudentDetailPage() {
                               </span>
                             ),
                           },
+                          ...(isFinance
+                            ? [
+                                {
+                                  key: '__actions',
+                                  label: '',
+                                  width: '48px',
+                                  render: (t) => {
+                                    if (t.type === 'payment' && !t.isReversed && !t.id.startsWith('rev_')) {
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={() => setDeleteTarget(t)}
+                                          aria-label="Удалить платёж"
+                                          className="text-muted hover:text-danger"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      );
+                                    }
+                                    if ((t.type === 'charge' || t.type === 'correction') && !t.isReversed && !t.id.startsWith('rev_')) {
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditTxTarget(t)}
+                                          aria-label="Исправить списание"
+                                          className="text-muted hover:text-navy"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </button>
+                                      );
+                                    }
+                                    return null;
+                                  },
+                                },
+                              ]
+                            : []),
                         ]}
                         rows={transactions}
                       />
@@ -355,11 +455,17 @@ export function StudentDetailPage() {
       <AddToGroupModal open={addToGroupOpen} student={student} onClose={() => setAddToGroupOpen(false)} />
       <FreezeEnrollmentModal enrollment={freezeTarget} onClose={() => setFreezeTarget(null)} />
       <LeaveGroupModal enrollment={leaveTarget} onClose={() => setLeaveTarget(null)} />
+      <ActivateEnrollmentModal
+        enrollment={activateTarget}
+        student={student}
+        onClose={() => setActivateTarget(null)}
+      />
       <AddPaymentModal open={paymentOpen} student={student} enrollments={enrollments} onClose={() => setPaymentOpen(false)} />
       {isFinance && (
         <>
           <ManualChargeModal open={manualChargeOpen} student={student} onClose={() => setManualChargeOpen(false)} />
           <ReverseTransactionModal open={reverseOpen} transactions={transactions} onClose={() => setReverseOpen(false)} />
+          <EditChargeModal open={Boolean(editTxTarget)} student={student} transaction={editTxTarget} onClose={() => setEditTxTarget(null)} />
         </>
       )}
 
@@ -371,6 +477,16 @@ export function StudentDetailPage() {
         title="Архивировать студента"
         message={`Перенести «${student.fullName}» в архив? История и записи останутся доступны.`}
         confirmLabel="В архив"
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDeletePayment}
+        loading={deleting}
+        title="Удалить платёж"
+        message={deleteTarget ? `Удалить платёж на ${formatMoney(deleteTarget.amount)} от ${formatDate(deleteTarget.date)}? Баланс студента пересчитается.` : ''}
+        confirmLabel="Удалить"
       />
     </>
   );

@@ -20,7 +20,9 @@ export const DatePicker = forwardRef(function DatePicker(
         <input
           ref={ref}
           type="date"
-          className={`h-11 w-full rounded-field border bg-white pl-9 pr-3 text-[15px] text-text focus:outline-none focus:ring-2 focus:ring-navy/15 ${
+          onClick={(e) => e.currentTarget.showPicker?.()}
+          onFocus={(e) => e.currentTarget.showPicker?.()}
+          className={`date-input h-11 w-full rounded-field border bg-white pl-10 pr-3 text-[15px] text-text focus:outline-none focus:ring-2 focus:ring-navy/15 ${
             error ? 'border-danger' : 'border-border-strong focus:border-navy'
           } ${className}`}
           {...rest}
