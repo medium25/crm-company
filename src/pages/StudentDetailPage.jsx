@@ -52,7 +52,7 @@ export function StudentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, staff } = useAuth();
-  const { isFinance } = useRole();
+  const { isAdmin } = useRole();
   const { branches } = useBranch();
   const { showToast } = useToast();
 
@@ -275,11 +275,11 @@ export function StudentDetailPage() {
               variant="chevron"
               items={[
                 { label: 'Оплата', onClick: () => setPaymentOpen(true) },
-                ...(isFinance ? [{ label: 'Сторно', onClick: () => setReverseOpen(true) }] : []),
+                ...(isAdmin ? [{ label: 'Сторно', onClick: () => setReverseOpen(true) }] : []),
               ]}
             />
           </div>
-          {isFinance && (
+          {isAdmin && (
             <button
               type="button"
               onClick={() => setManualChargeOpen(true)}
@@ -395,7 +395,7 @@ export function StudentDetailPage() {
                               </span>
                             ),
                           },
-                          ...(isFinance
+                          ...(isAdmin
                             ? [
                                 {
                                   key: '__actions',
@@ -461,7 +461,7 @@ export function StudentDetailPage() {
         onClose={() => setActivateTarget(null)}
       />
       <AddPaymentModal open={paymentOpen} student={student} enrollments={enrollments} onClose={() => setPaymentOpen(false)} />
-      {isFinance && (
+      {isAdmin && (
         <>
           <ManualChargeModal open={manualChargeOpen} student={student} onClose={() => setManualChargeOpen(false)} />
           <ReverseTransactionModal open={reverseOpen} transactions={transactions} onClose={() => setReverseOpen(false)} />

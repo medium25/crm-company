@@ -8,7 +8,7 @@ const AuthContext = createContext(null);
 // Только для локальной разработки без настоящего Firebase-проекта — см. .env.example.
 // В деплое VITE_DEV_BYPASS_AUTH не ставим, никогда.
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
-const DEV_ROLE = import.meta.env.VITE_DEV_BYPASS_ROLE || 'owner';
+const DEV_ROLE = import.meta.env.VITE_DEV_BYPASS_ROLE || 'ceo';
 const DEV_USER = { uid: 'dev-bypass-uid', email: 'dev@icon.local' };
 const DEV_STAFF = {
   id: 'dev-bypass-uid',

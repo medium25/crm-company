@@ -1,21 +1,26 @@
+import { useState } from 'react';
 import { collection, doc, orderBy, query, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Users } from 'lucide-react';
+import { Users, Plus, Link as LinkIcon } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Table } from '../ui/Table.jsx';
 import { Select } from '../ui/Select.jsx';
+import { Button } from '../ui/Button.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { SkeletonRow } from '../ui/Skeleton.jsx';
 import { Badge } from '../ui/Badge.jsx';
+import { AddStaffModal } from './AddStaffModal.jsx';
 
 const ROLE_OPTIONS = [
-  { value: 'owner', label: 'Владелец' },
+  { value: 'ceo', label: 'CEO' },
+  { value: 'manager', label: 'Менеджер' },
   { value: 'admin', label: 'Администратор' },
   { value: 'teacher', label: 'Учитель' },
-  { value: 'accountant', label: 'Бухгалтер' },
 ];
+
+const LOGIN_URL = `${window.location.origin}${window.location.pathname}#/login`;
 
 // Модуль грузится один раз — стабильная ссылка достаточна, useMemo тут не нужен.
 const staffQuery = db ? query(collection(db, 'staff'), orderBy('fullName')) : null;
@@ -24,6 +29,16 @@ export function StaffSettingsTab() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { data: staffList, loading, error } = useCollection(staffQuery);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const copyLoginLink = async () => {
+    try {
+      await navigator.clipboard.writeText(LOGIN_URL);
+      showToast('Ссылка для входа скопирована.');
+    } catch {
+      showToast('Не удалось скопировать ссылку.', { type: 'error' });
+    }
+  };
 
   const handleRoleChange = async (member, role) => {
     try {
@@ -47,19 +62,47 @@ export function StaffSettingsTab() {
     }
   };
 
+  const addButton = (
+    <div className="mb-4 flex items-center justify-end">
+      <Button onClick={() => setAddOpen(true)}>
+        <Plus className="h-4 w-4" /> Добавить сотрудника
+      </Button>
+    </div>
+  );
+
+  const modal = <AddStaffModal open={addOpen} onClose={() => setAddOpen(false)} />;
+
   if (loading) {
     return (
-      <div className="flex flex-col gap-2">
-        <SkeletonRow columns={4} />
-        <SkeletonRow columns={4} />
-      </div>
+      <>
+        {addButton}
+        <div className="flex flex-col gap-2">
+          <SkeletonRow columns={4} />
+          <SkeletonRow columns={4} />
+        </div>
+        {modal}
+      </>
     );
   }
 
-  if (error) return <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>;
+  if (error) {
+    return (
+      <>
+        {addButton}
+        <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>
+        {modal}
+      </>
+    );
+  }
 
   if (staffList.length === 0) {
-    return <EmptyState icon={Users} title="Пока нет ни одного сотрудника" />;
+    return (
+      <>
+        {addButton}
+        <EmptyState icon={Users} title="Пока нет ни одного сотрудника" />
+        {modal}
+      </>
+    );
   }
 
   const columns = [
@@ -96,7 +139,22 @@ export function StaffSettingsTab() {
         </button>
       ),
     },
+    {
+      key: '__link',
+      label: '',
+      render: () => (
+        <button type="button" onClick={copyLoginLink} className="text-muted hover:text-navy" aria-label="Скопировать ссылку для входа">
+          <LinkIcon className="h-4 w-4" />
+        </button>
+      ),
+    },
   ];
 
-  return <Table columns={columns} rows={staffList} />;
+  return (
+    <>
+      {addButton}
+      <Table columns={columns} rows={staffList} />
+      {modal}
+    </>
+  );
 }

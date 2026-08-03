@@ -5,7 +5,7 @@
  *
  * Нужны переменные окружения (кроме VITE_FB_* из .env):
  *   SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD — существующий пользователь Firebase Auth,
- *   станет владельцем (staff.role = 'owner'), если ещё не заведён в staff.
+ *   станет CEO (staff.role = 'ceo'), если ещё не заведён в staff.
  *
  * План Spark — Cloud Functions не используем, пишем клиентским SDK от имени
  * этого пользователя. Firestore Rules на момент сидирования должны разрешать
@@ -61,10 +61,10 @@ async function main() {
   const stamp = { createdAt: serverTimestamp(), createdBy: user.uid, updatedAt: serverTimestamp(), updatedBy: user.uid };
 
   batch.set(doc(db, 'staff', user.uid), {
-    fullName: 'Owner',
+    fullName: 'CEO',
     phone: '',
     email: SEED_ADMIN_EMAIL,
-    role: 'owner',
+    role: 'ceo',
     branchIds: [BRANCH_ID],
     teacherId: null,
     isActive: true,

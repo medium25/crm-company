@@ -29,11 +29,11 @@ const ITEMS = [
   { key: 'settings', to: '/settings', label: 'Настройки', icon: Settings },
 ];
 
-/** [достроено] грубая матрица видимости пунктов меню по роли, уточняется по ходу фаз 1-8. */
+/** ceo/manager/admin — полный доступ, teacher — только свои группы. */
 const ROLE_ITEM_KEYS = {
-  owner: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
-  admin: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports'],
-  accountant: ['dashboard', 'students', 'payments', 'reports'],
+  ceo: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
+  manager: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
+  admin: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
   teacher: ['dashboard', 'groups'],
 };
 

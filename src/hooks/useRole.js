@@ -2,14 +2,13 @@ import { useAuth } from './useAuth.js';
 
 /**
  * Права читаются и здесь (UI), и в Firestore Rules — UI-проверка не защита,
- * а только скрытие недоступных действий.
+ * а только скрытие недоступных действий. ceo/manager/admin — равнозначные
+ * должности полного доступа, между собой ничем не различаются.
  * @returns {{
  *   role: import('../types.js').Role|null,
  *   branchIds: string[],
- *   isOwner: boolean,
  *   isAdmin: boolean,
  *   isTeacher: boolean,
- *   isFinance: boolean,
  *   hasRole: (...roles: import('../types.js').Role[]) => boolean,
  * }}
  */
@@ -21,10 +20,8 @@ export function useRole() {
   return {
     role,
     branchIds,
-    isOwner: role === 'owner',
-    isAdmin: role === 'owner' || role === 'admin',
+    isAdmin: role === 'ceo' || role === 'manager' || role === 'admin',
     isTeacher: role === 'teacher',
-    isFinance: role === 'owner' || role === 'accountant',
     hasRole: (...roles) => roles.includes(role),
   };
 }

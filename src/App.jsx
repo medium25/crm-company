@@ -47,7 +47,7 @@ function App() {
                 <Route
                   path="courses"
                   element={
-                    <ProtectedRoute allow={['owner', 'admin']}>
+                    <ProtectedRoute allow={['ceo', 'manager', 'admin']}>
                       <CoursesPage />
                     </ProtectedRoute>
                   }
@@ -55,7 +55,7 @@ function App() {
                 <Route
                   path="rooms"
                   element={
-                    <ProtectedRoute allow={['owner', 'admin']}>
+                    <ProtectedRoute allow={['ceo', 'manager', 'admin']}>
                       <RoomsPage />
                     </ProtectedRoute>
                   }
@@ -65,7 +65,7 @@ function App() {
                 <Route
                   path="settings"
                   element={
-                    <ProtectedRoute allow={['owner']}>
+                    <ProtectedRoute allow={['ceo', 'manager', 'admin']}>
                       <SettingsPage />
                     </ProtectedRoute>
                   }

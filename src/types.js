@@ -4,7 +4,7 @@
  */
 
 /**
- * @typedef {'owner' | 'admin' | 'teacher' | 'accountant'} Role
+ * @typedef {'ceo' | 'manager' | 'admin' | 'teacher'} Role ceo/manager/admin — равнозначный полный доступ
  */
 
 /**

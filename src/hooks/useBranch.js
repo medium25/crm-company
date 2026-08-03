@@ -9,8 +9,8 @@ const STORAGE_KEY = 'icon-crm:active-branch';
 
 /**
  * Список филиалов, доступных пользователю, и активный филиал (переключатель
- * в топбаре). owner видит все неархивные филиалы, остальные — только свои
- * staff.branchIds.
+ * в топбаре). ceo/manager/admin видят все неархивные филиалы, остальные —
+ * только свои staff.branchIds.
  * @param {{children: import('react').ReactNode}} props
  */
 export function BranchProvider({ children }) {
@@ -18,7 +18,7 @@ export function BranchProvider({ children }) {
 
   const branchesQuery = useMemo(() => {
     if (!db || !staff) return null;
-    if (staff.role === 'owner') {
+    if (staff.role === 'ceo' || staff.role === 'manager' || staff.role === 'admin') {
       return query(collection(db, 'branches'), where('isArchived', '==', false));
     }
     if (!staff.branchIds?.length) return null;
