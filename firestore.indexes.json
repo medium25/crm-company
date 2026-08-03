@@ -271,6 +271,14 @@
       ]
     },
     {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "entityType", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "activityLog",
       "queryScope": "COLLECTION",
       "fields": [

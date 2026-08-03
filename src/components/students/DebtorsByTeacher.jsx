@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { collection, query, where, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { ArrowLeft, CalendarDays, GraduationCap, Flag, MessageSquare, ListTodo, Wallet } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -16,6 +16,10 @@ import { TaskListModal } from './TaskListModal.jsx';
 import { formatPhone, formatMoney, pluralize } from '../../lib/format.js';
 
 const PARITY_LABEL = { even: 'Чётные дни', odd: 'Нечётные дни' };
+
+// Круглый флаг должника — цикл серый → зелёный → красный → серый.
+const FLAG_NEXT = { gray: 'green', green: 'red', red: 'gray' };
+const FLAG_BG = { gray: 'bg-muted', green: 'bg-success', red: 'bg-danger' };
 
 /**
  * «Должники» — не плоский список, а drill-down: чётность дней → учитель →
@@ -52,11 +56,28 @@ export function DebtorsByTeacher() {
   );
   const { data: students, loading: studentsLoading } = useCollection(studentsQuery);
 
-  const loading = groupsLoading || enrollmentsLoading || studentsLoading;
+  // Последний комментарий на студента — виден прямо в списке, без захода в
+  // модалку. Клиентски по всему филиалу, как и остальные срезы здесь —
+  // масштаб одной школы это позволяет.
+  const commentsQuery = useMemo(
+    () => (db ? query(collection(db, 'comments'), where('entityType', '==', 'student'), orderBy('createdAt', 'desc')) : null),
+    [],
+  );
+  const { data: comments, loading: commentsLoading } = useCollection(commentsQuery);
+
+  const loading = groupsLoading || enrollmentsLoading || studentsLoading || commentsLoading;
 
   const studentById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const groupById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
   const debtorIds = useMemo(() => new Set(students.filter((s) => s.balance < 0).map((s) => s.id)), [students]);
+
+  const latestCommentByStudent = useMemo(() => {
+    const map = new Map();
+    for (const c of comments) {
+      if (!map.has(c.entityId)) map.set(c.entityId, c.text);
+    }
+    return map;
+  }, [comments]);
 
   // parity -> teacherId -> { teacherName, entries: [{studentId, groupCode}] }
   const structure = useMemo(() => {
@@ -76,9 +97,10 @@ export function DebtorsByTeacher() {
 
   const parityDebtorCount = (p) => new Set([...structure[p].values()].flatMap((t) => t.entries.map((en) => en.studentId))).size;
 
-  const toggleFlag = async (student) => {
+  const cycleFlag = async (student) => {
+    const next = FLAG_NEXT[student.debtorFlag ?? 'gray'];
     try {
-      await updateDoc(doc(db, 'students', student.id), { isFlagged: !student.isFlagged, updatedAt: serverTimestamp(), updatedBy: user.uid });
+      await updateDoc(doc(db, 'students', student.id), { debtorFlag: next, updatedAt: serverTimestamp(), updatedBy: user.uid });
     } catch {
       showToast('Не удалось обновить флажок.', { type: 'error' });
     }
@@ -165,16 +187,35 @@ export function DebtorsByTeacher() {
       render: (st) => <Badge variant="group-code">{st.groupCode}</Badge>,
     },
     {
+      key: 'comment',
+      label: 'Комментарий',
+      render: (st) => {
+        const text = latestCommentByStudent.get(st.id);
+        return (
+          <button
+            type="button"
+            onClick={() => setCommentTarget(st)}
+            className="flex max-w-[220px] items-center gap-1.5 text-left text-muted hover:text-navy"
+          >
+            <MessageSquare className="h-4 w-4 shrink-0" />
+            <span className="truncate text-[14px]">{text || '—'}</span>
+          </button>
+        );
+      },
+    },
+    {
       key: '__actions',
       label: '',
-      width: '120px',
+      width: '90px',
       render: (st) => (
         <span className="flex items-center gap-3">
-          <button type="button" onClick={() => toggleFlag(st)} aria-label="Флаг">
-            <Flag className={`h-4 w-4 ${st.isFlagged ? 'fill-orange text-orange' : 'text-muted'}`} />
-          </button>
-          <button type="button" onClick={() => setCommentTarget(st)} aria-label="Комментарии" className="text-muted hover:text-navy">
-            <MessageSquare className="h-4 w-4" />
+          <button
+            type="button"
+            onClick={() => cycleFlag(st)}
+            aria-label="Флаг"
+            className={`flex h-7 w-7 items-center justify-center rounded-full ${FLAG_BG[st.debtorFlag ?? 'gray']}`}
+          >
+            <Flag className="h-3.5 w-3.5 fill-white text-white" />
           </button>
           <button type="button" onClick={() => setTaskTarget(st)} aria-label="Задачи" className="text-muted hover:text-navy">
             <ListTodo className="h-4 w-4" />
