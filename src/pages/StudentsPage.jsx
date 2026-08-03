@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
-import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap } from 'lucide-react';
+import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, FileWarning } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -21,6 +21,7 @@ import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
 import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.jsx';
 import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
+import { NoChargeHistoryList } from '../components/students/NoChargeHistoryList.jsx';
 import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
