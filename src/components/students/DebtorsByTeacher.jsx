@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ArrowLeft, CalendarDays, GraduationCap, Flag, MessageSquare, ListTodo, Wallet } from 'lucide-react';
@@ -35,6 +36,7 @@ function effectiveFlag(student, todayStr) {
  * комментарий/задача — прямо в строке, без захода в карточку студента.
  */
 export function DebtorsByTeacher() {
+  const navigate = useNavigate();
   const { activeBranchId } = useBranch();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -184,7 +186,10 @@ export function DebtorsByTeacher() {
       render: (st) => (
         <button
           type="button"
-          onClick={() => cycleFlag(st)}
+          onClick={(e) => {
+            e.stopPropagation();
+            cycleFlag(st);
+          }}
           aria-label="Флаг"
           className={`flex h-7 w-7 items-center justify-center rounded-full ${FLAG_BG[effectiveFlag(st, today)]}`}
         >
@@ -201,7 +206,7 @@ export function DebtorsByTeacher() {
       key: 'phone',
       label: 'Телефон',
       render: (st) => (
-        <a href={`tel:+${st.phone}`} className="text-link">
+        <a href={`tel:+${st.phone}`} onClick={(e) => e.stopPropagation()} className="text-link">
           {formatPhone(st.phone)}
         </a>
       ),
@@ -224,7 +229,10 @@ export function DebtorsByTeacher() {
         return (
           <button
             type="button"
-            onClick={() => setCommentTarget(st)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setCommentTarget(st);
+            }}
             className="flex max-w-[220px] items-center gap-1.5 text-left text-muted hover:text-navy"
           >
             <MessageSquare className="h-4 w-4 shrink-0" />
@@ -238,7 +246,15 @@ export function DebtorsByTeacher() {
       label: '',
       width: '40px',
       render: (st) => (
-        <button type="button" onClick={() => setTaskTarget(st)} aria-label="Задачи" className="text-muted hover:text-navy">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setTaskTarget(st);
+          }}
+          aria-label="Задачи"
+          className="text-muted hover:text-navy"
+        >
           <ListTodo className="h-4 w-4" />
         </button>
       ),
@@ -251,7 +267,11 @@ export function DebtorsByTeacher() {
         <ArrowLeft className="h-4 w-4" /> {structure[parity].get(teacherId)?.teacherName} — назад
       </button>
 
-      {rows.length === 0 ? <EmptyState icon={Wallet} title="Должников нет" /> : <Table columns={columns} rows={rows} />}
+      {rows.length === 0 ? (
+        <EmptyState icon={Wallet} title="Должников нет" />
+      ) : (
+        <Table columns={columns} rows={rows} onRowClick={(st) => navigate(`/students/${st.id}`)} />
+      )}
 
       <CommentsModal student={commentTarget} onClose={() => setCommentTarget(null)} />
       <TaskListModal student={taskTarget} onClose={() => setTaskTarget(null)} />
