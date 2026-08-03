@@ -1,16 +1,34 @@
-# React + Vite
+# ICON CRM
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+CRM для учебного центра ICON Education (Ташкент): группы, студенты,
+посещаемость, оплаты и балансы. React + Vite, Firebase (Auth/Firestore).
 
-Currently, two official plugins are available:
+## Разработка
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+cp .env.example .env   # заполнить VITE_FB_* и SEED_ADMIN_EMAIL/PASSWORD
+npm run dev
+```
 
-## React Compiler
+## Скрипты
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `npm run dev` — локальный сервер разработки
+- `npm run build` — прод-сборка в `dist/`
+- `npm run preview` — предпросмотр прод-сборки
+- `npm run lint` — oxlint
+- `npm run seed` — заводит первого сотрудника (роль `ceo`) и справочники филиала
+- `npm run deploy` — сборка + публикация на GitHub Pages (`gh-pages`)
 
-## Expanding the Oxlint configuration
+## Firebase
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Правила и индексы — `firestore.rules` / `firestore.indexes.json`, деплой:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+## Документация
+
+- [docs/ICON-CRM-SPEC.md](docs/ICON-CRM-SPEC.md) — техническое задание
+- [docs/superpowers/specs/](docs/superpowers/specs/) — спеки отдельных фич
