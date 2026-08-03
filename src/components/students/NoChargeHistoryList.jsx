@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 import { collection, query, where, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Wallet } from 'lucide-react';
 import { db } from '../../firebase.js';
@@ -17,12 +18,17 @@ import { formatPhone, formatMoney, formatDate } from '../../lib/format.js';
 
 const STATUS_LABEL = { active: 'Активен', paused: 'Заморожен', trial: 'Пробный', left: 'Ушёл' };
 
+const CURRENT_MONTH = format(new Date(), 'yyyy-MM');
+
 /**
- * ВРЕМЕННЫЙ раздел — студенты без единой транзакции type=charge (история
- * списаний никогда не переносилась из modme, см. переписку). Админ
- * добавляет реальные списания вручную ("Ручное списание"), затем ставит
- * "Готово" — студент пропадает из списка. После обработки всех — раздел
- * удаляется целиком (компонент + пункт меню в StudentsPage).
+ * ВРЕМЕННЫЙ раздел — студенты без единой транзакции type=charge, а также
+ * студенты с ровно одним charge и он в текущем августе (история списаний
+ * никогда не переносилась из modme, см. переписку). Админ добавляет
+ * реальное списание вручную ("Ручное списание") — если списаний становится
+ * больше одного/не-августовское, студент автоматически уходит из списка по
+ * фильтру. Либо, если других списаний не требуется, ставит "Готово" вручную.
+ * После обработки всех — раздел удаляется целиком (компонент + пункт меню в
+ * StudentsPage).
  */
 export function NoChargeHistoryList() {
   const navigate = useNavigate();
@@ -51,7 +57,14 @@ export function NoChargeHistoryList() {
 
   const loading = studentsLoading || chargesLoading || enrollmentsLoading;
 
-  const studentIdsWithCharge = useMemo(() => new Set(charges.map((c) => c.studentId)), [charges]);
+  const chargesByStudent = useMemo(() => {
+    const map = new Map();
+    for (const c of charges) {
+      if (!map.has(c.studentId)) map.set(c.studentId, []);
+      map.get(c.studentId).push(c);
+    }
+    return map;
+  }, [charges]);
   const enrollmentsByStudent = useMemo(() => {
     const map = new Map();
     for (const e of enrollments) {
@@ -63,8 +76,14 @@ export function NoChargeHistoryList() {
   }, [enrollments]);
 
   const rows = useMemo(
-    () => students.filter((s) => !studentIdsWithCharge.has(s.id) && !s.chargeHistoryReviewed),
-    [students, studentIdsWithCharge],
+    () =>
+      students.filter((s) => {
+        if (s.chargeHistoryReviewed) return false;
+        const own = chargesByStudent.get(s.id) ?? [];
+        if (own.length === 0) return true;
+        return own.length === 1 && own[0].month === CURRENT_MONTH;
+      }),
+    [students, chargesByStudent],
   );
 
   const markDone = async (student) => {
@@ -145,8 +164,10 @@ export function NoChargeHistoryList() {
   return (
     <div>
       <p className="mb-4 text-[13px] text-muted">
-        Временный раздел — {rows.length} студентов без единой перенесённой транзакции списания. Введи реальные
-        списания вручную и отметь «Готово» — уйдёт из списка. Когда список опустеет, раздел удаляется.
+        Временный раздел — {rows.length} студентов без перенесённой истории списаний (включая тех, у кого есть
+        только одно списание за этот август). Введи реальное списание вручную — если оно не единственное или не за
+        этот месяц, студент уйдёт из списка сам. Если других списаний не требуется — отметь «Готово». Когда список
+        опустеет, раздел удаляется.
       </p>
 
       {rows.length === 0 ? (

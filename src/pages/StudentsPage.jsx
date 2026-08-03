@@ -41,6 +41,7 @@ const SECTION_TABS = [
   { key: 'paused', label: 'Замороженные', description: 'Студенты на паузе', icon: Snowflake },
   { key: 'trial', label: 'На пробном уроке', description: 'Пробные, сгруппированы по учителям', icon: GraduationCap },
   { key: 'left', label: 'Покинувшие', description: 'Кто ушёл и сколько успел проучиться', icon: UserX },
+  { key: 'noChargeHistory', label: 'Без истории списаний (врем.)', description: 'Ручной ввод списаний, удалить раздел после обработки всех', icon: FileWarning },
 ];
 
 const PAGE_SIZE = 25;
@@ -331,9 +332,9 @@ export function StudentsPage() {
     <>
       <PageHeader
         title="Студенты"
-        count={section === 'attendance' || section === 'debtors' ? undefined : filtered.length}
+        count={section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' ? undefined : filtered.length}
         actions={
-          section === 'attendance' || section === 'debtors' ? null : (
+          section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' ? null : (
             <>
               {selected.size > 0 && (
                 <>
@@ -364,6 +365,8 @@ export function StudentsPage() {
         <AttendanceByTeacher />
       ) : section === 'debtors' ? (
         <DebtorsByTeacher />
+      ) : section === 'noChargeHistory' ? (
+        <NoChargeHistoryList />
       ) : (
         <>
           <FilterBar onReset={resetFilters}>
