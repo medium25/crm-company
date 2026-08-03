@@ -20,6 +20,7 @@ import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
 import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.jsx';
+import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
 import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
@@ -34,7 +35,7 @@ const STATUS_OPTIONS = [
 
 const SECTION_TABS = [
   { key: 'all', label: 'Все ученики', description: 'Полный список, статус, баланс, срок обучения', icon: CircleUserRound },
-  { key: 'debtors', label: 'Должники', description: 'Активные студенты с отрицательным балансом', icon: Wallet },
+  { key: 'debtors', label: 'Должники', description: 'По чётности дней и учителям', icon: Wallet },
   { key: 'attendance', label: 'Посещаемость', description: 'По учителям — их студенты сразу по всем группам', icon: CalendarCheck },
   { key: 'paused', label: 'Замороженные', description: 'Студенты на паузе', icon: Snowflake },
   { key: 'trial', label: 'На пробном уроке', description: 'Пробные, сгруппированы по учителям', icon: GraduationCap },
@@ -59,16 +60,16 @@ export function StudentsPage() {
   const onlyDebtors = searchParams.get('debtors') === '1';
   const page = Math.max(1, Number(searchParams.get('page') || 1));
 
-  // «Должники»/«Покинувшие»/«Замороженные»/«На пробном» — отдельные секции
-  // с фиксированным фильтром статуса; общий фильтр «Статус» из «Все ученики»
-  // на них не влияет.
+  // «Покинувшие»/«Замороженные»/«На пробном» — отдельные секции с
+  // фиксированным фильтром статуса; общий фильтр «Статус» из «Все ученики»
+  // на них не влияет. «Должники» — свой drill-down компонент, здесь не
+  // участвует.
   const effectiveStatus =
-    section === 'debtors' ? 'active' :
     section === 'left' ? 'left' :
     section === 'paused' ? 'paused' :
     section === 'trial' ? 'trial' :
     status;
-  const effectiveOnlyDebtors = section === 'debtors' ? true : onlyDebtors;
+  const effectiveOnlyDebtors = onlyDebtors;
 
   const setFilter = (patch) => {
     const next = new URLSearchParams(searchParams);
@@ -104,7 +105,7 @@ export function StudentsPage() {
     if (effectiveStatus !== 'all' && effectiveStatus !== 'archived') clauses.push(where('status', '==', effectiveStatus));
     return query(collection(db, 'students'), ...clauses, orderBy('fullName'));
   }, [activeBranchId, effectiveStatus]);
-  const showTable = section === 'all' || section === 'debtors' || section === 'left' || section === 'paused' || section === 'trial';
+  const showTable = section === 'all' || section === 'left' || section === 'paused' || section === 'trial';
   const { data: rawStudents, loading, error } = useCollection(showTable ? studentsQuery : null);
 
   const enrollmentsQuery = useMemo(
@@ -329,9 +330,9 @@ export function StudentsPage() {
     <>
       <PageHeader
         title="Студенты"
-        count={section === 'attendance' ? undefined : filtered.length}
+        count={section === 'attendance' || section === 'debtors' ? undefined : filtered.length}
         actions={
-          section === 'attendance' ? null : (
+          section === 'attendance' || section === 'debtors' ? null : (
             <>
               {selected.size > 0 && (
                 <>
@@ -360,6 +361,8 @@ export function StudentsPage() {
 
       {section === 'attendance' ? (
         <AttendanceByTeacher />
+      ) : section === 'debtors' ? (
+        <DebtorsByTeacher />
       ) : (
         <>
           <FilterBar onReset={resetFilters}>
@@ -395,7 +398,6 @@ export function StudentsPage() {
             <EmptyState
               icon={section === 'paused' ? Snowflake : section === 'trial' ? GraduationCap : CircleUserRound}
               title={
-                section === 'debtors' ? 'Должников нет' :
                 section === 'left' ? 'Никто не уходил' :
                 section === 'paused' ? 'Замороженных нет' :
                 section === 'trial' ? 'Никого нет на пробном' :

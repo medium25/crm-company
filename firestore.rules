@@ -146,5 +146,9 @@ service cloud.firestore {
       allow read:  if request.auth != null;
       allow write: if isAdmin() || isTeacher();
     }
+
+    match /tasks/{id} {
+      allow read, write: if isAdmin();
+    }
   }
 }

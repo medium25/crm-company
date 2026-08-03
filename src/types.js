@@ -286,6 +286,26 @@
  */
 
 /**
+ * @typedef {'pending' | 'done'} TaskStatus
+ */
+
+/**
+ * @typedef {Object} Task напоминание по студенту (раздел «Должники» и т.п.)
+ * @property {string} id
+ * @property {string} studentId
+ * @property {string} studentName денорм.
+ * @property {string} branchId
+ * @property {string} text
+ * @property {import('firebase/firestore').Timestamp} dueDate
+ * @property {TaskStatus} status
+ * @property {string} createdBy
+ * @property {string} createdByName
+ * @property {import('firebase/firestore').Timestamp} createdAt
+ * @property {string|null} doneBy
+ * @property {import('firebase/firestore').Timestamp|null} doneAt
+ */
+
+/**
  * @typedef {Object} SmsLog P1
  * @property {string} id
  * @property {string[]} studentIds
