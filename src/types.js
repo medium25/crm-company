@@ -126,6 +126,7 @@
  * @property {string} note
  * @property {boolean} isFlagged
  * @property {'gray'|'green'|'red'} [debtorFlag] флаг в разделе «Должники», отдельно от isFlagged
+ * @property {import('firebase/firestore').Timestamp} [debtorFlagAt] когда выставлен — не сегодня, значит отображается серым
  * @property {number} activeGroupsCount денорм.
  * @property {import('firebase/firestore').Timestamp|null} firstPaymentAt
  * @property {import('firebase/firestore').Timestamp|null} lastPaymentAt

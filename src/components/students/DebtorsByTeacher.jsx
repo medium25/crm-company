@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { collection, query, where, orderBy, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { format } from 'date-fns';
 import { ArrowLeft, CalendarDays, GraduationCap, Flag, MessageSquare, ListTodo, Wallet } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -18,8 +19,15 @@ import { formatPhone, formatMoney, pluralize } from '../../lib/format.js';
 const PARITY_LABEL = { even: 'Чётные дни', odd: 'Нечётные дни' };
 
 // Круглый флаг должника — цикл серый → зелёный → красный → серый.
+// Сбрасывается на серый каждый день (по debtorFlagAt), чтобы администратор
+// перепроверял должника заново, а не жил вчерашней отметкой.
 const FLAG_NEXT = { gray: 'green', green: 'red', red: 'gray' };
 const FLAG_BG = { gray: 'bg-muted', green: 'bg-success', red: 'bg-danger' };
+
+function effectiveFlag(student, todayStr) {
+  if (!student.debtorFlagAt) return 'gray';
+  return format(student.debtorFlagAt.toDate(), 'yyyy-MM-dd') === todayStr ? (student.debtorFlag ?? 'gray') : 'gray';
+}
 
 /**
  * «Должники» — не плоский список, а drill-down: чётность дней → учитель →
@@ -97,10 +105,17 @@ export function DebtorsByTeacher() {
 
   const parityDebtorCount = (p) => new Set([...structure[p].values()].flatMap((t) => t.entries.map((en) => en.studentId))).size;
 
+  const today = format(new Date(), 'yyyy-MM-dd');
+
   const cycleFlag = async (student) => {
-    const next = FLAG_NEXT[student.debtorFlag ?? 'gray'];
+    const next = FLAG_NEXT[effectiveFlag(student, today)];
     try {
-      await updateDoc(doc(db, 'students', student.id), { debtorFlag: next, updatedAt: serverTimestamp(), updatedBy: user.uid });
+      await updateDoc(doc(db, 'students', student.id), {
+        debtorFlag: next,
+        debtorFlagAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+      });
     } catch {
       showToast('Не удалось обновить флажок.', { type: 'error' });
     }
@@ -171,7 +186,7 @@ export function DebtorsByTeacher() {
           type="button"
           onClick={() => cycleFlag(st)}
           aria-label="Флаг"
-          className={`flex h-7 w-7 items-center justify-center rounded-full ${FLAG_BG[st.debtorFlag ?? 'gray']}`}
+          className={`flex h-7 w-7 items-center justify-center rounded-full ${FLAG_BG[effectiveFlag(st, today)]}`}
         >
           <Flag className="h-3.5 w-3.5 fill-white text-white" />
         </button>
