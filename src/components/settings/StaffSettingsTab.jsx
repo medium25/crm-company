@@ -124,7 +124,6 @@ export function StaffSettingsTab() {
           options={ROLE_OPTIONS}
           value={m.role}
           onChange={(e) => handleRoleChange(m, e.target.value)}
-          disabled={m.id === user.uid}
         />
       ),
     },
