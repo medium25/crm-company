@@ -163,6 +163,21 @@ export function DebtorsByTeacher() {
 
   const columns = [
     {
+      key: '__flag',
+      label: '',
+      width: '40px',
+      render: (st) => (
+        <button
+          type="button"
+          onClick={() => cycleFlag(st)}
+          aria-label="Флаг"
+          className={`flex h-7 w-7 items-center justify-center rounded-full ${FLAG_BG[st.debtorFlag ?? 'gray']}`}
+        >
+          <Flag className="h-3.5 w-3.5 fill-white text-white" />
+        </button>
+      ),
+    },
+    {
       key: 'fullName',
       label: 'Имя',
       render: (st) => <span className="font-bold text-text">{st.fullName}</span>,
@@ -206,21 +221,11 @@ export function DebtorsByTeacher() {
     {
       key: '__actions',
       label: '',
-      width: '90px',
+      width: '40px',
       render: (st) => (
-        <span className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => cycleFlag(st)}
-            aria-label="Флаг"
-            className={`flex h-7 w-7 items-center justify-center rounded-full ${FLAG_BG[st.debtorFlag ?? 'gray']}`}
-          >
-            <Flag className="h-3.5 w-3.5 fill-white text-white" />
-          </button>
-          <button type="button" onClick={() => setTaskTarget(st)} aria-label="Задачи" className="text-muted hover:text-navy">
-            <ListTodo className="h-4 w-4" />
-          </button>
-        </span>
+        <button type="button" onClick={() => setTaskTarget(st)} aria-label="Задачи" className="text-muted hover:text-navy">
+          <ListTodo className="h-4 w-4" />
+        </button>
       ),
     },
   ];
