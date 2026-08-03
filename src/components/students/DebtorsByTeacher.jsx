@@ -100,7 +100,7 @@ export function DebtorsByTeacher() {
       if (type !== 'even' && type !== 'odd') continue;
       const map = byParity[type];
       if (!map.has(e.teacherId)) map.set(e.teacherId, { teacherName: e.teacherName, entries: [] });
-      map.get(e.teacherId).entries.push({ studentId: e.studentId, groupCode: e.groupCode });
+      map.get(e.teacherId).entries.push({ studentId: e.studentId, groupCode: e.groupCode, groupId: e.groupId });
     }
     return byParity;
   }, [enrollments, debtorIds, groupById]);
@@ -172,11 +172,12 @@ export function DebtorsByTeacher() {
     );
   }
 
-  // Уровень 3 — список должников учителя
+  // Уровень 3 — список должников учителя, раньше по времени группы — выше.
   const teacherEntries = structure[parity].get(teacherId)?.entries ?? [];
   const rows = [...new Map(teacherEntries.map((e) => [e.studentId, e])).values()]
-    .map((e) => ({ ...studentById.get(e.studentId), groupCode: e.groupCode }))
-    .filter((s) => s.id);
+    .map((e) => ({ ...studentById.get(e.studentId), groupCode: e.groupCode, groupTime: groupById.get(e.groupId)?.schedule?.time ?? '' }))
+    .filter((s) => s.id)
+    .sort((a, b) => a.groupTime.localeCompare(b.groupTime));
 
   const columns = [
     {
