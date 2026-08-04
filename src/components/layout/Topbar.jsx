@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Search, ChevronDown, LogOut } from 'lucide-react';
+import { ChevronDown, LogOut } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useRole } from '../../hooks/useRole.js';
+import { GlobalSearch } from './GlobalSearch.jsx';
 
 const ROLE_LABELS = {
   owner: 'Владелец',
@@ -38,14 +39,7 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, billingB
         </select>
       )}
 
-      <button
-        type="button"
-        className="flex h-9 flex-1 max-w-md items-center gap-2 rounded-full border border-border-strong bg-white px-3 text-[13px] text-muted"
-      >
-        <Search className="h-4 w-4" />
-        <span className="flex-1 text-left">Поиск по студентам и группам</span>
-        <kbd className="rounded bg-surface-alt px-1.5 py-0.5 text-[11px]">⌘K</kbd>
-      </button>
+      <GlobalSearch />
 
       {billingBanner && <div className="flex-1">{billingBanner}</div>}
 

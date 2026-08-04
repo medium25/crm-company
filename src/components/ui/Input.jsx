@@ -17,6 +17,7 @@ export const Input = forwardRef(function Input(
         {LeftIcon && <LeftIcon className="pointer-events-none absolute left-3 h-4 w-4 text-muted" />}
         <input
           ref={ref}
+          onWheel={rest.type === 'number' ? (e) => e.currentTarget.blur() : undefined}
           className={`h-11 w-full rounded-field border bg-white px-3 text-[15px] text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-navy/15 ${LeftIcon ? 'pl-9' : ''} ${
             error ? 'border-danger' : 'border-border-strong focus:border-navy'
           } ${className}`}
