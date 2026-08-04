@@ -37,6 +37,24 @@ export function TeachersPage() {
   }, [activeBranchId]);
   const { data: teachers, loading, error } = useCollection(teachersQuery);
 
+  const enrollmentsQuery = useMemo(
+    () => (db && activeBranchId ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    [activeBranchId],
+  );
+  const { data: enrollments } = useCollection(enrollmentsQuery);
+
+  const studentsCountByTeacher = useMemo(() => {
+    const map = new Map();
+    for (const e of enrollments) {
+      if (e.status === 'left' || e.status === 'archived') continue;
+      if (!map.has(e.teacherId)) map.set(e.teacherId, new Set());
+      map.get(e.teacherId).add(e.studentId);
+    }
+    const counts = new Map();
+    for (const [teacherId, ids] of map) counts.set(teacherId, ids.size);
+    return counts;
+  }, [enrollments]);
+
   const [bannerDismissed, setBannerDismissed] = useState(() => localStorage.getItem(BANNER_KEY) === '1');
   const [modalTeacher, setModalTeacher] = useState(null);
   const [archiveTarget, setArchiveTarget] = useState(null);
@@ -142,7 +160,7 @@ export function TeachersPage() {
                 {formatPhone(t.phone)}
               </a>
               <span className="text-[15px] text-muted">
-                {t.groupsCount} {pluralize(t.groupsCount, ['группа', 'группы', 'групп'])}
+                {studentsCountByTeacher.get(t.id) ?? 0} {pluralize(studentsCountByTeacher.get(t.id) ?? 0, ['студент', 'студента', 'студентов'])}
               </span>
               <DropdownMenu
                 items={[
