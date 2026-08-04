@@ -16,7 +16,10 @@ const DAY_TYPE_TABS = [
 const SLOT_MINUTES = 30;
 const DAY_START = 8 * 60; // 08:00
 const DAY_END = 21 * 60; // 21:00
-const SLOT_WIDTH = 72; // px
+const SLOT_HEIGHT = 36; // px
+const TIME_COL_WIDTH = 56; // px
+const ROOM_COL_WIDTH = 160; // px
+const HEADER_HEIGHT = 32; // px
 
 function toMinutes(time) {
   const [h, m] = time.split(':').map(Number);
@@ -88,16 +91,16 @@ export function RoomScheduleGrid({ branchId }) {
         <EmptyState icon={CalendarClock} title="Нет групп с таким типом расписания" />
       ) : (
         <div className="overflow-x-auto">
-          <div style={{ minWidth: 56 + slots.length * SLOT_WIDTH }}>
-            <div className="flex border-b border-border pb-2">
-              <div className="shrink-0" style={{ width: 56 }} />
+          <div className="flex" style={{ minWidth: TIME_COL_WIDTH + rooms.length * ROOM_COL_WIDTH }}>
+            <div className="shrink-0 border-r border-border" style={{ width: TIME_COL_WIDTH }}>
+              <div style={{ height: HEADER_HEIGHT }} />
               {slots.map((s) => (
                 <div
                   key={s}
-                  className={`shrink-0 text-center text-[12px] ${s % 60 === 0 ? 'font-bold text-text' : 'text-muted'}`}
-                  style={{ width: SLOT_WIDTH }}
+                  className={`flex items-start justify-end pr-2 text-[12px] ${s % 60 === 0 ? 'font-bold text-text' : 'text-muted'}`}
+                  style={{ height: SLOT_HEIGHT }}
                 >
-                  {formatSlotLabel(s)}
+                  {s % 60 === 0 ? formatSlotLabel(s) : ''}
                 </div>
               ))}
             </div>
@@ -105,23 +108,29 @@ export function RoomScheduleGrid({ branchId }) {
             {rooms.map((room) => {
               const roomGroups = filteredGroups.filter((g) => g.roomId === room.id);
               return (
-                <div key={room.id} className="relative flex border-b border-border py-2" style={{ minHeight: 44 }}>
-                  <div className="flex shrink-0 items-center text-[15px] font-bold text-text" style={{ width: 56 }}>
+                <div key={room.id} className="shrink-0 border-r border-border" style={{ width: ROOM_COL_WIDTH }}>
+                  <div className="flex items-center justify-center text-[15px] font-bold text-text" style={{ height: HEADER_HEIGHT }}>
                     {room.name}
                   </div>
-                  <div className="relative" style={{ width: slots.length * SLOT_WIDTH, height: 36 }}>
+                  <div
+                    className="relative"
+                    style={{
+                      height: slots.length * SLOT_HEIGHT,
+                      backgroundImage: `repeating-linear-gradient(to bottom, #E9EBEF, #E9EBEF 1px, transparent 1px, transparent ${SLOT_HEIGHT}px)`,
+                    }}
+                  >
                     {roomGroups.map((g) => {
                       const start = toMinutes(g.schedule.time);
-                      const left = ((start - DAY_START) / SLOT_MINUTES) * SLOT_WIDTH;
-                      const width = (g.schedule.durationMin / SLOT_MINUTES) * SLOT_WIDTH;
-                      if (left < 0 || left >= slots.length * SLOT_WIDTH) return null;
+                      const top = ((start - DAY_START) / SLOT_MINUTES) * SLOT_HEIGHT;
+                      const height = (g.schedule.durationMin / SLOT_MINUTES) * SLOT_HEIGHT;
+                      if (top < 0 || top >= slots.length * SLOT_HEIGHT) return null;
                       return (
                         <button
                           key={g.id}
                           type="button"
                           onClick={() => navigate(`/groups/${g.id}`)}
-                          className="absolute top-0 flex flex-col justify-center overflow-hidden rounded-field border border-navy/20 bg-orange-soft px-2 py-1 text-left hover:opacity-80"
-                          style={{ left, width: Math.max(width, SLOT_WIDTH), height: 36 }}
+                          className="absolute left-1 right-1 flex flex-col justify-center overflow-hidden rounded-field border border-navy/20 bg-orange-soft px-2 py-1 text-left hover:opacity-80"
+                          style={{ top, height: Math.max(height, SLOT_HEIGHT) }}
                           title={`${g.code} · ${g.courseName} · ${g.teacherName}`}
                         >
                           <span className="truncate text-[12px] font-bold text-navy">{g.code} · {g.courseName}</span>
