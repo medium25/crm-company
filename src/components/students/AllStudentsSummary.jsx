@@ -34,7 +34,7 @@ function renderCalloutLabel(colorByTeacher) {
         <text x={ex + (cos >= 0 ? 6 : -6)} y={ey - 2} textAnchor={textAnchor} className="fill-text text-[13px] font-bold">
           {payload.teacherName}
         </text>
-        <text x={ex + (cos >= 0 ? 6 : -6)} y={ey + 14} textAnchor={textAnchor} className="fill-muted text-[12px]">
+        <text x={ex + (cos >= 0 ? 6 : -6)} y={ey + 15} textAnchor={textAnchor} className="fill-muted text-[15px] font-bold">
           {payload.count} · {Math.round(percent * 100)}%
         </text>
       </g>
