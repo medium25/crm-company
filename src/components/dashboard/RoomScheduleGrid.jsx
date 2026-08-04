@@ -108,7 +108,7 @@ export function RoomScheduleGrid({ branchId }) {
             {rooms.map((room) => {
               const roomGroups = filteredGroups.filter((g) => g.roomId === room.id);
               return (
-                <div key={room.id} className="shrink-0 border-r border-border" style={{ width: ROOM_COL_WIDTH }}>
+                <div key={room.id} className="flex-1 border-r border-border" style={{ minWidth: ROOM_COL_WIDTH }}>
                   <div className="flex items-center justify-center text-[15px] font-bold text-text" style={{ height: HEADER_HEIGHT }}>
                     {room.name}
                   </div>

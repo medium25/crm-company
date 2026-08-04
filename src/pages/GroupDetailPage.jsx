@@ -225,10 +225,10 @@ export function GroupDetailPage() {
     <>
       <button
         type="button"
-        onClick={() => navigate('/groups')}
+        onClick={() => navigate(-1)}
         className="mb-4 flex items-center gap-1 text-[15px] text-muted hover:text-text"
       >
-        <ArrowLeft className="h-4 w-4" /> Все группы
+        <ArrowLeft className="h-4 w-4" /> Назад
       </button>
 
       <h1 className="mb-6 text-[32px] leading-[40px] text-text">
