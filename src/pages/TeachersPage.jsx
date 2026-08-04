@@ -46,7 +46,7 @@ export function TeachersPage() {
   const studentsCountByTeacher = useMemo(() => {
     const map = new Map();
     for (const e of enrollments) {
-      if (e.status === 'left' || e.status === 'archived') continue;
+      if (e.status !== 'active') continue;
       if (!map.has(e.teacherId)) map.set(e.teacherId, new Set());
       map.get(e.teacherId).add(e.studentId);
     }

@@ -49,6 +49,29 @@ export function TeachersAndGroupsPage() {
   }, [activeBranchId]);
   const { data: teachers, loading, error } = useCollection(teachersQuery);
 
+  const enrollmentsQuery = useMemo(
+    () => (db && activeBranchId ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    [activeBranchId],
+  );
+  const { data: enrollments } = useCollection(enrollmentsQuery);
+
+  const studentsCountByTeacher = useMemo(() => {
+    const map = new Map();
+    for (const e of enrollments) {
+      if (e.status !== 'active') continue;
+      if (!map.has(e.teacherId)) map.set(e.teacherId, new Set());
+      map.get(e.teacherId).add(e.studentId);
+    }
+    const counts = new Map();
+    for (const [teacherId, ids] of map) counts.set(teacherId, ids.size);
+    return counts;
+  }, [enrollments]);
+
+  const sortedTeachers = useMemo(
+    () => [...teachers].sort((a, b) => (studentsCountByTeacher.get(b.id) ?? 0) - (studentsCountByTeacher.get(a.id) ?? 0)),
+    [teachers, studentsCountByTeacher],
+  );
+
   const [bannerDismissed, setBannerDismissed] = useState(() => localStorage.getItem(BANNER_KEY) === '1');
   const [modalTeacher, setModalTeacher] = useState(null);
   const [modalGroup, setModalGroup] = useState(null);
@@ -157,14 +180,14 @@ export function TeachersAndGroupsPage() {
 
           {!loading && !error && teachers.length > 0 && (
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {teachers.map((t) => (
+              {sortedTeachers.map((t) => (
                 <Card key={t.id} hoverable className="flex h-[88px] cursor-pointer items-center justify-between p-4" onClick={() => openTeacher(t.id)}>
                   <span className="font-bold text-text">{t.displayName}</span>
                   <a href={`tel:+${t.phone}`} onClick={(e) => e.stopPropagation()} className="text-[15px] text-link">
                     {formatPhone(t.phone)}
                   </a>
                   <span className="text-[15px] text-muted">
-                    {t.groupsCount} {pluralize(t.groupsCount, ['группа', 'группы', 'групп'])}
+                    {studentsCountByTeacher.get(t.id) ?? 0} {pluralize(studentsCountByTeacher.get(t.id) ?? 0, ['студент', 'студента', 'студентов'])}
                   </span>
                   <DropdownMenu
                     items={[
