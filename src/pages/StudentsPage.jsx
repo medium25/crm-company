@@ -143,11 +143,12 @@ export function StudentsPage() {
     return map;
   }, [enrollments]);
 
-  // Синие — заморожен, срок ещё не горит; жёлтые — 3 дня или меньше до
-  // дедлайна; красные — дедлайн сегодня или уже прошёл.
+  // Синие — заморожен, срок ещё не горит (или дедлайн не указан — старые
+  // записи, до того как поле стало обязательным); жёлтые — 3 дня или
+  // меньше до дедлайна; красные — дедлайн сегодня или уже прошёл.
   const pausedRowClass = (st) => {
     const deadline = pausedDeadlineByStudent.get(st.id);
-    if (!deadline) return 'bg-surface hover:bg-surface-alt';
+    if (!deadline) return 'bg-freeze-blue hover:bg-freeze-blue/70';
     const daysLeft = differenceInCalendarDays(deadline.toDate(), new Date());
     if (daysLeft <= 0) return 'bg-freeze-red hover:bg-freeze-red/70';
     if (daysLeft <= 3) return 'bg-freeze-yellow hover:bg-freeze-yellow/70';
