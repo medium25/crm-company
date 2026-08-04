@@ -93,6 +93,19 @@ export function formatScheduleType(type) {
   return SCHEDULE_TYPE_LABELS[type] ?? type;
 }
 
+const WEEKDAY_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+/**
+ * @param {number[]} weekdays [1,3,5], 0=вс — как хранится в GroupSchedule
+ * @returns {string} "Пн, Ср, Пт", по возрастанию с недели, начинающейся с понедельника
+ */
+export function formatWeekdays(weekdays) {
+  return [...weekdays]
+    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+    .map((d) => WEEKDAY_SHORT[d])
+    .join(', ');
+}
+
 /**
  * Сколько учится — «X месяцев Y дней» от даты добавления до даты окончания
  * (по умолчанию — сегодня; для ушедших передавать `leftAt`).
