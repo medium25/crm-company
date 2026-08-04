@@ -10,6 +10,38 @@ import { pluralize } from '../../lib/format.js';
 // иначе перестановка мест при смене чисел перекрашивала бы survivors.
 const CATEGORICAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
 
+const RADIAN = Math.PI / 180;
+
+// Подпись-выноска у каждого сектора вместо отдельной легенды: линия от края
+// кольца к тексту «учитель / N · %», как в стандартном recharts-примере с
+// customized label, адаптировано под донат (innerRadius > 0).
+function renderCalloutLabel(colorByTeacher) {
+  return ({ cx, cy, midAngle, outerRadius, percent, payload }) => {
+    const sin = Math.sin(-RADIAN * midAngle);
+    const cos = Math.cos(-RADIAN * midAngle);
+    const sx = cx + (outerRadius + 8) * cos;
+    const sy = cy + (outerRadius + 8) * sin;
+    const mx = cx + (outerRadius + 26) * cos;
+    const my = cy + (outerRadius + 26) * sin;
+    const ex = mx + (cos >= 0 ? 1 : -1) * 14;
+    const ey = my;
+    const textAnchor = cos >= 0 ? 'start' : 'end';
+    const color = colorByTeacher.get(payload.teacherId);
+    return (
+      <g>
+        <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={color} fill="none" />
+        <circle cx={ex} cy={ey} r={2} fill={color} stroke="none" />
+        <text x={ex + (cos >= 0 ? 6 : -6)} y={ey - 2} textAnchor={textAnchor} className="fill-text text-[13px] font-bold">
+          {payload.teacherName}
+        </text>
+        <text x={ex + (cos >= 0 ? 6 : -6)} y={ey + 14} textAnchor={textAnchor} className="fill-muted text-[12px]">
+          {payload.count} · {Math.round(percent * 100)}%
+        </text>
+      </g>
+    );
+  };
+}
+
 function ChartTooltip({ active, payload, total }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
@@ -58,38 +90,32 @@ export function AllStudentsSummary({ total, breakdown }) {
           {total > 0 ? `${total} ${pluralize(total, ['ученик', 'ученика', 'учеников'])}, пока без группы.` : 'Учеников пока нет.'}
         </p>
       ) : (
-        <div className="flex flex-col items-center gap-6 sm:flex-row">
-          <div className="relative h-56 w-56 shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={breakdown} dataKey="count" nameKey="teacherName" innerRadius="62%" outerRadius="92%" paddingAngle={2} stroke="#FFFFFF" strokeWidth={2}>
-                  {breakdown.map((t) => (
-                    <Cell key={t.teacherId} fill={colorByTeacher.get(t.teacherId)} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ChartTooltip total={total} />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[32px] font-bold leading-none text-navy-num">{total}</span>
-              <span className="text-[13px] text-muted">{pluralize(total, ['ученик', 'ученика', 'учеников'])}</span>
-            </div>
+        <div className="relative mx-auto h-[360px] w-full max-w-[560px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={breakdown}
+                dataKey="count"
+                nameKey="teacherName"
+                innerRadius="42%"
+                outerRadius="62%"
+                paddingAngle={2}
+                stroke="#FFFFFF"
+                strokeWidth={2}
+                label={renderCalloutLabel(colorByTeacher)}
+                labelLine={false}
+              >
+                {breakdown.map((t) => (
+                  <Cell key={t.teacherId} fill={colorByTeacher.get(t.teacherId)} />
+                ))}
+              </Pie>
+              <Tooltip content={<ChartTooltip total={total} />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-[32px] font-bold leading-none text-navy-num">{total}</span>
+            <span className="text-[13px] text-muted">{pluralize(total, ['ученик', 'ученика', 'учеников'])}</span>
           </div>
-
-          <ul className="flex w-full flex-1 flex-col gap-2">
-            {breakdown.map((t) => {
-              const percent = total > 0 ? Math.round((t.count / total) * 100) : 0;
-              return (
-                <li key={t.teacherId} className="flex items-center gap-2 text-[15px]">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorByTeacher.get(t.teacherId) }} />
-                  <span className="flex-1 truncate text-text">{t.teacherName}</span>
-                  <span className="text-muted">
-                    {t.count} · {percent}%
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
         </div>
       )}
     </Card>
