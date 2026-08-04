@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { collection, doc, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
-import { differenceInCalendarDays } from 'date-fns';
+import { collection, doc, getDocs, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
+import { differenceInCalendarDays, format, startOfMonth, subDays } from 'date-fns';
 import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, FileWarning, Pencil } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -27,7 +27,6 @@ import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
 import { NoChargeHistoryList } from '../components/students/NoChargeHistoryList.jsx';
 import { AllStudentsSummary } from '../components/students/AllStudentsSummary.jsx';
 import { TeacherGroupsList } from '../components/students/TeacherGroupsList.jsx';
-import { TeacherFormModal } from '../components/teachers/TeacherFormModal.jsx';
 import { GroupFormModal } from '../components/groups/GroupFormModal.jsx';
 import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths, formatDaysLeft, pluralize } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
@@ -42,13 +41,13 @@ const STATUS_OPTIONS = [
 ];
 
 const SECTION_TABS = [
-  { key: 'all', label: 'Все ученики', description: 'Полный список, статус, баланс, срок обучения', icon: CircleUserRound },
-  { key: 'debtors', label: 'Должники', description: 'По чётности дней и учителям', icon: Wallet },
-  { key: 'attendance', label: 'Посещаемость', description: 'По учителям — их студенты сразу по всем группам', icon: CalendarCheck },
-  { key: 'paused', label: 'Замороженные', description: 'Студенты на паузе', icon: Snowflake },
-  { key: 'trial', label: 'На пробном уроке', description: 'Пробные, сгруппированы по учителям', icon: GraduationCap },
-  { key: 'left', label: 'Покинувшие', description: 'Кто ушёл и сколько успел проучиться', icon: UserX },
-  { key: 'noChargeHistory', label: 'Без истории списаний (врем.)', description: 'Ручной ввод списаний, удалить раздел после обработки всех', icon: FileWarning },
+  { key: 'all', label: 'Все ученики', icon: CircleUserRound },
+  { key: 'debtors', label: 'Должники', icon: Wallet },
+  { key: 'attendance', label: 'Посещаемость', icon: CalendarCheck },
+  { key: 'paused', label: 'Замороженные', icon: Snowflake },
+  { key: 'trial', label: 'На пробном уроке', icon: GraduationCap },
+  { key: 'left', label: 'Покинувшие', icon: UserX },
+  { key: 'noChargeHistory', label: 'Без истории списаний (врем.)', icon: FileWarning },
 ];
 
 const PAGE_SIZE = 25;
@@ -64,7 +63,6 @@ export function StudentsPage() {
   const [smsOpen, setSmsOpen] = useState(false);
   const [editFreezeTarget, setEditFreezeTarget] = useState(null);
   const [editFreezeEndTarget, setEditFreezeEndTarget] = useState(null);
-  const [modalTeacher, setModalTeacher] = useState(null);
   const [modalGroup, setModalGroup] = useState(null);
 
   const section = searchParams.get('section') || null;
@@ -97,11 +95,12 @@ export function StudentsPage() {
     next.delete('page');
     setSearchParams(next);
   };
-  const setSection = (key) => {
+  const setSection = (key, allView) => {
     const next = new URLSearchParams(searchParams);
     next.set('section', key);
     next.delete('page');
-    next.delete('allView');
+    if (allView) next.set('allView', allView);
+    else next.delete('allView');
     setSearchParams(next);
   };
   const setAllView = (view) => {
@@ -139,6 +138,63 @@ export function StudentsPage() {
     [activeBranchId],
   );
   const { data: enrollments } = useCollection(enrollmentsQuery);
+
+  // Плитки лендинга «Студенты» — свой запрос без фильтров таблицы (`status`/`q`
+  // могут остаться в URL после захода в «Все ученики» и обратно), иначе счётчики
+  // считались бы по случайно застрявшему фильтру.
+  const summaryStudentsQuery = useMemo(
+    () => (db && activeBranchId && !section ? query(collection(db, 'students'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    [activeBranchId, section],
+  );
+  const { data: summaryStudents, loading: summaryLoading } = useCollection(summaryStudentsQuery);
+
+  const summaryCounts = useMemo(() => {
+    const monthStart = startOfMonth(new Date());
+    const counts = { all: 0, debtors: 0, trial: 0, paused: 0, leftThisMonth: 0 };
+    for (const s of summaryStudents) {
+      if (s.status !== 'paused') counts.all += 1;
+      if (s.status === 'active' && s.balance < 0) counts.debtors += 1;
+      if (s.status === 'trial') counts.trial += 1;
+      if (s.status === 'paused') counts.paused += 1;
+      if (s.status === 'left' && s.leftAt && s.leftAt.toDate() >= monthStart) counts.leftThisMonth += 1;
+    }
+    return counts;
+  }, [summaryStudents]);
+
+  // «Посещаемость» на плитке — % учеников, посетивших вчерашний день (не
+  // средний за месяц): вчерашние уроки филиала → их отметки посещаемости.
+  const [attendancePct, setAttendancePct] = useState(null);
+  useEffect(() => {
+    if (section || !db || !activeBranchId) return;
+    const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    let cancelled = false;
+    (async () => {
+      const lessonsSnap = await getDocs(
+        query(collection(db, 'lessons'), where('branchId', '==', activeBranchId), where('dateKey', '==', yesterdayKey)),
+      );
+      if (cancelled) return;
+      if (lessonsSnap.empty) {
+        setAttendancePct(null);
+        return;
+      }
+      const attendanceSnaps = await Promise.all(
+        lessonsSnap.docs.map((l) => getDocs(collection(db, 'lessons', l.id, 'attendance'))),
+      );
+      if (cancelled) return;
+      let present = 0;
+      let total = 0;
+      for (const snap of attendanceSnaps) {
+        for (const d of snap.docs) {
+          total += 1;
+          if (d.data().status === 'present') present += 1;
+        }
+      }
+      setAttendancePct(total > 0 ? Math.round((present / total) * 100) : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [section, activeBranchId]);
 
   const enrollmentsByStudent = useMemo(() => {
     const map = new Map();
@@ -459,9 +515,27 @@ export function StudentsPage() {
   ];
 
   if (!section) {
+    const sectionMetric = summaryLoading
+      ? {}
+      : {
+          all: `${summaryCounts.all} ${pluralize(summaryCounts.all, ['ученик', 'ученика', 'учеников'])}`,
+          debtors: `${summaryCounts.debtors} ${pluralize(summaryCounts.debtors, ['должник', 'должника', 'должников'])}`,
+          attendance: attendancePct === null ? '—' : `${attendancePct}%`,
+          paused: `${summaryCounts.paused} ${pluralize(summaryCounts.paused, ['студент', 'студента', 'студентов'])}`,
+          trial: `${summaryCounts.trial} ${pluralize(summaryCounts.trial, ['студент', 'студента', 'студентов'])}`,
+          left: `${summaryCounts.leftThisMonth} ${pluralize(summaryCounts.leftThisMonth, ['студент', 'студента', 'студентов'])}`,
+        };
+
     return (
       <>
-        <PageHeader title="Студенты" />
+        <PageHeader
+          title="Студенты"
+          actions={
+            <Button onClick={() => setModalStudent({})}>
+              <Plus className="h-4 w-4" /> Добавить ученика
+            </Button>
+          }
+        />
         <div className="flex flex-col gap-3">
           {SECTION_TABS.map((t) => {
             const Icon = t.icon;
@@ -470,15 +544,13 @@ export function StudentsPage() {
                 key={t.key}
                 hoverable
                 className="flex cursor-pointer items-center gap-4 p-5"
-                onClick={() => setSection(t.key)}
+                onClick={() => setSection(t.key, t.key === 'all' ? 'list' : undefined)}
               >
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
                   <Icon className="h-6 w-6" strokeWidth={1.75} />
                 </span>
-                <span className="flex-1">
-                  <span className="block text-[17px] font-bold text-text">{t.label}</span>
-                  <span className="block text-[13px] text-muted">{t.description}</span>
-                </span>
+                <span className="flex-1 text-[17px] font-bold text-text">{t.label}</span>
+                {sectionMetric[t.key] && <span className="text-[15px] text-muted">{sectionMetric[t.key]}</span>}
                 <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
               </Card>
             );
@@ -504,11 +576,7 @@ export function StudentsPage() {
         title={SECTION_TABS.find((t) => t.key === section)?.label ?? 'Студенты'}
         count={hideHeaderExtras ? undefined : filtered.length}
         actions={
-          section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' ? null : isAllChooser ? (
-            <Button onClick={() => setModalTeacher({})}>
-              <Plus className="h-4 w-4" /> Добавить учителя
-            </Button>
-          ) : isTeacherGroups ? (
+          section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' || isAllChooser ? null : isTeacherGroups ? (
             <Button onClick={() => setModalGroup({})}>
               <Plus className="h-4 w-4" /> Добавить
             </Button>
@@ -572,23 +640,6 @@ export function StudentsPage() {
               </span>
               <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
             </Card>
-
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {teacherBreakdown.map((t) => (
-                <Card
-                  key={t.teacherId}
-                  hoverable
-                  className="flex cursor-pointer items-center justify-between p-5"
-                  onClick={() => setAllView(t.teacherId)}
-                >
-                  <span className="font-bold text-text">{t.teacherName}</span>
-                  <span className="flex items-center gap-2 text-[15px] text-muted">
-                    {t.count} из {nonPausedStudents.length}
-                    <ChevronRight className="h-4 w-4 text-muted" />
-                  </span>
-                </Card>
-              ))}
-            </div>
           </div>
         )
       ) : section === 'all' && allView !== 'list' ? (
@@ -686,7 +737,6 @@ export function StudentsPage() {
 
       <EditFreezeEndModal enrollment={editFreezeEndTarget} onClose={() => setEditFreezeEndTarget(null)} />
 
-      <TeacherFormModal teacher={modalTeacher} onClose={() => setModalTeacher(null)} />
 
       <GroupFormModal group={modalGroup} onClose={() => setModalGroup(null)} />
 
