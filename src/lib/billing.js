@@ -233,44 +233,6 @@ export async function chargeMonthly(db, { student, enrollment, group, month, hol
 }
 
 /**
- * Перерасчёт при уходе из группы в середине месяца — возврат стоимости
- * неотходенных уроков, «03 · Бизнес-логика» §3.5.
- * @param {import('firebase/firestore').Firestore} db
- * @param {{student: Object, enrollment: Object, group: Object, leftAt: Date, holidays?: string[]}} ctx
- * @param {{uid: string, fullName: string}} user
- * @returns {Promise<string|null>}
- */
-export async function chargeLeaveCorrection(db, { student, enrollment, group, leftAt, holidays = [] }, user) {
-  const monthEnd = endOfMonth(leftAt);
-  const lessonsAfterLeave = lessonsInRange(group.schedule, addDays(leftAt, 1), monthEnd, holidays);
-  if (lessonsAfterLeave === 0) return null;
-
-  const amount = Math.round(pricePerLesson(enrollment, group) * lessonsAfterLeave);
-
-  return writeTransaction(db, {
-    branchId: group.branchId,
-    studentId: student.id,
-    studentName: student.fullName,
-    enrollmentId: enrollment.id,
-    groupId: group.id,
-    groupCode: group.code,
-    teacherId: group.teacherId,
-    teacherName: group.teacherName,
-    type: 'correction',
-    amount,
-    method: null,
-    date: Timestamp.fromDate(leftAt),
-    month: format(leftAt, 'yyyy-MM'),
-    comment: 'Перерасчёт при уходе',
-    periodFrom: Timestamp.fromDate(addDays(leftAt, 1)),
-    periodTo: Timestamp.fromDate(monthEnd),
-    lessonsCount: lessonsAfterLeave,
-    createdBy: user.uid,
-    createdByName: user.fullName,
-  });
-}
-
-/**
  * Оплата — «Добавить оплату» в карточке студента.
  * @param {import('firebase/firestore').Firestore} db
  * @param {{student: Object, branchId: string, amount: number, method: string, date: Date, comment?: string, groupId?: string, groupCode?: string}} ctx
