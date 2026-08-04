@@ -27,6 +27,8 @@ import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
 import { NoChargeHistoryList } from '../components/students/NoChargeHistoryList.jsx';
 import { AllStudentsSummary } from '../components/students/AllStudentsSummary.jsx';
 import { TeacherGroupsList } from '../components/students/TeacherGroupsList.jsx';
+import { TeacherFormModal } from '../components/teachers/TeacherFormModal.jsx';
+import { GroupFormModal } from '../components/groups/GroupFormModal.jsx';
 import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths, formatDaysLeft, pluralize } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
@@ -62,6 +64,8 @@ export function StudentsPage() {
   const [smsOpen, setSmsOpen] = useState(false);
   const [editFreezeTarget, setEditFreezeTarget] = useState(null);
   const [editFreezeEndTarget, setEditFreezeEndTarget] = useState(null);
+  const [modalTeacher, setModalTeacher] = useState(null);
+  const [modalGroup, setModalGroup] = useState(null);
 
   const section = searchParams.get('section') || null;
   // «Все ученики» — свой drill-down: null (выбор — общий список или
@@ -491,6 +495,8 @@ export function StudentsPage() {
   // как для attendance/debtors/noChargeHistory — без счётчика и bulk-действий.
   const hideHeaderExtras =
     section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' || (section === 'all' && allView !== 'list');
+  const isAllChooser = section === 'all' && allView === null;
+  const isTeacherGroups = section === 'all' && allView !== null && allView !== 'list';
 
   return (
     <>
@@ -498,7 +504,15 @@ export function StudentsPage() {
         title={SECTION_TABS.find((t) => t.key === section)?.label ?? 'Студенты'}
         count={hideHeaderExtras ? undefined : filtered.length}
         actions={
-          hideHeaderExtras ? null : (
+          section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' ? null : isAllChooser ? (
+            <Button onClick={() => setModalTeacher({})}>
+              <Plus className="h-4 w-4" /> Добавить учителя
+            </Button>
+          ) : isTeacherGroups ? (
+            <Button onClick={() => setModalGroup({})}>
+              <Plus className="h-4 w-4" /> Добавить
+            </Button>
+          ) : (
             <>
               {selected.size > 0 && (
                 <>
@@ -671,6 +685,10 @@ export function StudentsPage() {
       <EditFreezeStartModal enrollment={editFreezeTarget} onClose={() => setEditFreezeTarget(null)} />
 
       <EditFreezeEndModal enrollment={editFreezeEndTarget} onClose={() => setEditFreezeEndTarget(null)} />
+
+      <TeacherFormModal teacher={modalTeacher} onClose={() => setModalTeacher(null)} />
+
+      <GroupFormModal group={modalGroup} onClose={() => setModalGroup(null)} />
 
       <SmsSendModal
         open={smsOpen}
