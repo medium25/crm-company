@@ -17,7 +17,7 @@ import { Input } from '../components/ui/Input.jsx';
 import { Table } from '../components/ui/Table.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
-import { SkeletonRow } from '../components/ui/Skeleton.jsx';
+import { Skeleton, SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { EditFreezeStartModal } from '../components/students/EditFreezeStartModal.jsx';
 import { EditFreezeEndModal } from '../components/students/EditFreezeEndModal.jsx';
@@ -25,7 +25,9 @@ import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
 import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.jsx';
 import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
 import { NoChargeHistoryList } from '../components/students/NoChargeHistoryList.jsx';
-import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths, formatDaysLeft } from '../lib/format.js';
+import { AllStudentsSummary } from '../components/students/AllStudentsSummary.jsx';
+import { TeacherGroupsList } from '../components/students/TeacherGroupsList.jsx';
+import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths, formatDaysLeft, pluralize } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
 const STATUS_OPTIONS = [
@@ -62,6 +64,10 @@ export function StudentsPage() {
   const [editFreezeEndTarget, setEditFreezeEndTarget] = useState(null);
 
   const section = searchParams.get('section') || null;
+  // «Все ученики» — свой drill-down: null (выбор — общий список или
+  // учитель), 'list' (полный список с фильтрами, как раньше), иначе id
+  // учителя (его группы).
+  const allView = searchParams.get('allView') || null;
   const search = searchParams.get('q') || '';
   const status = searchParams.get('status') || 'all';
   const onlyDebtors = searchParams.get('debtors') === '1';
@@ -91,12 +97,21 @@ export function StudentsPage() {
     const next = new URLSearchParams(searchParams);
     next.set('section', key);
     next.delete('page');
+    next.delete('allView');
+    setSearchParams(next);
+  };
+  const setAllView = (view) => {
+    const next = new URLSearchParams(searchParams);
+    if (view) next.set('allView', view);
+    else next.delete('allView');
+    next.delete('page');
     setSearchParams(next);
   };
   const goToLanding = () => {
     const next = new URLSearchParams(searchParams);
     next.delete('section');
     next.delete('page');
+    next.delete('allView');
     setSearchParams(next);
   };
   const setPage = (n) => {
@@ -134,6 +149,23 @@ export function StudentsPage() {
     }
     return map;
   }, [enrollments]);
+
+  // Разбивка «Все ученики» по учителям — сколько РАЗНЫХ студентов у каждого
+  // (студент с 2 группами у одного учителя считается один раз; с группами
+  // у 2 разных учителей — попадает в оба). Не зависит от поиска/статус-
+  // фильтра списка — это ориентир на входе в раздел, до применения фильтров.
+  const teacherBreakdown = useMemo(() => {
+    const map = new Map();
+    for (const [studentId, list] of enrollmentsByStudent) {
+      for (const e of list) {
+        if (!map.has(e.teacherId)) map.set(e.teacherId, { teacherId: e.teacherId, teacherName: e.teacherName, studentIds: new Set() });
+        map.get(e.teacherId).studentIds.add(studentId);
+      }
+    }
+    return [...map.values()]
+      .map((t) => ({ teacherId: t.teacherId, teacherName: t.teacherName, count: t.studentIds.size }))
+      .sort((a, b) => b.count - a.count);
+  }, [enrollmentsByStudent]);
 
   // Замороженная запись на студента, показанная в разделе «Замороженные» —
   // если их несколько сразу, берём с самой ранней pausedTo (самая срочная);
@@ -445,13 +477,19 @@ export function StudentsPage() {
     );
   }
 
+  // «Все ученики» держит свой drill-down (выбор → общий список / учитель);
+  // пока не дошли до общего списка (allView === 'list'), шапка ведёт себя
+  // как для attendance/debtors/noChargeHistory — без счётчика и bulk-действий.
+  const hideHeaderExtras =
+    section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' || (section === 'all' && allView !== 'list');
+
   return (
     <>
       <PageHeader
         title={SECTION_TABS.find((t) => t.key === section)?.label ?? 'Студенты'}
-        count={section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' ? undefined : filtered.length}
+        count={hideHeaderExtras ? undefined : filtered.length}
         actions={
-          section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' ? null : (
+          hideHeaderExtras ? null : (
             <>
               {selected.size > 0 && (
                 <>
@@ -474,9 +512,15 @@ export function StudentsPage() {
         }
       />
 
-      <button type="button" onClick={goToLanding} className="mb-6 flex items-center gap-1 text-[15px] text-link">
-        <ArrowLeft className="h-4 w-4" /> Все разделы
-      </button>
+      {section === 'all' && allView ? (
+        <button type="button" onClick={() => setAllView(null)} className="mb-6 flex items-center gap-1 text-[15px] text-link">
+          <ArrowLeft className="h-4 w-4" /> Все ученики — назад
+        </button>
+      ) : (
+        <button type="button" onClick={goToLanding} className="mb-6 flex items-center gap-1 text-[15px] text-link">
+          <ArrowLeft className="h-4 w-4" /> Все разделы
+        </button>
+      )}
 
       {section === 'attendance' ? (
         <AttendanceByTeacher />
@@ -484,8 +528,52 @@ export function StudentsPage() {
         <DebtorsByTeacher />
       ) : section === 'noChargeHistory' ? (
         <NoChargeHistoryList />
+      ) : section === 'all' && allView === null ? (
+        loading ? (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-[88px] w-full rounded-card" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <Card hoverable className="flex cursor-pointer items-center gap-4 p-5" onClick={() => setAllView('list')}>
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
+                <CircleUserRound className="h-6 w-6" strokeWidth={1.75} />
+              </span>
+              <span className="flex-1">
+                <span className="block text-[17px] font-bold text-text">Все ученики</span>
+                <span className="block text-[13px] text-muted">
+                  {rawStudents.length} {pluralize(rawStudents.length, ['ученик', 'ученика', 'учеников'])}
+                </span>
+              </span>
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
+            </Card>
+
+            {teacherBreakdown.map((t) => (
+              <Card
+                key={t.teacherId}
+                hoverable
+                className="flex cursor-pointer items-center justify-between p-5"
+                onClick={() => setAllView(t.teacherId)}
+              >
+                <span className="font-bold text-text">{t.teacherName}</span>
+                <span className="flex items-center gap-2 text-[15px] text-muted">
+                  {t.count} из {rawStudents.length}
+                  <ChevronRight className="h-4 w-4 text-muted" />
+                </span>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : section === 'all' && allView !== 'list' ? (
+        <TeacherGroupsList teacherId={allView} branchId={activeBranchId} />
       ) : (
         <>
+          {section === 'all' && !loading && rawStudents.length > 0 && (
+            <AllStudentsSummary total={rawStudents.length} breakdown={teacherBreakdown} />
+          )}
+
           <FilterBar onReset={resetFilters}>
             <Input placeholder="Поиск по имени или телефону" value={search} onChange={(e) => setFilter({ q: e.target.value })} className="w-64" />
             {section === 'all' && (
