@@ -23,7 +23,7 @@ import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
 import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.jsx';
 import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
 import { NoChargeHistoryList } from '../components/students/NoChargeHistoryList.jsx';
-import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths } from '../lib/format.js';
+import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths, formatDaysLeft } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
 const STATUS_OPTIONS = [
@@ -304,24 +304,12 @@ export function StudentsPage() {
       label: 'Дата добавления',
       render: (st) => formatDate(st.createdAt),
     },
-    ...(section === 'all' || section === 'left' || section === 'paused'
+    ...(section === 'all' || section === 'left'
       ? [
           {
             key: 'duration',
             label: 'Обучается',
             render: (st) => formatDuration(st.createdAt, section === 'left' ? st.leftAt : null),
-          },
-        ]
-      : []),
-    ...(section === 'paused'
-      ? [
-          {
-            key: 'pausedTo',
-            label: 'Дедлайн заморозки',
-            render: (st) => {
-              const deadline = pausedDeadlineByStudent.get(st.id);
-              return deadline ? formatDate(deadline) : '—';
-            },
           },
         ]
       : []),
@@ -332,6 +320,40 @@ export function StudentsPage() {
     },
   ];
   const trialColumns = columns.filter((c) => c.key !== 'teachers');
+
+  // «Замороженные» — своя урезанная раскладка: группы и учителя в одной
+  // колонке, вместо дат добавления/срока обучения — обратный отсчёт до
+  // конца заморозки (дублирует цвет карточки текстом).
+  const pausedColumns = [
+    columns[0],
+    columns[1],
+    columns[2],
+    {
+      key: 'groupsTeachers',
+      label: 'Группы и учителя',
+      render: (st) => {
+        const list = enrollmentsByStudent.get(st.id) ?? [];
+        return list.length === 0 ? (
+          '—'
+        ) : (
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {list.map((e) => (
+              <span key={e.id} className="flex items-center gap-1">
+                <Badge variant="group-code">{e.groupCode}</Badge>
+                <span className="text-muted">{e.teacherName}</span>
+              </span>
+            ))}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'daysLeft',
+      label: 'Осталось',
+      render: (st) => formatDaysLeft(pausedDeadlineByStudent.get(st.id)),
+    },
+    columns[columns.length - 1],
+  ];
 
   if (!section) {
     return (
@@ -463,7 +485,7 @@ export function StudentsPage() {
           {!loading && !error && filtered.length > 0 && section !== 'trial' && (
             <>
               <Table
-                columns={columns}
+                columns={section === 'paused' ? pausedColumns : columns}
                 rows={pageRows}
                 onRowClick={(st) => navigate(`/students/${st.id}`)}
                 rowClassName={section === 'paused' ? pausedRowClass : undefined}

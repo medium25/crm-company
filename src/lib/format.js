@@ -153,6 +153,20 @@ export function formatAvgMonths(students) {
 }
 
 /**
+ * Осталось до дедлайна заморозки — «3 дня» | «сегодня» | «просрочено на N дней» | «—» (дедлайн не указан).
+ * @param {import('firebase/firestore').Timestamp|null} deadlineTs
+ * @returns {string}
+ */
+export function formatDaysLeft(deadlineTs) {
+  if (!deadlineTs) return '—';
+  const days = differenceInCalendarDays(deadlineTs.toDate(), new Date());
+  if (days > 0) return `${days} ${pluralize(days, ['день', 'дня', 'дней'])}`;
+  if (days === 0) return 'сегодня';
+  const overdue = Math.abs(days);
+  return `просрочено на ${overdue} ${pluralize(overdue, ['день', 'дня', 'дней'])}`;
+}
+
+/**
  * @param {number} n
  * @param {[string, string, string]} forms [1 месяц, 2 месяца, 5 месяцев]
  * @returns {string}
