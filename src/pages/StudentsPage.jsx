@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { differenceInCalendarDays } from 'date-fns';
-import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, FileWarning } from 'lucide-react';
+import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, FileWarning, Pencil } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -19,6 +19,7 @@ import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
+import { EditFreezeStartModal } from '../components/students/EditFreezeStartModal.jsx';
 import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
 import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.jsx';
 import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
@@ -56,6 +57,7 @@ export function StudentsPage() {
   const [modalStudent, setModalStudent] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [smsOpen, setSmsOpen] = useState(false);
+  const [editFreezeTarget, setEditFreezeTarget] = useState(null);
 
   const section = searchParams.get('section') || null;
   const search = searchParams.get('q') || '';
@@ -131,14 +133,18 @@ export function StudentsPage() {
     return map;
   }, [enrollments]);
 
-  // Ближайший дедлайн заморозки на студента — если он записан в несколько
-  // замороженных групп сразу, берём самую раннюю pausedTo (самая срочная).
-  const pausedDeadlineByStudent = useMemo(() => {
+  // Замороженная запись на студента, показанная в разделе «Замороженные» —
+  // если их несколько сразу, берём с самой ранней pausedTo (самая срочная);
+  // пока ни у одной нет pausedTo, берём первую попавшуюся, чтобы дата начала
+  // заморозки всё равно была видна.
+  const pausedEnrollmentByStudent = useMemo(() => {
     const map = new Map();
     for (const e of enrollments) {
-      if (e.status !== 'paused' || !e.pausedTo) continue;
+      if (e.status !== 'paused') continue;
       const current = map.get(e.studentId);
-      if (!current || e.pausedTo.toMillis() < current.toMillis()) map.set(e.studentId, e.pausedTo);
+      if (!current || (e.pausedTo && (!current.pausedTo || e.pausedTo.toMillis() < current.pausedTo.toMillis()))) {
+        map.set(e.studentId, e);
+      }
     }
     return map;
   }, [enrollments]);
@@ -147,7 +153,7 @@ export function StudentsPage() {
   // записи, до того как поле стало обязательным); жёлтые — 3 дня или
   // меньше до дедлайна; красные — дедлайн сегодня или уже прошёл.
   const pausedRowClass = (st) => {
-    const deadline = pausedDeadlineByStudent.get(st.id);
+    const deadline = pausedEnrollmentByStudent.get(st.id)?.pausedTo;
     if (!deadline) return 'bg-freeze-blue hover:bg-freeze-blue/70';
     const daysLeft = differenceInCalendarDays(deadline.toDate(), new Date());
     if (daysLeft <= 0) return 'bg-freeze-red hover:bg-freeze-red/70';
@@ -348,9 +354,34 @@ export function StudentsPage() {
       },
     },
     {
+      key: 'pausedFrom',
+      label: 'Начало заморозки',
+      render: (st) => {
+        const enr = pausedEnrollmentByStudent.get(st.id);
+        return (
+          <span className="flex items-center gap-2">
+            {enr?.pausedFrom ? formatDate(enr.pausedFrom) : '—'}
+            {enr && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditFreezeTarget(enr);
+                }}
+                aria-label="Изменить дату начала заморозки"
+                className="text-muted hover:text-navy"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </span>
+        );
+      },
+    },
+    {
       key: 'daysLeft',
       label: 'Осталось',
-      render: (st) => formatDaysLeft(pausedDeadlineByStudent.get(st.id)),
+      render: (st) => formatDaysLeft(pausedEnrollmentByStudent.get(st.id)?.pausedTo),
     },
     columns[columns.length - 1],
   ];
@@ -390,7 +421,7 @@ export function StudentsPage() {
   return (
     <>
       <PageHeader
-        title="Студенты"
+        title={SECTION_TABS.find((t) => t.key === section)?.label ?? 'Студенты'}
         count={section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' ? undefined : filtered.length}
         actions={
           section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' ? null : (
@@ -510,6 +541,8 @@ export function StudentsPage() {
       )}
 
       <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} />
+
+      <EditFreezeStartModal enrollment={editFreezeTarget} onClose={() => setEditFreezeTarget(null)} />
 
       <SmsSendModal
         open={smsOpen}
