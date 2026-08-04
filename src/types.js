@@ -214,7 +214,7 @@
 
 /**
  * @typedef {Object} Transaction
- * @property {string} id charge_{enrollmentId}_{YYYY-MM} | авто (payment) | rev_{originalTransactionId} (сторно)
+ * @property {string} id charge_{enrollmentId}_{YYYY-MM} | авто (payment)
  * @property {string} branchId
  * @property {string} studentId
  * @property {string} studentName
@@ -235,8 +235,6 @@
  * @property {string} createdBy
  * @property {string} createdByName
  * @property {import('firebase/firestore').Timestamp} createdAt фактическое время ввода
- * @property {boolean} isReversed
- * @property {string|null} reversedBy
  */
 
 /**

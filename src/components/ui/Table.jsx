@@ -18,11 +18,16 @@ export function Table({ columns, rows, sortKey, sortDir = 'asc', onSort, onRowCl
   // на каждую строку): иначе строка с более длинным содержимым (например,
   // студент в 2+ группах) растягивает свои колонки независимо от соседних
   // строк, и всё расползается по вертикали.
+  //
+  // Сетка всегда шириной в контейнер (`w-full`, не `min-w-max`), а гибкие
+  // колонки — `minmax(0, 1fr)`: колонки делят доступную ширину и переносят
+  // содержимое по словам, вместо того чтобы раздувать таблицу вбок. Раздел
+  // должен помещаться в окно целиком, без горизонтального скролла.
   return (
     <div className="w-full overflow-x-auto">
       <div
-        className="grid min-w-max gap-x-4 gap-y-2"
-        style={{ gridTemplateColumns: columns.map((c) => c.width ?? 'minmax(120px, 1fr)').join(' ') }}
+        className="grid w-full gap-x-4 gap-y-2"
+        style={{ gridTemplateColumns: columns.map((c) => c.width ?? 'minmax(0, 1fr)').join(' ') }}
       >
         {columns.map((col) => {
           const active = col.key === sortKey;
@@ -33,12 +38,12 @@ export function Table({ columns, rows, sortKey, sortDir = 'asc', onSort, onRowCl
               type="button"
               disabled={!col.sortable}
               onClick={() => col.sortable && onSort?.(col.key)}
-              className={`flex items-center gap-1 px-5 py-2 text-left text-[15px] font-bold ${
+              className={`flex min-w-0 items-center gap-1 px-5 py-2 text-left text-[15px] font-bold ${
                 col.sortable ? 'cursor-pointer' : 'cursor-default'
               } ${active ? 'text-navy' : 'text-text'}`}
             >
-              {col.label}
-              {col.sortable && <Icon className={`h-3.5 w-3.5 ${active ? 'text-navy' : 'text-muted'}`} />}
+              <span className="truncate">{col.label}</span>
+              {col.sortable && <Icon className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-navy' : 'text-muted'}`} />}
             </button>
           );
         })}
@@ -53,7 +58,7 @@ export function Table({ columns, rows, sortKey, sortDir = 'asc', onSort, onRowCl
             }`}
           >
             {columns.map((col) => (
-              <div key={col.key} className="px-0 text-[15px] text-text">
+              <div key={col.key} className="min-w-0 px-0 text-[15px] text-text">
                 {col.render ? col.render(row, index) : row[col.key]}
               </div>
             ))}

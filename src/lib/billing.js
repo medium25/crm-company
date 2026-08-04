@@ -28,11 +28,10 @@ export function pricePerLesson(enrollment, group) {
 /**
  * Пишет транзакцию и одной batch-операцией обновляет `students.balance` и
  * `monthlyBalances/{studentId}_{month}` — «02 · Модель данных»,
- * «Денормализация: что и когда пересчитывать». Транзакции неизменяемы:
- * это единственное место, которое их создаёт, апдейтов/удалений нет нигде.
+ * «Денормализация: что и когда пересчитывать».
  * @param {import('firebase/firestore').Firestore} db
- * @param {Object} tx поля транзакции (без createdAt/isReversed/reversedBy — проставляются здесь)
- * @param {string} [tx.id] explicit ID (списания/сторно) — иначе авто
+ * @param {Object} tx поля транзакции (без createdAt — проставляется здесь)
+ * @param {string} [tx.id] explicit ID (списания) — иначе авто
  * @returns {Promise<string>} ID созданной транзакции
  */
 export async function writeTransaction(db, tx) {
@@ -47,8 +46,6 @@ export async function writeTransaction(db, tx) {
     type,
     branchId,
     ...rest,
-    isReversed: false,
-    reversedBy: null,
     createdAt: serverTimestamp(),
   });
 
@@ -338,55 +335,96 @@ export async function recordManualCharge(db, { student, branchId, amount, commen
 }
 
 /**
- * Сторно — гасит ошибочную транзакцию встречной записью, саму запись не
- * трогает (транзакции неизменяемы). Только `owner`/`accountant`.
+ * Правит транзакцию на месте (сумма/комментарий/дата) — без компенсирующих
+ * записей. Откатывает старый вклад и применяет новый к `students.balance`,
+ * `monthlyBalances` (обеих месяцев, если дата переехала в другой месяц) и,
+ * для type=payment, `monthlyRevenue`.
  * @param {import('firebase/firestore').Firestore} db
  * @param {Object} original исходная транзакция
- * @param {{uid: string, fullName: string}} user
- * @returns {Promise<string>}
+ * @param {{amount: number, comment: string, date: Date}} patch
+ * @param {{uid: string}} user
+ * @returns {Promise<void>}
  */
-export async function reverseTransaction(db, original, user) {
-  if (original.isReversed) throw new Error('Транзакция уже сторнирована.');
+export async function updateTransaction(db, original, { amount, comment, date }, user) {
+  const month = format(date, 'yyyy-MM');
+  const delta = amount - original.amount;
+  const batch = writeBatch(db);
 
-  const reversalId = `rev_${original.id}`;
-  const now = new Date();
-
-  const txId = await writeTransaction(db, {
-    id: reversalId,
-    branchId: original.branchId,
-    studentId: original.studentId,
-    studentName: original.studentName,
-    enrollmentId: original.enrollmentId ?? null,
-    groupId: original.groupId ?? null,
-    groupCode: original.groupCode ?? null,
-    teacherId: original.teacherId ?? null,
-    teacherName: original.teacherName ?? null,
-    type: 'correction',
-    amount: -original.amount,
-    method: null,
-    date: Timestamp.fromDate(now),
-    month: format(now, 'yyyy-MM'),
-    comment: `Сторно: ${original.comment || ''}`.trim(),
-    periodFrom: null,
-    periodTo: null,
-    lessonsCount: null,
-    createdBy: user.uid,
-    createdByName: user.fullName,
+  batch.update(doc(db, 'transactions', original.id), {
+    amount,
+    comment,
+    date: Timestamp.fromDate(date),
+    month,
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid,
   });
 
-  await updateDoc(doc(db, 'transactions', original.id), { isReversed: true, reversedBy: user.uid });
-  return txId;
+  batch.update(doc(db, 'students', original.studentId), {
+    balance: increment(delta),
+    balanceUpdatedAt: serverTimestamp(),
+  });
+
+  const oldCharge = original.amount < 0 ? original.amount : 0;
+  const oldPayment = original.amount > 0 ? original.amount : 0;
+  const newCharge = amount < 0 ? amount : 0;
+  const newPayment = amount > 0 ? amount : 0;
+
+  if (month === original.month) {
+    batch.set(
+      doc(db, 'monthlyBalances', `${original.studentId}_${month}`),
+      { charges: increment(newCharge - oldCharge), payments: increment(newPayment - oldPayment), balance: increment(delta), updatedAt: serverTimestamp() },
+      { merge: true },
+    );
+  } else {
+    batch.set(
+      doc(db, 'monthlyBalances', `${original.studentId}_${original.month}`),
+      { charges: increment(-oldCharge), payments: increment(-oldPayment), balance: increment(-original.amount), updatedAt: serverTimestamp() },
+      { merge: true },
+    );
+    batch.set(
+      doc(db, 'monthlyBalances', `${original.studentId}_${month}`),
+      { charges: increment(newCharge), payments: increment(newPayment), balance: increment(amount), updatedAt: serverTimestamp() },
+      { merge: true },
+    );
+  }
+
+  if (original.branchId && (oldPayment !== 0 || newPayment !== 0)) {
+    if (month === original.month) {
+      batch.set(
+        doc(db, 'monthlyRevenue', `${original.branchId}_${month}`),
+        { amount: increment(newPayment - oldPayment), paymentsCount: increment((newPayment !== 0) - (oldPayment !== 0)), updatedAt: serverTimestamp() },
+        { merge: true },
+      );
+    } else {
+      if (oldPayment !== 0) {
+        batch.set(
+          doc(db, 'monthlyRevenue', `${original.branchId}_${original.month}`),
+          { amount: increment(-oldPayment), paymentsCount: increment(-1), updatedAt: serverTimestamp() },
+          { merge: true },
+        );
+      }
+      if (newPayment !== 0) {
+        batch.set(
+          doc(db, 'monthlyRevenue', `${original.branchId}_${month}`),
+          { amount: increment(newPayment), paymentsCount: increment(1), updatedAt: serverTimestamp() },
+          { merge: true },
+        );
+      }
+    }
+  }
+
+  await batch.commit();
 }
 
 /**
- * Удаляет платёж навсегда — без компенсирующей записи. Откатывает эффект
- * на `students.balance`, `monthlyBalances` и (для type=payment) `monthlyRevenue`
- * тем же батчем. Только для type === 'payment'.
+ * Удаляет транзакцию навсегда (любой type) — без компенсирующей записи.
+ * Откатывает эффект на `students.balance`, `monthlyBalances` и (для
+ * type=payment) `monthlyRevenue` тем же батчем.
  * @param {import('firebase/firestore').Firestore} db
  * @param {Object} original исходная транзакция
  * @returns {Promise<void>}
  */
-export async function deletePayment(db, original) {
+export async function deleteTransaction(db, original) {
   const { id, studentId, amount, month, type, branchId } = original;
   const batch = writeBatch(db);
 

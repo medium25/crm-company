@@ -26,12 +26,11 @@ import { LeaveGroupModal } from '../components/students/LeaveGroupModal.jsx';
 import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
 import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
 import { ManualChargeModal } from '../components/students/ManualChargeModal.jsx';
-import { ReverseTransactionModal } from '../components/students/ReverseTransactionModal.jsx';
 import { EditChargeModal } from '../components/students/EditChargeModal.jsx';
 import { CommentsTab } from '../components/shared/CommentsTab.jsx';
 import { HistoryTab } from '../components/shared/HistoryTab.jsx';
 import { CallLogsTab } from '../components/students/CallLogsTab.jsx';
-import { recalcBalance, reverseTransaction, deletePayment } from '../lib/billing.js';
+import { recalcBalance, deleteTransaction } from '../lib/billing.js';
 import { formatDateLong, formatDate, formatMoney, formatMoneySigned, formatMonth, formatPhone } from '../lib/format.js';
 
 const TABS = [
@@ -51,7 +50,7 @@ function BalanceBadge({ balance }) {
 export function StudentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, staff } = useAuth();
+  const { user } = useAuth();
   const { isAdmin } = useRole();
   const { branches } = useBranch();
   const { showToast } = useToast();
@@ -88,7 +87,6 @@ export function StudentDetailPage() {
   const [note, setNote] = useState('');
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [manualChargeOpen, setManualChargeOpen] = useState(false);
-  const [reverseOpen, setReverseOpen] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -137,14 +135,14 @@ export function StudentDetailPage() {
     }
   };
 
-  const confirmDeletePayment = async () => {
+  const confirmDeleteTx = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await deletePayment(db, deleteTarget);
-      showToast('Платёж удалён.');
+      await deleteTransaction(db, deleteTarget);
+      showToast('Транзакция удалена.');
     } catch {
-      showToast('Не удалось удалить платёж.', { type: 'error' });
+      showToast('Не удалось удалить.', { type: 'error' });
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
@@ -273,10 +271,7 @@ export function StudentDetailPage() {
             </button>
             <DropdownMenu
               variant="chevron"
-              items={[
-                { label: 'Оплата', onClick: () => setPaymentOpen(true) },
-                ...(isAdmin ? [{ label: 'Сторно', onClick: () => setReverseOpen(true) }] : []),
-              ]}
+              items={[{ label: 'Оплата', onClick: () => setPaymentOpen(true) }]}
             />
           </div>
           {isAdmin && (
@@ -356,10 +351,11 @@ export function StudentDetailPage() {
                     ) : (
                       <Table
                         columns={[
-                          { key: 'date', label: 'Дата', render: (t) => formatDate(t.date) },
+                          { key: 'date', label: 'Дата', width: '90px', render: (t) => formatDate(t.date) },
                           {
                             key: 'type',
                             label: 'Тип',
+                            width: '100px',
                             render: (t) => (
                               <Badge variant={t.type === 'payment' ? 'type-payment' : 'type-system'}>
                                 {t.type === 'payment' ? 'оплата' : t.type === 'correction' ? 'коррекция' : 'система'}
@@ -369,6 +365,7 @@ export function StudentDetailPage() {
                           {
                             key: 'amount',
                             label: 'Сумма',
+                            width: '110px',
                             render: (t) => (
                               <span className={t.amount < 0 ? 'text-danger' : 'text-success'}>{formatMoneySigned(t.amount)}</span>
                             ),
@@ -376,17 +373,18 @@ export function StudentDetailPage() {
                           {
                             key: 'comment',
                             label: 'Комментарий',
+                            width: 'minmax(160px, 300px)',
                             render: (t) => (
-                              <span className="flex flex-wrap items-center gap-1">
+                              <span className="flex min-w-0 flex-wrap items-center gap-1 break-words">
                                 {t.groupCode && <Badge variant="group-code">{t.groupCode}</Badge>}
                                 {t.comment}
-                                {t.isReversed && <Badge variant="status-debt">сторнировано</Badge>}
                               </span>
                             ),
                           },
                           {
                             key: 'createdByName',
                             label: 'Сотрудник',
+                            width: '130px',
                             render: (t) => (
                               <span>
                                 {t.createdByName}
@@ -400,22 +398,10 @@ export function StudentDetailPage() {
                                 {
                                   key: '__actions',
                                   label: '',
-                                  width: '48px',
-                                  render: (t) => {
-                                    if (t.type === 'payment' && !t.isReversed && !t.id.startsWith('rev_')) {
-                                      return (
-                                        <button
-                                          type="button"
-                                          onClick={() => setDeleteTarget(t)}
-                                          aria-label="Удалить платёж"
-                                          className="text-muted hover:text-danger"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </button>
-                                      );
-                                    }
-                                    if ((t.type === 'charge' || t.type === 'correction') && !t.isReversed && !t.id.startsWith('rev_')) {
-                                      return (
+                                  width: '72px',
+                                  render: (t) => (
+                                    <span className="flex items-center gap-2">
+                                      {t.type !== 'payment' && (
                                         <button
                                           type="button"
                                           onClick={() => setEditTxTarget(t)}
@@ -424,10 +410,17 @@ export function StudentDetailPage() {
                                         >
                                           <Pencil className="h-4 w-4" />
                                         </button>
-                                      );
-                                    }
-                                    return null;
-                                  },
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setDeleteTarget(t)}
+                                        aria-label="Удалить"
+                                        className="text-muted hover:text-danger"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </span>
+                                  ),
                                 },
                               ]
                             : []),
@@ -464,8 +457,7 @@ export function StudentDetailPage() {
       {isAdmin && (
         <>
           <ManualChargeModal open={manualChargeOpen} student={student} onClose={() => setManualChargeOpen(false)} />
-          <ReverseTransactionModal open={reverseOpen} transactions={transactions} onClose={() => setReverseOpen(false)} />
-          <EditChargeModal open={Boolean(editTxTarget)} student={student} transaction={editTxTarget} onClose={() => setEditTxTarget(null)} />
+          <EditChargeModal open={Boolean(editTxTarget)} transaction={editTxTarget} onClose={() => setEditTxTarget(null)} />
         </>
       )}
 
@@ -482,10 +474,10 @@ export function StudentDetailPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={confirmDeletePayment}
+        onConfirm={confirmDeleteTx}
         loading={deleting}
-        title="Удалить платёж"
-        message={deleteTarget ? `Удалить платёж на ${formatMoney(deleteTarget.amount)} от ${formatDate(deleteTarget.date)}? Баланс студента пересчитается.` : ''}
+        title="Удалить транзакцию"
+        message={deleteTarget ? `Удалить ${deleteTarget.type === 'payment' ? 'платёж' : 'списание'} на ${formatMoney(Math.abs(deleteTarget.amount))} от ${formatDate(deleteTarget.date)}? Баланс студента пересчитается.` : ''}
         confirmLabel="Удалить"
       />
     </>

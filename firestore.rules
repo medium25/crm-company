@@ -80,12 +80,11 @@ service cloud.firestore {
     match /transactions/{id} {
       allow read:   if isAdmin();
       allow create: if isAdmin();
-      allow delete: if isAdmin() && resource.data.type == 'payment';
-      // Транзакции неизменяемы по сумме/типу — единственный разрешённый
-      // update это сторно (reverseTransaction), которое помечает исходную
-      // запись isReversed/reversedBy, саму запись не меняя.
+      allow delete: if isAdmin();
+      // updateTransaction правит только сумму/комментарий/дату/месяц записи
+      // на месте (без компенсирующих проводок).
       allow update: if isAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isReversed', 'reversedBy']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'comment', 'date', 'month', 'updatedAt', 'updatedBy']);
     }
 
     match /enrollments/{id} {

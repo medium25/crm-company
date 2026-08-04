@@ -30,7 +30,7 @@ export function FreezeEnrollmentModal({ enrollment, onClose }) {
       await updateDoc(doc(db, 'enrollments', enrollment.id), {
         status: 'paused',
         pausedFrom: Timestamp.fromDate(new Date(`${pausedFrom}T00:00:00`)),
-        pausedTo: pausedTo ? Timestamp.fromDate(new Date(`${pausedTo}T00:00:00`)) : null,
+        pausedTo: Timestamp.fromDate(new Date(`${pausedTo}T00:00:00`)),
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });
@@ -59,7 +59,7 @@ export function FreezeEnrollmentModal({ enrollment, onClose }) {
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit} loading={saving} disabled={!pausedFrom}>
+          <Button onClick={handleSubmit} loading={saving} disabled={!pausedFrom || !pausedTo}>
             Заморозить
           </Button>
         </>
@@ -67,7 +67,7 @@ export function FreezeEnrollmentModal({ enrollment, onClose }) {
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <DatePicker label="С" required value={pausedFrom} onChange={(e) => setPausedFrom(e.target.value)} />
-        <DatePicker label="По (необязательно)" value={pausedTo} onChange={(e) => setPausedTo(e.target.value)} />
+        <DatePicker label="По" required value={pausedTo} onChange={(e) => setPausedTo(e.target.value)} />
       </form>
     </Modal>
   );
