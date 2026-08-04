@@ -49,12 +49,12 @@ export function DashboardPage() {
 
   const cards = stats
     ? [
-        { icon: GraduationCap, label: 'Активные студенты', value: stats.activeStudents, to: '/students?status=active' },
-        { icon: Handshake, label: 'Оплатили в текущем месяце', value: stats.paidThisMonth, to: '/payments?period=current' },
-        { icon: AlertTriangle, label: 'Должники', value: stats.debtors, to: '/students?debtors=1' },
-        { icon: LogOut, label: 'Ушли из активной группы', value: stats.leftActiveGroup, to: '/students?status=left&from=group' },
-        { icon: Timer, label: 'В пробном уроке', value: stats.trial, to: '/students?status=trial' },
-        { icon: UserX, label: 'Ушли после пробного периода', value: stats.leftAfterTrial, to: '/students?status=left&from=trial' },
+        { icon: GraduationCap, label: 'Активные студенты', value: stats.activeStudents, to: '/students?section=all&allView=list&status=active' },
+        { icon: Handshake, label: 'Оплатили в текущем месяце', value: stats.paidThisMonth, to: '/payments' },
+        { icon: AlertTriangle, label: 'Должники', value: stats.debtors, to: '/students?section=debtors' },
+        { icon: LogOut, label: 'Ушли из активной группы', value: stats.leftActiveGroup, to: '/students?section=left' },
+        { icon: Timer, label: 'В пробном уроке', value: stats.trial, to: '/students?section=trial' },
+        { icon: UserX, label: 'Ушли после пробного периода', value: stats.leftAfterTrial, to: '/students?section=left' },
       ]
     : [];
 
