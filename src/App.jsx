@@ -13,6 +13,7 @@ import { GroupsPage } from './pages/GroupsPage.jsx';
 import { GroupDetailPage } from './pages/GroupDetailPage.jsx';
 import { TeachersPage } from './pages/TeachersPage.jsx';
 import { TeacherDetailPage } from './pages/TeacherDetailPage.jsx';
+import { TeachersAndGroupsPage } from './pages/TeachersAndGroupsPage.jsx';
 import { CoursesPage } from './pages/CoursesPage.jsx';
 import { RoomsPage } from './pages/RoomsPage.jsx';
 import { PaymentsPage } from './pages/PaymentsPage.jsx';
@@ -40,6 +41,7 @@ function App() {
                 <Route path="leads" element={<LeadsPage />} />
                 <Route path="students" element={<StudentsPage />} />
                 <Route path="students/:id" element={<StudentDetailPage />} />
+                <Route path="teachers-groups" element={<TeachersAndGroupsPage />} />
                 <Route path="groups" element={<GroupsPage />} />
                 <Route path="groups/:id" element={<GroupDetailPage />} />
                 <Route path="teachers" element={<TeachersPage />} />

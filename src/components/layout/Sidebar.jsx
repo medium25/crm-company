@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutGrid,
   CircleUserRound,
-  Layers,
   GraduationCap,
   Coins,
   BarChart3,
@@ -17,24 +16,25 @@ const STORAGE_KEY = 'icon-crm:sidebar-collapsed';
 
 /**
  * Полный список пунктов меню. Видимость по роли — см. ROLE_ITEM_KEYS ниже.
- * Учитель — частный случай: только «Группы» и «Дашборд учителя» (04 · Экраны, «Оболочка приложения»).
+ * «Группы» и «Учителя» объединены в один пункт «Учителя и группы» —
+ * список учителей, клик по учителю открывает его группы (TeachersAndGroupsPage).
+ * Учитель — частный случай: только он и «Дашборд учителя» (04 · Экраны, «Оболочка приложения»).
  */
 const ITEMS = [
   { key: 'dashboard', to: '/', label: 'Дашборд', icon: LayoutGrid },
   { key: 'students', to: '/students', label: 'Студенты', icon: CircleUserRound },
-  { key: 'groups', to: '/groups', label: 'Группы', icon: Layers },
-  { key: 'teachers', to: '/teachers', label: 'Учителя', icon: GraduationCap },
+  { key: 'teachersGroups', to: '/teachers-groups', label: 'Учителя и группы', icon: GraduationCap },
   { key: 'payments', to: '/payments', label: 'Финансы', icon: Coins },
   { key: 'reports', to: '/reports', label: 'Отчёты', icon: BarChart3 },
   { key: 'settings', to: '/settings', label: 'Настройки', icon: Settings },
 ];
 
-/** ceo/manager/admin — полный доступ, teacher — только свои группы. */
+/** ceo/manager/admin — полный доступ, teacher — только «Учителя и группы» (те же группы, что раньше). */
 const ROLE_ITEM_KEYS = {
-  ceo: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
-  manager: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
-  admin: ['dashboard', 'students', 'groups', 'teachers', 'payments', 'reports', 'settings'],
-  teacher: ['dashboard', 'groups'],
+  ceo: ['dashboard', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  manager: ['dashboard', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  admin: ['dashboard', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  teacher: ['dashboard', 'teachersGroups'],
 };
 
 /**
