@@ -150,14 +150,23 @@ export function StudentsPage() {
     return map;
   }, [enrollments]);
 
+  // «Все ученики» не считает замороженных — студент возвращается в счёт
+  // только когда его разморозят (status обратно 'active'/'trial').
+  // recomputeStudentAggregates ставит status='paused' лишь когда ВСЕ записи
+  // студента на паузе, так что общий счётчик ниже использует это же поле.
+  const nonPausedStudents = useMemo(() => rawStudents.filter((st) => st.status !== 'paused'), [rawStudents]);
+
   // Разбивка «Все ученики» по учителям — сколько РАЗНЫХ студентов у каждого
   // (студент с 2 группами у одного учителя считается один раз; с группами
-  // у 2 разных учителей — попадает в оба). Не зависит от поиска/статус-
-  // фильтра списка — это ориентир на входе в раздел, до применения фильтров.
+  // у 2 разных учителей — попадает в оба). Замороженные записи (status ===
+  // 'paused') пропускаются — если у студента есть ещё активная запись у
+  // другого учителя, он всё равно считается за тем учителем. Не зависит от
+  // поиска/статус-фильтра списка — это ориентир на входе в раздел.
   const teacherBreakdown = useMemo(() => {
     const map = new Map();
     for (const [studentId, list] of enrollmentsByStudent) {
       for (const e of list) {
+        if (e.status === 'paused') continue;
         if (!map.has(e.teacherId)) map.set(e.teacherId, { teacherId: e.teacherId, teacherName: e.teacherName, studentIds: new Set() });
         map.get(e.teacherId).studentIds.add(studentId);
       }
@@ -544,7 +553,7 @@ export function StudentsPage() {
               <span className="flex-1">
                 <span className="block text-[17px] font-bold text-text">Все ученики</span>
                 <span className="block text-[13px] text-muted">
-                  {rawStudents.length} {pluralize(rawStudents.length, ['ученик', 'ученика', 'учеников'])}
+                  {nonPausedStudents.length} {pluralize(nonPausedStudents.length, ['ученик', 'ученика', 'учеников'])}
                 </span>
               </span>
               <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
@@ -559,7 +568,7 @@ export function StudentsPage() {
               >
                 <span className="font-bold text-text">{t.teacherName}</span>
                 <span className="flex items-center gap-2 text-[15px] text-muted">
-                  {t.count} из {rawStudents.length}
+                  {t.count} из {nonPausedStudents.length}
                   <ChevronRight className="h-4 w-4 text-muted" />
                 </span>
               </Card>
@@ -571,7 +580,7 @@ export function StudentsPage() {
       ) : (
         <>
           {section === 'all' && !loading && rawStudents.length > 0 && (
-            <AllStudentsSummary total={rawStudents.length} breakdown={teacherBreakdown} />
+            <AllStudentsSummary total={nonPausedStudents.length} breakdown={teacherBreakdown} />
           )}
 
           <FilterBar onReset={resetFilters}>
