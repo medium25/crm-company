@@ -20,6 +20,7 @@ import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { EditFreezeStartModal } from '../components/students/EditFreezeStartModal.jsx';
+import { EditFreezeEndModal } from '../components/students/EditFreezeEndModal.jsx';
 import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
 import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.jsx';
 import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
@@ -58,6 +59,7 @@ export function StudentsPage() {
   const [selected, setSelected] = useState(() => new Set());
   const [smsOpen, setSmsOpen] = useState(false);
   const [editFreezeTarget, setEditFreezeTarget] = useState(null);
+  const [editFreezeEndTarget, setEditFreezeEndTarget] = useState(null);
 
   const section = searchParams.get('section') || null;
   const search = searchParams.get('q') || '';
@@ -379,6 +381,31 @@ export function StudentsPage() {
       },
     },
     {
+      key: 'pausedTo',
+      label: 'Конец заморозки',
+      render: (st) => {
+        const enr = pausedEnrollmentByStudent.get(st.id);
+        return (
+          <span className="flex items-center gap-2">
+            {enr?.pausedTo ? formatDate(enr.pausedTo) : '—'}
+            {enr && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditFreezeEndTarget(enr);
+                }}
+                aria-label="Изменить дату окончания заморозки"
+                className="text-muted hover:text-navy"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </span>
+        );
+      },
+    },
+    {
       key: 'daysLeft',
       label: 'Осталось',
       render: (st) => formatDaysLeft(pausedEnrollmentByStudent.get(st.id)?.pausedTo),
@@ -543,6 +570,8 @@ export function StudentsPage() {
       <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} />
 
       <EditFreezeStartModal enrollment={editFreezeTarget} onClose={() => setEditFreezeTarget(null)} />
+
+      <EditFreezeEndModal enrollment={editFreezeEndTarget} onClose={() => setEditFreezeEndTarget(null)} />
 
       <SmsSendModal
         open={smsOpen}
