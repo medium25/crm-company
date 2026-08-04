@@ -7,7 +7,7 @@ import { MoreVertical, ChevronDown } from 'lucide-react';
  * передаётся `variant="chevron"` — узкая стрелка ▾, встраиваемая вплотную
  * к основной кнопке в общую пилюлю.
  * @param {Object} props
- * @param {Array<{label: string, onClick: () => void, danger?: boolean}>} props.items
+ * @param {Array<{label: string, onClick: () => void, danger?: boolean, disabled?: boolean, title?: string}>} props.items
  * @param {'icon'|'chevron'} [props.variant]
  */
 export function DropdownMenu({ items, variant = 'icon' }) {
@@ -50,11 +50,14 @@ export function DropdownMenu({ items, variant = 'icon' }) {
             <button
               key={item.label}
               type="button"
+              disabled={item.disabled}
+              title={item.title}
               onClick={() => {
+                if (item.disabled) return;
                 setOpen(false);
                 item.onClick();
               }}
-              className={`block w-full px-3 py-2 text-left text-[15px] hover:bg-surface-alt ${
+              className={`block w-full px-3 py-2 text-left text-[15px] hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
                 item.danger ? 'text-danger' : 'text-text'
               }`}
             >

@@ -5,26 +5,33 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../ui/Toast.jsx';
 import { recomputeStudentAggregates } from '../../lib/students.js';
 import { logActivity } from '../../lib/activityLog.js';
+import { MIN_FREEZE_BALANCE } from '../../lib/billing.js';
+import { formatMoney } from '../../lib/format.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
 
 /**
  * Заморозка записи — списания прекращаются со дня заморозки (реализация
- * списаний — фаза 5, здесь только фиксация дат).
+ * списаний — фаза 5, здесь только фиксация дат). Разрешена только при
+ * balance >= MIN_FREEZE_BALANCE (гейт на кнопке в EnrollmentCard, здесь —
+ * повторная проверка на случай прямого открытия модалки).
  * @param {Object} props
  * @param {Object|null} props.enrollment
+ * @param {number} props.studentBalance
  * @param {() => void} props.onClose
  */
-export function FreezeEnrollmentModal({ enrollment, onClose }) {
+export function FreezeEnrollmentModal({ enrollment, studentBalance, onClose }) {
   const { user, staff } = useAuth();
   const { showToast } = useToast();
   const [pausedFrom, setPausedFrom] = useState('');
   const [pausedTo, setPausedTo] = useState('');
   const [saving, setSaving] = useState(false);
+  const canFreeze = studentBalance >= MIN_FREEZE_BALANCE;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canFreeze) return;
     setSaving(true);
     try {
       await updateDoc(doc(db, 'enrollments', enrollment.id), {
@@ -59,13 +66,18 @@ export function FreezeEnrollmentModal({ enrollment, onClose }) {
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit} loading={saving} disabled={!pausedFrom || !pausedTo}>
+          <Button onClick={handleSubmit} loading={saving} disabled={!canFreeze || !pausedFrom || !pausedTo}>
             Заморозить
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {!canFreeze && (
+          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+            Заморозка доступна только при балансе от {formatMoney(MIN_FREEZE_BALANCE)}. Текущий баланс: {formatMoney(studentBalance)}.
+          </p>
+        )}
         <DatePicker label="С" required value={pausedFrom} onChange={(e) => setPausedFrom(e.target.value)} />
         <DatePicker label="По" required value={pausedTo} onChange={(e) => setPausedTo(e.target.value)} />
       </form>

@@ -4,6 +4,7 @@ import { doc } from 'firebase/firestore';
 import { Pause, Ghost, CheckCircle } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useDoc } from '../../hooks/useDoc.js';
+import { MIN_FREEZE_BALANCE } from '../../lib/billing.js';
 import { Badge } from '../ui/Badge.jsx';
 import { Button } from '../ui/Button.jsx';
 import { formatDate, formatMoney, formatScheduleType } from '../../lib/format.js';
@@ -12,16 +13,18 @@ import { formatDate, formatMoney, formatScheduleType } from '../../lib/format.js
  * Карточка записи студента в группу — все поля со скриншота 6.
  * @param {Object} props
  * @param {Object} props.enrollment
+ * @param {number} props.studentBalance баланс студента — заморозка разрешена только при balance >= MIN_FREEZE_BALANCE
  * @param {(enrollment: Object) => void} props.onFreeze
  * @param {(enrollment: Object) => void} props.onLeave
  * @param {(enrollment: Object) => void} props.onActivate
  */
-export function EnrollmentCard({ enrollment, onFreeze, onLeave, onActivate }) {
+export function EnrollmentCard({ enrollment, studentBalance, onFreeze, onLeave, onActivate }) {
   const navigate = useNavigate();
   const groupRef = useMemo(() => (db ? doc(db, 'groups', enrollment.groupId) : null), [enrollment.groupId]);
   const { data: group } = useDoc(groupRef);
 
   const canAct = enrollment.status === 'active' || enrollment.status === 'trial' || enrollment.status === 'paused';
+  const canFreeze = studentBalance >= MIN_FREEZE_BALANCE;
 
   return (
     <div className="rounded-card border border-border bg-surface p-5">
@@ -57,7 +60,14 @@ export function EnrollmentCard({ enrollment, onFreeze, onLeave, onActivate }) {
               </Button>
             )}
             {canAct && enrollment.status !== 'paused' && (
-              <Button variant="icon-round" tone="warning" onClick={() => onFreeze(enrollment)} aria-label="Заморозить">
+              <Button
+                variant="icon-round"
+                tone="warning"
+                onClick={() => onFreeze(enrollment)}
+                disabled={!canFreeze}
+                aria-label="Заморозить"
+                title={canFreeze ? undefined : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`}
+              >
                 <Pause className="h-4 w-4" />
               </Button>
             )}

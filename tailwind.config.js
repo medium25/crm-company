@@ -18,6 +18,11 @@ export default {
         present:       '#3E8B84',
         absent:        '#2F80D8',
         link:          '#2563EB',
+        freeze: {
+          blue:   '#EAF3FF',
+          yellow: '#FFF6D9',
+          red:    '#FBEAEA',
+        },
       },
       fontFamily: {
         sans: ['"Nunito Sans"', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],

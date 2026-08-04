@@ -12,8 +12,9 @@ import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
  * @param {'asc'|'desc'} [props.sortDir]
  * @param {(key: string) => void} [props.onSort]
  * @param {(row: Object) => void} [props.onRowClick]
+ * @param {(row: Object) => string} [props.rowClassName] переопределяет фон/hover строки (по умолчанию `bg-surface hover:bg-surface-alt`)
  */
-export function Table({ columns, rows, sortKey, sortDir = 'asc', onSort, onRowClick }) {
+export function Table({ columns, rows, sortKey, sortDir = 'asc', onSort, onRowClick, rowClassName }) {
   // Заголовок и строки — один общий grid-контейнер (а не отдельная сетка
   // на каждую строку): иначе строка с более длинным содержимым (например,
   // студент в 2+ группах) растягивает свои колонки независимо от соседних
@@ -53,9 +54,9 @@ export function Table({ columns, rows, sortKey, sortDir = 'asc', onSort, onRowCl
             key={row.id}
             role="row"
             onClick={() => onRowClick?.(row)}
-            className={`col-span-full grid grid-cols-subgrid items-center rounded-row bg-surface px-5 py-4 shadow-card transition-shadow hover:bg-surface-alt hover:shadow-hover ${
-              onRowClick ? 'cursor-pointer' : ''
-            }`}
+            className={`col-span-full grid grid-cols-subgrid items-center rounded-row px-5 py-4 shadow-card transition-shadow hover:shadow-hover ${
+              rowClassName ? rowClassName(row) : 'bg-surface hover:bg-surface-alt'
+            } ${onRowClick ? 'cursor-pointer' : ''}`}
           >
             {columns.map((col) => (
               <div key={col.key} className="min-w-0 px-0 text-[15px] text-text">

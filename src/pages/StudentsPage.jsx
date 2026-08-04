@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
+import { differenceInCalendarDays } from 'date-fns';
 import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, FileWarning } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -129,6 +130,29 @@ export function StudentsPage() {
     }
     return map;
   }, [enrollments]);
+
+  // Ближайший дедлайн заморозки на студента — если он записан в несколько
+  // замороженных групп сразу, берём самую раннюю pausedTo (самая срочная).
+  const pausedDeadlineByStudent = useMemo(() => {
+    const map = new Map();
+    for (const e of enrollments) {
+      if (e.status !== 'paused' || !e.pausedTo) continue;
+      const current = map.get(e.studentId);
+      if (!current || e.pausedTo.toMillis() < current.toMillis()) map.set(e.studentId, e.pausedTo);
+    }
+    return map;
+  }, [enrollments]);
+
+  // Синие — заморожен, срок ещё не горит; жёлтые — 3 дня или меньше до
+  // дедлайна; красные — дедлайн сегодня или уже прошёл.
+  const pausedRowClass = (st) => {
+    const deadline = pausedDeadlineByStudent.get(st.id);
+    if (!deadline) return 'bg-surface hover:bg-surface-alt';
+    const daysLeft = differenceInCalendarDays(deadline.toDate(), new Date());
+    if (daysLeft <= 0) return 'bg-freeze-red hover:bg-freeze-red/70';
+    if (daysLeft <= 3) return 'bg-freeze-yellow hover:bg-freeze-yellow/70';
+    return 'bg-freeze-blue hover:bg-freeze-blue/70';
+  };
 
   const filtered = useMemo(() => {
     let list = rawStudents;
@@ -288,6 +312,18 @@ export function StudentsPage() {
           },
         ]
       : []),
+    ...(section === 'paused'
+      ? [
+          {
+            key: 'pausedTo',
+            label: 'Дедлайн заморозки',
+            render: (st) => {
+              const deadline = pausedDeadlineByStudent.get(st.id);
+              return deadline ? formatDate(deadline) : '—';
+            },
+          },
+        ]
+      : []),
     {
       key: 'balance',
       label: 'Баланс',
@@ -425,7 +461,12 @@ export function StudentsPage() {
 
           {!loading && !error && filtered.length > 0 && section !== 'trial' && (
             <>
-              <Table columns={columns} rows={pageRows} onRowClick={(st) => navigate(`/students/${st.id}`)} />
+              <Table
+                columns={columns}
+                rows={pageRows}
+                onRowClick={(st) => navigate(`/students/${st.id}`)}
+                rowClassName={section === 'paused' ? pausedRowClass : undefined}
+              />
               {totalPages > 1 && (
                 <div className="mt-4 flex justify-center gap-2">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (

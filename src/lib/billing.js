@@ -15,6 +15,9 @@ import {
 import { format, endOfMonth, startOfMonth, addDays, subDays } from 'date-fns';
 import { lessonsInRange } from './schedule.js';
 
+/** Минимальный положительный баланс студента, при котором разрешена заморозка записи. */
+export const MIN_FREEZE_BALANCE = 140000;
+
 /**
  * Цена одного урока для конкретной записи — «03 · Бизнес-логика» §3.1.
  * @param {{price: number}} enrollment

@@ -28,6 +28,7 @@ import { LeaveGroupModal } from '../components/students/LeaveGroupModal.jsx';
 import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
 import { formatDate, formatMoney, formatPhone, formatScheduleType } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
+import { MIN_FREEZE_BALANCE } from '../lib/billing.js';
 
 const TABS = [
   { key: 'attendance', label: 'Посещаемость' },
@@ -49,6 +50,7 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
   const balance = student?.balance ?? 0;
   const isTrial = enrollment.status === 'trial';
   const isPaused = enrollment.status === 'paused';
+  const canFreeze = balance >= MIN_FREEZE_BALANCE;
 
   return (
     <li className="flex items-center gap-2 text-[15px] text-text">
@@ -87,7 +89,16 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
         items={[
           { label: 'Открыть карточку', onClick: () => navigate(`/students/${enrollment.studentId}`) },
           ...(isTrial ? [{ label: 'Активировать', onClick: () => onActivate(enrollment) }] : []),
-          { label: 'Заморозить', onClick: () => onFreeze(enrollment) },
+          ...(isPaused
+            ? []
+            : [
+                {
+                  label: 'Заморозить',
+                  onClick: () => onFreeze(enrollment),
+                  disabled: !canFreeze,
+                  title: canFreeze ? undefined : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`,
+                },
+              ]),
           { label: 'Перевести в другую группу', onClick: () => showToast('Скоро появится.') },
           { label: 'Убрать из группы', onClick: () => onLeave(enrollment), danger: true },
         ]}
@@ -316,7 +327,11 @@ export function GroupDetailPage() {
       </div>
 
       <GroupFormModal group={editing ? group : null} onClose={() => setEditing(false)} />
-      <FreezeEnrollmentModal enrollment={freezeTarget} onClose={() => setFreezeTarget(null)} />
+      <FreezeEnrollmentModal
+        enrollment={freezeTarget}
+        studentBalance={studentsById.get(freezeTarget?.studentId)?.balance}
+        onClose={() => setFreezeTarget(null)}
+      />
       <LeaveGroupModal enrollment={leaveTarget} onClose={() => setLeaveTarget(null)} />
       <ActivateEnrollmentModal
         enrollment={activateTarget}
