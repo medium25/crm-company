@@ -545,7 +545,7 @@ export function StudentsPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="flex flex-col gap-3">
             <Card hoverable className="flex cursor-pointer items-center gap-4 p-5" onClick={() => setAllView('list')}>
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
                 <CircleUserRound className="h-6 w-6" strokeWidth={1.75} />
@@ -559,20 +559,22 @@ export function StudentsPage() {
               <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
             </Card>
 
-            {teacherBreakdown.map((t) => (
-              <Card
-                key={t.teacherId}
-                hoverable
-                className="flex cursor-pointer items-center justify-between p-5"
-                onClick={() => setAllView(t.teacherId)}
-              >
-                <span className="font-bold text-text">{t.teacherName}</span>
-                <span className="flex items-center gap-2 text-[15px] text-muted">
-                  {t.count} из {nonPausedStudents.length}
-                  <ChevronRight className="h-4 w-4 text-muted" />
-                </span>
-              </Card>
-            ))}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {teacherBreakdown.map((t) => (
+                <Card
+                  key={t.teacherId}
+                  hoverable
+                  className="flex cursor-pointer items-center justify-between p-5"
+                  onClick={() => setAllView(t.teacherId)}
+                >
+                  <span className="font-bold text-text">{t.teacherName}</span>
+                  <span className="flex items-center gap-2 text-[15px] text-muted">
+                    {t.count} из {nonPausedStudents.length}
+                    <ChevronRight className="h-4 w-4 text-muted" />
+                  </span>
+                </Card>
+              ))}
+            </div>
           </div>
         )
       ) : section === 'all' && allView !== 'list' ? (
