@@ -26,8 +26,6 @@ import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.
 import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
 import { NoChargeHistoryList } from '../components/students/NoChargeHistoryList.jsx';
 import { AllStudentsSummary } from '../components/students/AllStudentsSummary.jsx';
-import { TeacherGroupsList } from '../components/students/TeacherGroupsList.jsx';
-import { GroupFormModal } from '../components/groups/GroupFormModal.jsx';
 import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths, formatDaysLeft, pluralize } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
@@ -63,13 +61,8 @@ export function StudentsPage() {
   const [smsOpen, setSmsOpen] = useState(false);
   const [editFreezeTarget, setEditFreezeTarget] = useState(null);
   const [editFreezeEndTarget, setEditFreezeEndTarget] = useState(null);
-  const [modalGroup, setModalGroup] = useState(null);
 
   const section = searchParams.get('section') || null;
-  // «Все ученики» — свой drill-down: null (выбор — общий список или
-  // учитель), 'list' (полный список с фильтрами, как раньше), иначе id
-  // учителя (его группы).
-  const allView = searchParams.get('allView') || null;
   const search = searchParams.get('q') || '';
   const status = searchParams.get('status') || 'all';
   const onlyDebtors = searchParams.get('debtors') === '1';
@@ -101,13 +94,6 @@ export function StudentsPage() {
     next.delete('page');
     if (allView) next.set('allView', allView);
     else next.delete('allView');
-    setSearchParams(next);
-  };
-  const setAllView = (view) => {
-    const next = new URLSearchParams(searchParams);
-    if (view) next.set('allView', view);
-    else next.delete('allView');
-    next.delete('page');
     setSearchParams(next);
   };
   const goToLanding = () => {
@@ -562,13 +548,7 @@ export function StudentsPage() {
     );
   }
 
-  // «Все ученики» держит свой drill-down (выбор → общий список / учитель);
-  // пока не дошли до общего списка (allView === 'list'), шапка ведёт себя
-  // как для attendance/debtors/noChargeHistory — без счётчика и bulk-действий.
-  const hideHeaderExtras =
-    section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' || (section === 'all' && allView !== 'list');
-  const isAllChooser = section === 'all' && allView === null;
-  const isTeacherGroups = section === 'all' && allView !== null && allView !== 'list';
+  const hideHeaderExtras = section === 'attendance' || section === 'debtors' || section === 'noChargeHistory';
 
   return (
     <>
@@ -576,11 +556,7 @@ export function StudentsPage() {
         title={SECTION_TABS.find((t) => t.key === section)?.label ?? 'Студенты'}
         count={hideHeaderExtras ? undefined : filtered.length}
         actions={
-          section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' || isAllChooser ? null : isTeacherGroups ? (
-            <Button onClick={() => setModalGroup({})}>
-              <Plus className="h-4 w-4" /> Добавить
-            </Button>
-          ) : (
+          hideHeaderExtras ? null : (
             <>
               {selected.size > 0 && (
                 <>
@@ -603,15 +579,9 @@ export function StudentsPage() {
         }
       />
 
-      {section === 'all' && allView ? (
-        <button type="button" onClick={() => setAllView(null)} className="mb-6 flex items-center gap-1 text-[15px] text-link">
-          <ArrowLeft className="h-4 w-4" /> Все ученики — назад
-        </button>
-      ) : (
-        <button type="button" onClick={goToLanding} className="mb-6 flex items-center gap-1 text-[15px] text-link">
-          <ArrowLeft className="h-4 w-4" /> Все разделы
-        </button>
-      )}
+      <button type="button" onClick={goToLanding} className="mb-6 flex items-center gap-1 text-[15px] text-link">
+        <ArrowLeft className="h-4 w-4" /> Все разделы
+      </button>
 
       {section === 'attendance' ? (
         <AttendanceByTeacher />
@@ -619,31 +589,6 @@ export function StudentsPage() {
         <DebtorsByTeacher />
       ) : section === 'noChargeHistory' ? (
         <NoChargeHistoryList />
-      ) : section === 'all' && allView === null ? (
-        loading ? (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-[88px] w-full rounded-card" />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <Card hoverable className="flex cursor-pointer items-center gap-4 p-5" onClick={() => setAllView('list')}>
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
-                <CircleUserRound className="h-6 w-6" strokeWidth={1.75} />
-              </span>
-              <span className="flex-1">
-                <span className="block text-[17px] font-bold text-text">Все ученики</span>
-                <span className="block text-[13px] text-muted">
-                  {nonPausedStudents.length} {pluralize(nonPausedStudents.length, ['ученик', 'ученика', 'учеников'])}
-                </span>
-              </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
-            </Card>
-          </div>
-        )
-      ) : section === 'all' && allView !== 'list' ? (
-        <TeacherGroupsList teacherId={allView} branchId={activeBranchId} />
       ) : (
         <>
           {section === 'all' && !loading && rawStudents.length > 0 && (
@@ -738,7 +683,6 @@ export function StudentsPage() {
       <EditFreezeEndModal enrollment={editFreezeEndTarget} onClose={() => setEditFreezeEndTarget(null)} />
 
 
-      <GroupFormModal group={modalGroup} onClose={() => setModalGroup(null)} />
 
       <SmsSendModal
         open={smsOpen}
