@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { collection, doc, orderBy, query, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, orderBy, query, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Users, Plus, Link as LinkIcon } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -11,7 +11,10 @@ import { Button } from '../ui/Button.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { SkeletonRow } from '../ui/Skeleton.jsx';
 import { Badge } from '../ui/Badge.jsx';
+import { DropdownMenu } from '../ui/DropdownMenu.jsx';
+import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { AddStaffModal } from './AddStaffModal.jsx';
+import { formatPhone } from '../../lib/format.js';
 
 const ROLE_OPTIONS = [
   { value: 'ceo', label: 'CEO' },
@@ -29,7 +32,9 @@ export function StaffSettingsTab() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { data: staffList, loading, error } = useCollection(staffQuery);
-  const [addOpen, setAddOpen] = useState(false);
+  const [modalMember, setModalMember] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const copyLoginLink = async () => {
     try {
@@ -62,15 +67,28 @@ export function StaffSettingsTab() {
     }
   };
 
+  const confirmDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'staff', deleteTarget.id));
+      showToast('Сотрудник удалён.');
+      setDeleteTarget(null);
+    } catch {
+      showToast('Не удалось удалить сотрудника.', { type: 'error' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const addButton = (
     <div className="mb-4 flex items-center justify-end">
-      <Button onClick={() => setAddOpen(true)}>
+      <Button onClick={() => setModalMember({})}>
         <Plus className="h-4 w-4" /> Добавить сотрудника
       </Button>
     </div>
   );
 
-  const modal = <AddStaffModal open={addOpen} onClose={() => setAddOpen(false)} />;
+  const modal = <AddStaffModal member={modalMember} onClose={() => setModalMember(null)} />;
 
   if (loading) {
     return (
@@ -112,7 +130,7 @@ export function StaffSettingsTab() {
       render: (m) => (
         <div>
           <div className="font-bold">{m.fullName}</div>
-          <div className="text-[13px] text-muted">{m.email}</div>
+          <div className="text-[13px] text-muted">{m.phone ? formatPhone(m.phone) : m.email}</div>
         </div>
       ),
     },
@@ -147,6 +165,24 @@ export function StaffSettingsTab() {
         </button>
       ),
     },
+    {
+      key: '__actions',
+      label: '',
+      render: (m) => (
+        <DropdownMenu
+          items={[
+            { label: 'Редактировать', onClick: () => setModalMember(m) },
+            {
+              label: 'Удалить',
+              onClick: () => setDeleteTarget(m),
+              danger: true,
+              disabled: m.id === user.uid,
+              title: m.id === user.uid ? 'Нельзя удалить свой же аккаунт' : undefined,
+            },
+          ]}
+        />
+      ),
+    },
   ];
 
   return (
@@ -154,6 +190,15 @@ export function StaffSettingsTab() {
       {addButton}
       <Table columns={columns} rows={staffList} />
       {modal}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        loading={deleting}
+        title="Удалить сотрудника"
+        message={`Удалить «${deleteTarget?.fullName}»? Доступ в CRM пропадёт сразу. Firebase Auth-аккаунт (логин/пароль) не удаляется — просто перестаёт пускать в приложение без staff-документа.`}
+        confirmLabel="Удалить"
+      />
     </>
   );
 }

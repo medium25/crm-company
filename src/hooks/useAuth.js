@@ -2,6 +2,7 @@ import { createContext, createElement, useContext, useEffect, useState } from 'r
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase.js';
+import { phoneToAuthEmail, isPhoneIdentifier } from '../lib/auth.js';
 
 const AuthContext = createContext(null);
 
@@ -66,7 +67,8 @@ export function AuthProvider({ children }) {
     user,
     staff,
     loading,
-    login: (email, password) => signInWithEmailAndPassword(auth, email, password),
+    login: (identifier, password) =>
+      signInWithEmailAndPassword(auth, isPhoneIdentifier(identifier) ? phoneToAuthEmail(identifier) : identifier, password),
     logout: () => signOut(auth),
   };
 

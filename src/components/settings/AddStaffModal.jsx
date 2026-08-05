@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, collection, query, where, orderBy } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, serverTimestamp, collection, query, where, orderBy } from 'firebase/firestore';
 import { db, firebaseConfig } from '../../firebase.js';
+import { phoneToAuthEmail } from '../../lib/auth.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -21,31 +22,55 @@ const ROLE_OPTIONS = [
 
 const teachersQuery = db ? query(collection(db, 'teachers'), where('isArchived', '==', false), orderBy('displayName')) : null;
 
+const localPhone = (phone) => (phone ?? '').replace(/\D/g, '').replace(/^998/, '');
+
 /**
- * Заводит нового сотрудника: Firebase Auth аккаунт (email/пароль) + staff-
- * документ одним кликом. Создание через отдельный, временный instance
- * Firebase App — иначе createUserWithEmailAndPassword переключил бы текущую
- * сессию (owner/CEO) на новый аккаунт. Инстанс удаляется сразу после.
+ * Заводит нового сотрудника (Firebase Auth аккаунт по номеру телефона,
+ * без SMS — логин это {998+номер}@icon-crm.local, пароль по умолчанию
+ * равен номеру без 998) или правит существующего.
+ *
+ * Создание через отдельный, временный instance Firebase App — иначе
+ * createUserWithEmailAndPassword переключил бы текущую сессию (owner/CEO)
+ * на новый аккаунт. Инстанс удаляется сразу после.
+ *
+ * Редактирование правит только staff-документ (имя/роль/привязка к
+ * учителю) — номер телефона (= логин) сменить нельзя без нового аккаунта,
+ * Firebase Auth не даёт менять email существующего пользователя без
+ * подтверждения по почте, а для синтетического адреса подтверждать нечем.
  * @param {Object} props
- * @param {boolean} props.open
+ * @param {Object|null} props.member null — закрыто, {} — создание, сущность — редактирование
  * @param {() => void} props.onClose
  */
-export function AddStaffModal({ open, onClose }) {
+export function AddStaffModal({ member, onClose }) {
   const { user } = useAuth();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const { data: teachers } = useCollection(teachersQuery);
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordEdited, setPasswordEdited] = useState(false);
   const [role, setRole] = useState('teacher');
   const [teacherId, setTeacherId] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const isEdit = Boolean(member?.id);
+
+  useEffect(() => {
+    if (!member) return;
+    setFullName(member.fullName ?? '');
+    setPhone(localPhone(member.phone));
+    setPassword('');
+    setPasswordEdited(false);
+    setRole(member.role ?? 'teacher');
+    setTeacherId(member.teacherId ?? '');
+  }, [member]);
+
   const reset = () => {
     setFullName('');
-    setEmail('');
+    setPhone('');
     setPassword('');
+    setPasswordEdited(false);
     setRole('teacher');
     setTeacherId('');
   };
@@ -55,68 +80,124 @@ export function AddStaffModal({ open, onClose }) {
     onClose();
   };
 
+  const handlePhoneChange = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 9);
+    setPhone(digits);
+    if (!passwordEdited) setPassword(digits);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const tempApp = initializeApp(firebaseConfig, `staff-create-${Date.now()}`);
     try {
-      const tempAuth = getAuth(tempApp);
-      const { user: newUser } = await createUserWithEmailAndPassword(tempAuth, email, password);
+      if (isEdit) {
+        await updateDoc(doc(db, 'staff', member.id), {
+          fullName,
+          role,
+          teacherId: role === 'teacher' ? teacherId || null : null,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        });
+        showToast('Сотрудник обновлён.');
+        handleClose();
+        return;
+      }
 
-      await setDoc(doc(db, 'staff', newUser.uid), {
-        fullName,
-        phone: '',
-        email,
-        role,
-        branchIds: activeBranchId ? [activeBranchId] : [],
-        teacherId: role === 'teacher' ? teacherId || null : null,
-        isActive: true,
-        createdAt: serverTimestamp(),
-        createdBy: user.uid,
-      });
+      const fullPhone = `998${phone}`;
+      const authEmail = phoneToAuthEmail(fullPhone);
+      const tempApp = initializeApp(firebaseConfig, `staff-create-${Date.now()}`);
+      try {
+        const tempAuth = getAuth(tempApp);
+        const { user: newUser } = await createUserWithEmailAndPassword(tempAuth, authEmail, password);
 
-      showToast('Сотрудник добавлен.');
-      handleClose();
+        await setDoc(doc(db, 'staff', newUser.uid), {
+          fullName,
+          phone: fullPhone,
+          email: '',
+          role,
+          branchIds: activeBranchId ? [activeBranchId] : [],
+          teacherId: role === 'teacher' ? teacherId || null : null,
+          isActive: true,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid,
+        });
+
+        showToast('Сотрудник добавлен.');
+        handleClose();
+      } finally {
+        await deleteApp(tempApp);
+      }
     } catch (err) {
       const message =
-        err.code === 'auth/email-already-in-use' ? 'Такой email уже используется.' :
+        err.code === 'auth/email-already-in-use' ? 'Такой номер телефона уже используется.' :
         err.code === 'auth/weak-password' ? 'Пароль слишком короткий (минимум 6 символов).' :
-        'Не удалось добавить сотрудника.';
+        isEdit ? 'Не удалось сохранить изменения.' : 'Не удалось добавить сотрудника.';
       showToast(message, { type: 'error' });
     } finally {
-      await deleteApp(tempApp);
       setSaving(false);
     }
   };
 
   return (
     <Modal
-      open={open}
+      open={Boolean(member)}
       onClose={handleClose}
-      title="Добавить сотрудника"
+      title={isEdit ? 'Редактировать сотрудника' : 'Добавить сотрудника'}
       footer={
         <>
           <Button variant="secondary" onClick={handleClose}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit} loading={saving} disabled={!fullName || !email || !password}>
-            Добавить
+          <Button
+            onClick={handleSubmit}
+            loading={saving}
+            disabled={!fullName || (!isEdit && (!phone || phone.length < 9 || !password))}
+          >
+            {isEdit ? 'Сохранить' : 'Добавить'}
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input label="Имя" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
-        <Input label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Input
-          label="Пароль"
-          type="text"
-          required
-          minLength={6}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
         <Select label="Должность" options={ROLE_OPTIONS} value={role} onChange={(e) => setRole(e.target.value)} />
+
+        {isEdit ? (
+          <Input label="Телефон (логин)" value={`+998 ${phone}`} disabled />
+        ) : (
+          <label className="block">
+            <span className="mb-1 block text-[13px] text-muted">Телефон</span>
+            <span className="flex items-center gap-2">
+              <span className="flex h-11 shrink-0 items-center rounded-field border border-border-strong bg-surface-alt px-3 text-[15px] text-muted">
+                +998
+              </span>
+              <input
+                type="tel"
+                placeholder="901234567"
+                required
+                maxLength={9}
+                value={phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                className="h-11 w-full rounded-field border border-border-strong bg-white px-3 text-[15px] text-text placeholder:text-muted focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
+              />
+            </span>
+          </label>
+        )}
+
+        {!isEdit && (
+          <Input
+            label="Пароль"
+            type="text"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => {
+              setPasswordEdited(true);
+              setPassword(e.target.value);
+            }}
+          />
+        )}
+
         {role === 'teacher' && (
           <Select
             label="Учитель (карточка)"
@@ -125,9 +206,16 @@ export function AddStaffModal({ open, onClose }) {
             onChange={(e) => setTeacherId(e.target.value)}
           />
         )}
-        <p className="text-[13px] text-muted">
-          Пароль вводишь ты сам и сообщаешь сотруднику лично (по SMS/мессенджеру) — восстановления по email нет.
-        </p>
+
+        {!isEdit && (
+          <p className="text-[13px] text-muted">
+            Вход — по этому номеру телефона и паролю, без SMS-кода. Пароль по умолчанию — сам номер, можно
+            поменять здесь. Сообщи сотруднику лично.
+          </p>
+        )}
+        {isEdit && (
+          <p className="text-[13px] text-muted">Номер телефона (логин) сменить нельзя — удали сотрудника и заведи заново.</p>
+        )}
       </form>
     </Modal>
   );
