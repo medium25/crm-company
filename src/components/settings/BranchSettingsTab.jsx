@@ -36,7 +36,7 @@ export function BranchSettingsTab() {
       name: activeBranch.name ?? '',
       address: activeBranch.address ?? '',
       phone: activeBranch.phone ?? '',
-      lessonsPerMonth: String(activeBranch.lessonsPerMonth ?? 14),
+      lessonsPerMonth: String(activeBranch.lessonsPerMonth ?? 12),
       churnPeriod: settingsDoc?.churnPeriod ?? 'year',
     });
   }, [activeBranch, settingsDoc]);

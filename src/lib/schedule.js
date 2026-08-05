@@ -17,22 +17,27 @@ export function trainingWeeks(startDate, today = new Date()) {
   return { months, weeks };
 }
 
+// «Чётные»/«нечётные дни» — не календарная чётность числа месяца, а
+// недельный паттерн (3 занятия в неделю): нечётные = пн/ср/пт, чётные =
+// вт/чт/сб. getDay(): 0=вс,1=пн,2=вт,3=ср,4=чт,5=пт,6=сб.
+const ODD_WEEKDAYS = [1, 3, 5];
+const EVEN_WEEKDAYS = [2, 4, 6];
+
 /**
  * @param {Date} date
  * @param {import('../types.js').GroupSchedule} schedule
  * @returns {boolean}
  */
 export function matchesSchedule(date, schedule) {
-  if (schedule.type === 'even') return date.getDate() % 2 === 0;
-  if (schedule.type === 'odd') return date.getDate() % 2 === 1;
+  if (schedule.type === 'even') return EVEN_WEEKDAYS.includes(date.getDay());
+  if (schedule.type === 'odd') return ODD_WEEKDAYS.includes(date.getDay());
   if (schedule.type === 'weekdays') return (schedule.weekdays ?? []).includes(date.getDay());
   return false;
 }
 
 /**
  * Все даты уроков группы в диапазоне [from, to] включительно, за вычетом
- * праздников. При `type: 'odd'` 31-е и 1-е число идут подряд — это ожидаемое
- * поведение референсной системы (оба нечётные), не баг.
+ * праздников.
  * @param {import('../types.js').GroupSchedule} schedule
  * @param {Date} from
  * @param {Date} to

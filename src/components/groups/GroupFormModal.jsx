@@ -62,7 +62,7 @@ export function GroupFormModal({ group, onClose }) {
   const { user, staff } = useAuth();
   const { activeBranchId, activeBranch } = useBranch();
   const { showToast } = useToast();
-  const [form, setForm] = useState(() => emptyForm(activeBranch?.lessonsPerMonth ?? 14));
+  const [form, setForm] = useState(() => emptyForm(activeBranch?.lessonsPerMonth ?? 12));
   const [saving, setSaving] = useState(false);
 
   const coursesQuery = useMemo(() => (db ? query(collection(db, 'courses'), where('isArchived', '==', false)) : null), []);
@@ -103,7 +103,7 @@ export function GroupFormModal({ group, onClose }) {
         tags: (group.tags ?? []).join(', '),
       });
     } else {
-      setForm(emptyForm(activeBranch?.lessonsPerMonth ?? 14));
+      setForm(emptyForm(activeBranch?.lessonsPerMonth ?? 12));
     }
   }, [group, activeBranch]);
 
