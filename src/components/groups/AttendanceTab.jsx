@@ -108,13 +108,26 @@ export function AttendanceTab({ group }) {
   };
 
   const today = todayStart();
+  const todayKey = format(today, 'yyyy-MM-dd');
+  const isCurrentMonth = monthStr === format(today, 'yyyy-MM');
+  const todayHeaderRef = useRef(null);
+
+  // Учитель открывает вкладку отметить сегодняшний урок — сетка месяца
+  // широкая, без автоскролла на телефоне пришлось бы сначала листать её
+  // горизонтально, чтобы найти сегодняшнюю колонку.
+  useEffect(() => {
+    if (!isCurrentMonth) return;
+    todayHeaderRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [lessons, isCurrentMonth]);
 
   const canMarkLesson = (lessonDate) => {
     if (isAdmin) return true;
     if (isTeacher && staff?.teacherId === group.teacherId) {
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(today.getDate() - 7);
-      return lessonDate <= today && lessonDate >= sevenDaysAgo;
+      // Учитель отмечает урок только в день урока или на следующий день —
+      // дальше только через администрацию.
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      return lessonDate <= today && lessonDate >= yesterday;
     }
     return false;
   };
@@ -194,30 +207,30 @@ export function AttendanceTab({ group }) {
     return <EmptyState icon={Users} title="Пока нет студентов в группе" />;
   }
 
-  const gridTemplate = `200px repeat(${lessons.length}, 64px)`;
+  const gridTemplate = `repeat(${lessons.length}, 64px)`;
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2">
-        <button type="button" onClick={() => setMonthDate(startOfMonth(new Date()))} className="rounded-full px-3 py-1.5 text-[13px] text-link">
+      <div className="mb-4 flex items-center gap-1 sm:gap-2">
+        <button type="button" onClick={() => setMonthDate(startOfMonth(new Date()))} className="shrink-0 rounded-full px-2 py-1.5 text-[13px] text-link sm:px-3">
           Текущий
         </button>
-        <button type="button" onClick={() => setMonthDate((d) => subMonths(d, 12))} aria-label="-12 мес" className="text-muted hover:text-text">
+        <button type="button" onClick={() => setMonthDate((d) => subMonths(d, 12))} aria-label="-12 мес" className="hidden shrink-0 text-muted hover:text-text sm:block">
           <ChevronsLeft className="h-4 w-4" />
         </button>
-        <button type="button" onClick={() => setMonthDate((d) => subMonths(d, 1))} aria-label="-1 мес" className="text-muted hover:text-text">
+        <button type="button" onClick={() => setMonthDate((d) => subMonths(d, 1))} aria-label="-1 мес" className="shrink-0 text-muted hover:text-text">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="min-w-32 text-center text-[15px] font-bold text-text">
+        <span className="min-w-24 shrink-0 text-center text-[15px] font-bold text-text sm:min-w-32">
           {format(monthDate, 'LLLL yyyy', { locale: ru })}
         </span>
-        <button type="button" onClick={() => setMonthDate((d) => addMonths(d, 1))} aria-label="+1 мес" className="text-muted hover:text-text">
+        <button type="button" onClick={() => setMonthDate((d) => addMonths(d, 1))} aria-label="+1 мес" className="shrink-0 text-muted hover:text-text">
           <ChevronRight className="h-4 w-4" />
         </button>
-        <button type="button" onClick={() => setMonthDate((d) => addMonths(d, 12))} aria-label="+12 мес" className="text-muted hover:text-text">
+        <button type="button" onClick={() => setMonthDate((d) => addMonths(d, 12))} aria-label="+12 мес" className="hidden shrink-0 text-muted hover:text-text sm:block">
           <ChevronsRight className="h-4 w-4" />
         </button>
-        <button type="button" onClick={() => setHideAbsent((v) => !v)} aria-label="Скрыть/показать отсутствующих" className="ml-2 text-muted hover:text-text">
+        <button type="button" onClick={() => setHideAbsent((v) => !v)} aria-label="Скрыть/показать отсутствующих" className="ml-auto shrink-0 text-muted hover:text-text sm:ml-2">
           {hideAbsent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </div>
@@ -225,59 +238,75 @@ export function AttendanceTab({ group }) {
       {lessons.length === 0 ? (
         <EmptyState icon={Users} title="В этом месяце нет уроков" />
       ) : (
-        <div className="w-full overflow-x-auto">
-          <div className="grid" style={{ gridTemplateColumns: gridTemplate }}>
-            <div className="sticky left-0 z-10 bg-surface px-3 py-2 text-[15px] font-bold text-text">Имя</div>
-            {lessons.map((lesson) => (
-              <button
-                key={lesson.id}
-                type="button"
-                onClick={(e) => handleHeaderClick(lesson, e)}
-                title="Ctrl/Cmd+клик — отметить всех присутствующими"
-                className="px-1 py-2 text-center text-[13px] font-bold text-text hover:bg-surface-alt"
-              >
-                {format(lesson.date.toDate(), 'd MMM', { locale: ru })}
-              </button>
-            ))}
-
-            {enrollments.map((enrollment) => (
-              <div key={enrollment.id} className="contents">
-                <div className="sticky left-0 z-10 flex items-center gap-2 bg-surface px-3 py-2 text-[15px] text-text">
+        <div className="w-full">
+          {/*
+            Имя-колонка — отдельная от прокручиваемой сетки дат панель, а не
+            `position: sticky` grid-item: в Chromium sticky внутри CSS Grid с
+            явными широкими треками теряет привязку после ~90px прокрутки
+            (эмпирически воспроизведено) — имена уезжают вместе со скроллом.
+            Две синхронные колонки с одинаковой высотой строк (h-11) не
+            зависят от этого поведения.
+          */}
+          <div className="flex">
+            <div className="w-[160px] shrink-0 border-r border-border sm:w-[200px]">
+              <div className="flex h-11 items-center bg-surface px-3 text-[15px] font-bold text-text">Имя</div>
+              {enrollments.map((enrollment) => (
+                <div key={enrollment.id} className="flex h-11 items-center gap-2 bg-surface px-3 text-[15px] text-text">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-alt text-[12px] font-bold text-muted">
                     {enrollment.studentName[0]}
                   </span>
                   <span className="truncate">{enrollment.studentName}</span>
                 </div>
-                {lessons.map((lesson) => {
-                  const lessonDate = lesson.date.toDate();
-                  if (lessonDate < eligibleFrom(enrollment)) {
-                    return <div key={lesson.id} />;
-                  }
-                  const status = getStatus(lesson.id, enrollment.studentId);
-                  const displayStatus = hideAbsent && status === 'absent' ? null : status;
-                  const future = lessonDate > today;
-                  return (
-                    <div key={lesson.id} className="flex items-center justify-center py-1">
-                      <AttendanceCell
-                        status={displayStatus}
-                        future={future}
-                        onClick={() => handleCellClick(lesson, enrollment)}
-                      />
-                    </div>
-                  );
-                })}
+              ))}
+            </div>
+
+            <div className="min-w-0 flex-1 overflow-x-auto">
+              <div className="grid" style={{ gridTemplateColumns: gridTemplate }}>
+                {lessons.map((lesson) => (
+                  <button
+                    key={lesson.id}
+                    ref={lesson.dateKey === todayKey ? todayHeaderRef : undefined}
+                    type="button"
+                    onClick={(e) => handleHeaderClick(lesson, e)}
+                    title="Ctrl/Cmd+клик — отметить всех присутствующими"
+                    className={`flex h-11 items-center justify-center px-1 text-[13px] font-bold hover:bg-surface-alt ${
+                      lesson.dateKey === todayKey ? 'bg-orange-soft/40 text-navy' : 'text-text'
+                    }`}
+                  >
+                    {format(lesson.date.toDate(), 'd MMM', { locale: ru })}
+                  </button>
+                ))}
+
+                {enrollments.map((enrollment) =>
+                  lessons.map((lesson) => {
+                    const lessonDate = lesson.date.toDate();
+                    if (lessonDate < eligibleFrom(enrollment)) {
+                      return <div key={`${enrollment.id}_${lesson.id}`} className="h-11" />;
+                    }
+                    const status = getStatus(lesson.id, enrollment.studentId);
+                    const displayStatus = hideAbsent && status === 'absent' ? null : status;
+                    const future = lessonDate > today;
+                    return (
+                      <div key={`${enrollment.id}_${lesson.id}`} className="flex h-11 items-center justify-center">
+                        <AttendanceCell
+                          status={displayStatus}
+                          future={future}
+                          onClick={() => handleCellClick(lesson, enrollment)}
+                        />
+                      </div>
+                    );
+                  }),
+                )}
               </div>
-            ))}
+            </div>
           </div>
 
           <div className="mt-4 flex flex-col gap-1">
             {enrollments.map((enrollment) => {
-              const eligibleLessons = lessons.filter((l) => {
-                const ld = l.date.toDate();
-                return ld >= eligibleFrom(enrollment) && ld <= today;
-              });
-              const presentCount = eligibleLessons.filter((l) => getStatus(l.id, enrollment.studentId) === 'present').length;
-              const total = eligibleLessons.length;
+              // Знаменатель — все уроки группы в месяце (сколько всего будет),
+              // не только прошедшие/доступные студенту — по просьбе.
+              const presentCount = lessons.filter((l) => getStatus(l.id, enrollment.studentId) === 'present').length;
+              const total = lessons.length;
               const pct = total > 0 ? Math.round((presentCount / total) * 100) : 0;
               return (
                 <div key={enrollment.id} className="flex items-center justify-between text-[13px] text-muted">
