@@ -13,6 +13,8 @@ import {
   X,
 } from 'lucide-react';
 import { useRole } from '../../hooks/useRole.js';
+import iconMark from '../../../public/icon-mark.png';
+import iconWordmark from '../../../public/icon-wordmark.png';
 
 const STORAGE_KEY = 'icon-crm:sidebar-collapsed';
 
@@ -68,8 +70,8 @@ export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
         }`}
       >
         <div className="flex h-16 items-center justify-center gap-2 px-3">
-          <img src="/icon-mark.png" alt="" className="h-5 w-5 shrink-0" />
-          {!collapsed && <img src="/icon-wordmark.png" alt="ICON" className="h-4 w-auto shrink-0" />}
+          <img src={iconMark} alt="" className="h-5 w-5 shrink-0" />
+          {!collapsed && <img src={iconWordmark} alt="ICON" className="h-4 w-auto shrink-0" />}
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2">
@@ -127,8 +129,8 @@ export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
             <nav className="relative flex h-full w-64 max-w-[80vw] flex-col bg-surface shadow-modal">
               <div className="flex h-16 items-center justify-between border-b border-border px-4">
                 <span className="flex items-center gap-2">
-                  <img src="/icon-mark.png" alt="" className="h-5 w-5 shrink-0" />
-                  <img src="/icon-wordmark.png" alt="ICON" className="h-4 w-auto shrink-0" />
+                  <img src={iconMark} alt="" className="h-5 w-5 shrink-0" />
+                  <img src={iconWordmark} alt="ICON" className="h-4 w-auto shrink-0" />
                 </span>
                 <button type="button" onClick={onMobileClose} className="rounded-full p-1 text-muted hover:bg-surface-alt" aria-label="Закрыть меню">
                   <X className="h-5 w-5" />
