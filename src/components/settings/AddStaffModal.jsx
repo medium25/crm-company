@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { doc, setDoc, updateDoc, serverTimestamp, collection, query, where, orderBy } from 'firebase/firestore';
 import { db, firebaseConfig } from '../../firebase.js';
 import { phoneToAuthEmail } from '../../lib/auth.js';
@@ -110,17 +110,24 @@ export function AddStaffModal({ member, onClose }) {
         const tempAuth = getAuth(tempApp);
         const { user: newUser } = await createUserWithEmailAndPassword(tempAuth, authEmail, password);
 
-        await setDoc(doc(db, 'staff', newUser.uid), {
-          fullName,
-          phone: fullPhone,
-          email: '',
-          role,
-          branchIds: activeBranchId ? [activeBranchId] : [],
-          teacherId: role === 'teacher' ? teacherId || null : null,
-          isActive: true,
-          createdAt: serverTimestamp(),
-          createdBy: user.uid,
-        });
+        try {
+          await setDoc(doc(db, 'staff', newUser.uid), {
+            fullName,
+            phone: fullPhone,
+            email: '',
+            role,
+            branchIds: activeBranchId ? [activeBranchId] : [],
+            teacherId: role === 'teacher' ? teacherId || null : null,
+            isActive: true,
+            createdAt: serverTimestamp(),
+            createdBy: user.uid,
+          });
+        } catch (docErr) {
+          // Auth-аккаунт создан, а staff-документ — нет: без отката сотрудник
+          // залогинится в аккаунт без доступа ("Доступ не выдан"). Убираем сирота-аккаунт.
+          await deleteUser(newUser).catch(() => {});
+          throw docErr;
+        }
 
         showToast('Сотрудник добавлен.');
         handleClose();
