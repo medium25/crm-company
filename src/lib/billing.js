@@ -7,7 +7,7 @@ import {
   where,
   writeBatch,
   updateDoc,
-  setDoc,
+  runTransaction,
   increment,
   serverTimestamp,
   Timestamp,
@@ -481,16 +481,40 @@ export async function runMonthlyBilling(db, branchId, user, holidays = []) {
   const month = format(new Date(), 'yyyy-MM');
   const runRef = doc(db, 'billingRuns', billingRunId(branchId, month));
 
-  const existing = await getDoc(runRef);
-  if (existing.exists() && existing.data().status === 'done') {
-    return { processed: existing.data().processed ?? 0, totalAmount: 0, errors: [], skipped: true };
-  }
+  // Атомарный «захват» рана — без этого два почти одновременных клика (ceo
+  // и manager, оба видят ещё не done/running) оба проходят проверку и оба
+  // начинают начислять: у транзакций один и тот же ID, но students.balance
+  // получает increment(amount) из каждого batch отдельно — двойное списание
+  // с баланса при одной видимой транзакции. runTransaction читает и пишет
+  // billingRuns одной атомарной операцией — выигрывает только один вызов.
+  // Если ран завис в 'running' дольше STALE_RUN_MS (упала вкладка/сеть до
+  // финального updateDoc в status: 'done') — считаем брошенным, разрешаем
+  // перезахват. Настоящий одновременный клик такого разрыва не даёт —
+  // startedAt будет свежим, вторая попытка упрётся в !isStale.
+  const STALE_RUN_MS = 5 * 60 * 1000;
 
-  await setDoc(
-    runRef,
-    { branchId, month, status: 'running', startedAt: serverTimestamp(), finishedAt: null, processed: 0, errors: [] },
-    { merge: true },
-  );
+  const claimed = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(runRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.status === 'done') return false;
+      if (data.status === 'running') {
+        const isStale = Date.now() - (data.startedAt?.toMillis?.() ?? 0) > STALE_RUN_MS;
+        if (!isStale) return false;
+      }
+    }
+    tx.set(
+      runRef,
+      { branchId, month, status: 'running', startedAt: serverTimestamp(), finishedAt: null, processed: 0, errors: [] },
+      { merge: true },
+    );
+    return true;
+  });
+
+  if (!claimed) {
+    const current = await getDoc(runRef);
+    return { processed: current.data()?.processed ?? 0, totalAmount: 0, errors: [], skipped: true };
+  }
 
   const enrollSnap = await getDocs(
     query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', '==', 'active')),

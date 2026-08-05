@@ -3,6 +3,7 @@ import { collection, query, where, orderBy } from 'firebase/firestore';
 import { CircleDollarSign } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { useRole } from '../../hooks/useRole.js';
 import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
@@ -26,9 +27,11 @@ const STATUS_BADGE = {
  */
 export function BillingHistoryTab() {
   const { user, staff } = useAuth();
+  const { role } = useRole();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [running, setRunning] = useState(false);
+  const canRun = role === 'ceo' || role === 'manager';
 
   const runsQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'billingRuns'), where('branchId', '==', activeBranchId), orderBy('month', 'desc')) : null),
@@ -52,9 +55,11 @@ export function BillingHistoryTab() {
     <Card>
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-[15px] font-bold text-text">История запусков</h3>
-        <Button onClick={handleRun} loading={running}>
-          <CircleDollarSign className="h-4 w-4" /> Начислить сейчас
-        </Button>
+        {canRun && (
+          <Button onClick={handleRun} loading={running}>
+            <CircleDollarSign className="h-4 w-4" /> Начислить сейчас
+          </Button>
+        )}
       </div>
 
       {loading && <Skeleton className="h-20 w-full" />}

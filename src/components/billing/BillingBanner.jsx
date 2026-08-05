@@ -14,12 +14,12 @@ import { formatMoney, formatMonth } from '../../lib/format.js';
 
 /**
  * Баннер месячного начисления в топбаре — «03 · Бизнес-логика» §3.4.
- * Виден только ceo/manager/admin, только с 1-го числа месяца, только пока
- * биллинг-ран за этот месяц ещё не `done`.
+ * Виден только ceo/manager (не admin), только с 1-го числа месяца, только
+ * пока биллинг-ран за этот месяц ещё не `done`.
  */
 export function BillingBanner() {
   const { user, staff } = useAuth();
-  const { isAdmin } = useRole();
+  const { role } = useRole();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [running, setRunning] = useState(false);
@@ -31,7 +31,7 @@ export function BillingBanner() {
   );
   const { data: run, loading } = useDoc(runRef);
 
-  const canRun = isAdmin;
+  const canRun = role === 'ceo' || role === 'manager';
 
   if (!canRun || loading || run?.status === 'done' || !activeBranchId) {
     return null;
