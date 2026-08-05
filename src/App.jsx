@@ -1,5 +1,6 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth.js';
+import { useRole } from './hooks/useRole.js';
 import { BranchProvider } from './hooks/useBranch.js';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { ProtectedRoute } from './components/ProtectedRoute.jsx';
@@ -21,6 +22,13 @@ import { ReportsPage } from './pages/ReportsPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { UiKitShowcasePage } from './pages/UiKitShowcasePage.jsx';
 
+// Учитель в меню не видит «Дашборд» — прямой заход на '/' уводит его сразу
+// в «Учителя и группы», чтобы не показывать общий дашборд по URL в обход меню.
+function HomeRoute() {
+  const { isTeacher } = useRole();
+  return isTeacher ? <Navigate to="/teachers-groups" replace /> : <DashboardPage />;
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -37,7 +45,7 @@ function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<DashboardPage />} />
+                <Route index element={<HomeRoute />} />
                 <Route path="leads" element={<LeadsPage />} />
                 <Route path="students" element={<StudentsPage />} />
                 <Route path="students/:id" element={<StudentDetailPage />} />

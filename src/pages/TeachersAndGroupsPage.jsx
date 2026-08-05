@@ -4,6 +4,7 @@ import { collection, query, where, orderBy, doc, updateDoc, getDocs, serverTimes
 import { Plus, UploadCloud, CheckCircle2, X, GraduationCap, ArrowLeft } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { useRole } from '../hooks/useRole.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
 import { useToast } from '../components/ui/Toast.jsx';
@@ -32,26 +33,30 @@ const BANNER_KEY = 'icon-crm:teachers-banner-dismissed';
  * никуда не делись — просто больше не входная точка из меню.
  */
 export function TeachersAndGroupsPage() {
-  const { user } = useAuth();
+  const { user, staff } = useAuth();
+  const { isTeacher } = useRole();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const teacherId = searchParams.get('teacher') || null;
+  const teacherId = isTeacher ? staff?.teacherId ?? null : searchParams.get('teacher') || null;
 
   const teachersQuery = useMemo(() => {
-    if (!db || !activeBranchId) return null;
+    if (!db || !activeBranchId || isTeacher) return null;
     return query(
       collection(db, 'teachers'),
       where('branchIds', 'array-contains', activeBranchId),
       where('isArchived', '==', false),
       orderBy('displayName'),
     );
-  }, [activeBranchId]);
+  }, [activeBranchId, isTeacher]);
   const { data: teachers, loading, error } = useCollection(teachersQuery);
 
   const enrollmentsQuery = useMemo(
-    () => (db && activeBranchId ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
-    [activeBranchId],
+    () =>
+      db && activeBranchId && !isTeacher
+        ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false))
+        : null,
+    [activeBranchId, isTeacher],
   );
   const { data: enrollments } = useCollection(enrollmentsQuery);
 
@@ -121,13 +126,15 @@ export function TeachersAndGroupsPage() {
   return (
     <>
       <PageHeader
-        title={teacherId ? selectedTeacher?.displayName ?? 'Учитель' : 'Учителя и группы'}
+        title={isTeacher ? 'Мои группы сегодня' : teacherId ? selectedTeacher?.displayName ?? 'Учитель' : 'Учителя и группы'}
         count={teacherId ? undefined : teachers.length}
         actions={
           teacherId ? (
-            <Button onClick={() => setModalGroup({})}>
-              <Plus className="h-4 w-4" /> Добавить
-            </Button>
+            !isTeacher && (
+              <Button onClick={() => setModalGroup({})}>
+                <Plus className="h-4 w-4" /> Добавить
+              </Button>
+            )
           ) : (
             <>
               <Button variant="secondary" onClick={() => setImportOpen(true)}>
@@ -141,14 +148,16 @@ export function TeachersAndGroupsPage() {
         }
       />
 
-      {teacherId && (
+      {teacherId && !isTeacher && (
         <button type="button" onClick={() => openTeacher(null)} className="mb-6 flex items-center gap-1 text-[15px] text-link">
           <ArrowLeft className="h-4 w-4" /> Учителя и группы — назад
         </button>
       )}
 
-      {teacherId ? (
-        <TeacherGroupsList teacherId={teacherId} branchId={activeBranchId} />
+      {isTeacher && !teacherId ? (
+        <EmptyState icon={GraduationCap} title="Аккаунт не привязан к профилю учителя — обратитесь к администратору" />
+      ) : teacherId ? (
+        <TeacherGroupsList teacherId={teacherId} branchId={activeBranchId} todayOnly={isTeacher} />
       ) : (
         <>
           {!bannerDismissed && (
