@@ -52,7 +52,7 @@ export function RevenueChart({ data }) {
         ))}
       </div>
 
-      <div className="h-[420px] w-full">
+      <div className="h-[300px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filtered} margin={{ top: 10, right: 20, bottom: 40, left: 10 }}>
             <CartesianGrid stroke="#E9EBEF" />

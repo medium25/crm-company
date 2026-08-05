@@ -67,14 +67,14 @@ export function GlobalSearch() {
   };
 
   return (
-    <div ref={boxRef} className="relative max-w-md flex-1">
+    <div ref={boxRef} className="relative min-w-0 max-w-md flex-1">
       <button
         type="button"
         onClick={() => {
           setOpen(true);
           setTimeout(() => inputRef.current?.focus(), 0);
         }}
-        className="flex h-9 w-full items-center gap-2 rounded-full border border-border-strong bg-white px-3 text-[13px] text-muted"
+        className="flex h-9 w-full items-center justify-center gap-2 rounded-full border border-border-strong bg-white px-3 text-[13px] text-muted sm:justify-start"
       >
         <Search className="h-4 w-4 shrink-0" />
         {open ? (
@@ -83,17 +83,17 @@ export function GlobalSearch() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onClick={(e) => e.stopPropagation()}
-            placeholder="Поиск по студентам и группам"
-            className="flex-1 bg-transparent text-[13px] text-text outline-none placeholder:text-muted"
+            placeholder="Поиск"
+            className="w-full min-w-0 flex-1 bg-transparent text-[13px] text-text outline-none placeholder:text-muted"
           />
         ) : (
-          <span className="flex-1 text-left">Поиск по студентам и группам</span>
+          <span className="hidden flex-1 truncate text-left sm:inline">Поиск по студентам и группам</span>
         )}
-        <kbd className="shrink-0 rounded bg-surface-alt px-1.5 py-0.5 text-[11px]">⌘K</kbd>
+        <kbd className="hidden shrink-0 rounded bg-surface-alt px-1.5 py-0.5 text-[11px] sm:inline">⌘K</kbd>
       </button>
 
       {open && term && (
-        <div className="absolute left-0 top-11 z-20 max-h-96 w-full overflow-y-auto rounded-field border border-border bg-surface py-2 shadow-hover">
+        <div className="fixed inset-x-3 top-[4.5rem] z-20 max-h-96 overflow-y-auto rounded-field border border-border bg-surface py-2 shadow-hover sm:absolute sm:inset-x-auto sm:left-0 sm:top-11 sm:w-full">
           {studentResults.length === 0 && groupResults.length === 0 ? (
             <p className="px-3 py-2 text-[13px] text-muted">Ничего не найдено</p>
           ) : (

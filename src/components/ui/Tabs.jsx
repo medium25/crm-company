@@ -7,7 +7,7 @@
  */
 export function Tabs({ tabs, activeKey, onChange }) {
   return (
-    <div className="flex gap-6 border-b border-border" role="tablist">
+    <div className="flex gap-6 overflow-x-auto border-b border-border" role="tablist">
       {tabs.map((tab) => {
         const active = tab.key === activeKey;
         return (
@@ -17,7 +17,7 @@ export function Tabs({ tabs, activeKey, onChange }) {
             role="tab"
             aria-selected={active}
             onClick={() => onChange(tab.key)}
-            className={`relative -mb-px border-b-[3px] px-1 pb-3 text-[15px] transition-colors ${
+            className={`relative -mb-px shrink-0 border-b-[3px] px-1 pb-3 text-[15px] transition-colors ${
               active ? 'border-navy font-bold text-text' : 'border-transparent font-normal text-muted hover:text-text'
             }`}
           >
