@@ -8,6 +8,7 @@ import { recordPayment } from '../../lib/billing.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
+import { MoneyInput } from '../ui/MoneyInput.jsx';
 import { Select } from '../ui/Select.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -102,7 +103,7 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input label="Сумма" type="number" min="1" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <MoneyInput label="Сумма" required value={amount} onChange={(e) => setAmount(e.target.value)} />
         <Select label="Метод оплаты" options={METHOD_OPTIONS} value={method} onChange={(e) => setMethod(e.target.value)} />
         {activeEnrollments.length > 1 && (
           <Select

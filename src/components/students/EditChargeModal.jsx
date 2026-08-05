@@ -7,6 +7,7 @@ import { updateTransaction } from '../../lib/billing.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
+import { MoneyInput } from '../ui/MoneyInput.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
 
 /**
@@ -74,7 +75,7 @@ export function EditChargeModal({ open, transaction, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input label="Сумма" type="number" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <MoneyInput label="Сумма" required value={amount} onChange={(e) => setAmount(e.target.value)} />
         <DatePicker label="Дата" required value={date} onChange={(e) => setDate(e.target.value)} />
         <Input label="Комментарий" required value={comment} onChange={(e) => setComment(e.target.value)} />
       </form>
