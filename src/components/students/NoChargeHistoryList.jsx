@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
 import { collection, query, where, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Wallet } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -11,43 +10,41 @@ import { useToast } from '../ui/Toast.jsx';
 import { Table } from '../ui/Table.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Badge } from '../ui/Badge.jsx';
+import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { Skeleton } from '../ui/Skeleton.jsx';
-import { ManualChargeModal } from './ManualChargeModal.jsx';
 import { formatPhone, formatMoney, formatDate } from '../../lib/format.js';
 
 const STATUS_LABEL = { active: 'Активен', paused: 'Заморожен', trial: 'Пробный', left: 'Ушёл' };
 
-const CURRENT_MONTH = format(new Date(), 'yyyy-MM');
-
 /**
- * ВРЕМЕННЫЙ раздел — студенты без единой транзакции type=charge, а также
- * студенты с ровно одним charge и он в текущем августе (история списаний
- * никогда не переносилась из modme, см. переписку). Админ добавляет
- * реальное списание вручную ("Ручное списание") — если списаний становится
- * больше одного/не-августовское, студент автоматически уходит из списка по
- * фильтру. Либо, если других списаний не требуется, ставит "Готово" вручную.
- * После обработки всех — раздел удаляется целиком (компонент + пункт меню в
- * StudentsPage).
+ * Раздел ручной сверки со старой системой — список активных студентов,
+ * ещё не отмеченных проверенными. Владелец сравнивает карточку с modme и
+ * жмёт «Проверено»; после подтверждения студент помечается
+ * chargeHistoryReviewed и пропадает из списка. Список опустеет — раздел
+ * можно будет убрать вовсе.
  */
 export function NoChargeHistoryList() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
-  const [chargeTarget, setChargeTarget] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   const studentsQuery = useMemo(
-    () => (db && activeBranchId ? query(collection(db, 'students'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    () =>
+      db && activeBranchId
+        ? query(
+            collection(db, 'students'),
+            where('branchId', '==', activeBranchId),
+            where('isArchived', '==', false),
+            where('status', '==', 'active'),
+          )
+        : null,
     [activeBranchId],
   );
   const { data: students, loading: studentsLoading } = useCollection(studentsQuery);
-
-  const chargesQuery = useMemo(
-    () => (db && activeBranchId ? query(collection(db, 'transactions'), where('branchId', '==', activeBranchId), where('type', '==', 'charge')) : null),
-    [activeBranchId],
-  );
-  const { data: charges, loading: chargesLoading } = useCollection(chargesQuery);
 
   const enrollmentsQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
@@ -55,16 +52,8 @@ export function NoChargeHistoryList() {
   );
   const { data: enrollments, loading: enrollmentsLoading } = useCollection(enrollmentsQuery);
 
-  const loading = studentsLoading || chargesLoading || enrollmentsLoading;
+  const loading = studentsLoading || enrollmentsLoading;
 
-  const chargesByStudent = useMemo(() => {
-    const map = new Map();
-    for (const c of charges) {
-      if (!map.has(c.studentId)) map.set(c.studentId, []);
-      map.get(c.studentId).push(c);
-    }
-    return map;
-  }, [charges]);
   const enrollmentsByStudent = useMemo(() => {
     const map = new Map();
     for (const e of enrollments) {
@@ -75,26 +64,22 @@ export function NoChargeHistoryList() {
     return map;
   }, [enrollments]);
 
-  const rows = useMemo(
-    () =>
-      students.filter((s) => {
-        if (s.chargeHistoryReviewed) return false;
-        const own = chargesByStudent.get(s.id) ?? [];
-        if (own.length === 0) return true;
-        return own.length === 1 && own[0].month === CURRENT_MONTH;
-      }),
-    [students, chargesByStudent],
-  );
+  const rows = useMemo(() => students.filter((s) => !s.chargeHistoryReviewed), [students]);
 
-  const markDone = async (student) => {
+  const confirmVerified = async () => {
+    if (!confirmTarget) return;
+    setConfirming(true);
     try {
-      await updateDoc(doc(db, 'students', student.id), {
+      await updateDoc(doc(db, 'students', confirmTarget.id), {
         chargeHistoryReviewed: true,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });
+      setConfirmTarget(null);
     } catch {
       showToast('Не удалось отметить.', { type: 'error' });
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -146,16 +131,12 @@ export function NoChargeHistoryList() {
     {
       key: '__actions',
       label: '',
-      width: '220px',
+      width: '160px',
       render: (st) => (
-        <span className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <Button variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setChargeTarget(st)}>
-            Ручное списание
+        <span onClick={(e) => e.stopPropagation()}>
+          <Button variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setConfirmTarget(st)}>
+            Проверено
           </Button>
-          <label className="flex items-center gap-1.5 text-[13px] text-muted">
-            <input type="checkbox" onChange={() => markDone(st)} />
-            Готово
-          </label>
         </span>
       ),
     },
@@ -164,19 +145,25 @@ export function NoChargeHistoryList() {
   return (
     <div>
       <p className="mb-4 text-[13px] text-muted">
-        Временный раздел — {rows.length} студентов без перенесённой истории списаний (включая тех, у кого есть
-        только одно списание за этот август). Введи реальное списание вручную — если оно не единственное или не за
-        этот месяц, студент уйдёт из списка сам. Если других списаний не требуется — отметь «Готово». Когда список
-        опустеет, раздел удаляется.
+        Сверка со старой системой — {rows.length} активных студентов. Открой карточку, сравни баланс и историю
+        списаний с modme, затем нажми «Проверено». Список опустеет — сверка завершена.
       </p>
 
       {rows.length === 0 ? (
-        <EmptyState icon={Wallet} title="Все обработаны" />
+        <EmptyState icon={ShieldCheck} title="Все проверены" />
       ) : (
         <Table columns={columns} rows={rows} onRowClick={(st) => navigate(`/students/${st.id}`)} />
       )}
 
-      <ManualChargeModal open={Boolean(chargeTarget)} student={chargeTarget} onClose={() => setChargeTarget(null)} />
+      <ConfirmDialog
+        open={Boolean(confirmTarget)}
+        onClose={() => setConfirmTarget(null)}
+        onConfirm={confirmVerified}
+        loading={confirming}
+        title="Отметить проверенным"
+        message={`Точно убрать «${confirmTarget?.fullName}» из списка сверки?`}
+        confirmLabel="Проверено"
+      />
     </div>
   );
 }

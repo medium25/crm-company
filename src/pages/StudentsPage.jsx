@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, getDocs, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, format, startOfMonth, subDays } from 'date-fns';
-import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, FileWarning, Pencil } from 'lucide-react';
+import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, ShieldCheck, Pencil } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -45,7 +45,7 @@ const SECTION_TABS = [
   { key: 'paused', label: 'Замороженные', icon: Snowflake },
   { key: 'trial', label: 'На пробном уроке', icon: GraduationCap },
   { key: 'left', label: 'Покинувшие', icon: UserX },
-  { key: 'noChargeHistory', label: 'Без истории списаний (врем.)', icon: FileWarning },
+  { key: 'noChargeHistory', label: 'Проверка', icon: ShieldCheck },
 ];
 
 const PAGE_SIZE = 25;
