@@ -23,6 +23,7 @@ import { AddToGroupModal } from '../components/students/AddToGroupModal.jsx';
 import { EnrollmentCard } from '../components/students/EnrollmentCard.jsx';
 import { FreezeEnrollmentModal } from '../components/students/FreezeEnrollmentModal.jsx';
 import { LeaveGroupModal } from '../components/students/LeaveGroupModal.jsx';
+import { UnfreezeEnrollmentModal } from '../components/students/UnfreezeEnrollmentModal.jsx';
 import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
 import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
 import { ManualChargeModal } from '../components/students/ManualChargeModal.jsx';
@@ -82,6 +83,7 @@ export function StudentDetailPage() {
   const [freezeTarget, setFreezeTarget] = useState(null);
   const [leaveTarget, setLeaveTarget] = useState(null);
   const [activateTarget, setActivateTarget] = useState(null);
+  const [unfreezeTarget, setUnfreezeTarget] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [note, setNote] = useState('');
@@ -318,6 +320,7 @@ export function StudentDetailPage() {
                           onFreeze={setFreezeTarget}
                           onLeave={setLeaveTarget}
                           onActivate={setActivateTarget}
+                          onUnfreeze={setUnfreezeTarget}
                         />
                       ))}
                     </div>
@@ -449,6 +452,7 @@ export function StudentDetailPage() {
       <AddToGroupModal open={addToGroupOpen} student={student} onClose={() => setAddToGroupOpen(false)} />
       <FreezeEnrollmentModal enrollment={freezeTarget} studentBalance={student.balance} onClose={() => setFreezeTarget(null)} />
       <LeaveGroupModal enrollment={leaveTarget} onClose={() => setLeaveTarget(null)} />
+      <UnfreezeEnrollmentModal enrollment={unfreezeTarget} onClose={() => setUnfreezeTarget(null)} />
       <ActivateEnrollmentModal
         enrollment={activateTarget}
         student={student}

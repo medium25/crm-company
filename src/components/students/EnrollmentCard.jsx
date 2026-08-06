@@ -17,8 +17,9 @@ import { formatDate, formatMoney, formatScheduleType } from '../../lib/format.js
  * @param {(enrollment: Object) => void} props.onFreeze
  * @param {(enrollment: Object) => void} props.onLeave
  * @param {(enrollment: Object) => void} props.onActivate
+ * @param {(enrollment: Object) => void} props.onUnfreeze
  */
-export function EnrollmentCard({ enrollment, studentBalance, onFreeze, onLeave, onActivate }) {
+export function EnrollmentCard({ enrollment, studentBalance, onFreeze, onLeave, onActivate, onUnfreeze }) {
   const navigate = useNavigate();
   const groupRef = useMemo(() => (db ? doc(db, 'groups', enrollment.groupId) : null), [enrollment.groupId]);
   const { data: group } = useDoc(groupRef);
@@ -56,6 +57,11 @@ export function EnrollmentCard({ enrollment, studentBalance, onFreeze, onLeave, 
           <div className="flex items-center gap-1">
             {enrollment.status === 'trial' && (
               <Button variant="icon-round" tone="navy" onClick={() => onActivate(enrollment)} aria-label="Активировать">
+                <CheckCircle className="h-4 w-4" />
+              </Button>
+            )}
+            {enrollment.status === 'paused' && (
+              <Button variant="icon-round" tone="navy" onClick={() => onUnfreeze(enrollment)} aria-label="Снять заморозку">
                 <CheckCircle className="h-4 w-4" />
               </Button>
             )}

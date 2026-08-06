@@ -21,6 +21,7 @@ import { Skeleton, SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { EditFreezeStartModal } from '../components/students/EditFreezeStartModal.jsx';
 import { EditFreezeEndModal } from '../components/students/EditFreezeEndModal.jsx';
+import { UnfreezeEnrollmentModal } from '../components/students/UnfreezeEnrollmentModal.jsx';
 import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
 import { AttendanceByTeacher } from '../components/students/AttendanceByTeacher.jsx';
 import { DebtorsByTeacher } from '../components/students/DebtorsByTeacher.jsx';
@@ -61,6 +62,7 @@ export function StudentsPage() {
   const [smsOpen, setSmsOpen] = useState(false);
   const [editFreezeTarget, setEditFreezeTarget] = useState(null);
   const [editFreezeEndTarget, setEditFreezeEndTarget] = useState(null);
+  const [unfreezeTarget, setUnfreezeTarget] = useState(null);
 
   const section = searchParams.get('section') || null;
   const search = searchParams.get('q') || '';
@@ -498,6 +500,22 @@ export function StudentsPage() {
       render: (st) => formatDaysLeft(pausedEnrollmentByStudent.get(st.id)?.pausedTo),
     },
     columns[columns.length - 1],
+    {
+      key: '__actions',
+      label: '',
+      width: '140px',
+      render: (st) => (
+        <span onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="secondary"
+            className="h-8 px-3 text-[13px]"
+            onClick={() => setUnfreezeTarget(pausedEnrollmentByStudent.get(st.id))}
+          >
+            Активировать
+          </Button>
+        </span>
+      ),
+    },
   ];
 
   if (!section) {
@@ -681,6 +699,7 @@ export function StudentsPage() {
       <EditFreezeStartModal enrollment={editFreezeTarget} onClose={() => setEditFreezeTarget(null)} />
 
       <EditFreezeEndModal enrollment={editFreezeEndTarget} onClose={() => setEditFreezeEndTarget(null)} />
+      <UnfreezeEnrollmentModal enrollment={unfreezeTarget} onClose={() => setUnfreezeTarget(null)} />
 
 
 
