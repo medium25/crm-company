@@ -11,18 +11,7 @@ import { Input } from '../ui/Input.jsx';
 import { MoneyInput } from '../ui/MoneyInput.jsx';
 import { Select } from '../ui/Select.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
-import { formatMoney } from '../../lib/format.js';
-
-const METHOD_OPTIONS = [
-  { value: 'cash', label: 'Наличные' },
-  { value: 'click', label: 'Click' },
-  { value: 'payme', label: 'Payme' },
-  { value: 'uzum', label: 'Uzum' },
-  { value: 'uzcard', label: 'Uzcard' },
-  { value: 'humo', label: 'Humo' },
-  { value: 'card', label: 'Карта' },
-  { value: 'transfer', label: 'Банковский перевод' },
-];
+import { formatMoney, PAYMENT_METHOD_OPTIONS } from '../../lib/format.js';
 
 /**
  * «Добавить оплату» — с превью нового баланса до сохранения.
@@ -104,7 +93,7 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <MoneyInput label="Сумма" required value={amount} onChange={(e) => setAmount(e.target.value)} />
-        <Select label="Метод оплаты" options={METHOD_OPTIONS} value={method} onChange={(e) => setMethod(e.target.value)} />
+        <Select label="Метод оплаты" options={PAYMENT_METHOD_OPTIONS} value={method} onChange={(e) => setMethod(e.target.value)} />
         {activeEnrollments.length > 1 && (
           <Select
             label="Группа"

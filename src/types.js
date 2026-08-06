@@ -209,7 +209,10 @@
  */
 
 /**
- * @typedef {'cash' | 'click' | 'payme' | 'uzum' | 'uzcard' | 'humo' | 'card' | 'transfer'} PaymentMethod
+ * @typedef {'cash' | 'click' | 'uzcard'} PaymentMethod форма отдаёт только эти
+ * три ('uzcard' подписан «Терминал» в интерфейсе); старые значения
+ * (payme/uzum/card/transfer/humo) не выдаём в UI, но formatMethod() их
+ * ещё умеет отобразить, если они где-то остались в исторических данных.
  */
 
 /**

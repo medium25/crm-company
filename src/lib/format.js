@@ -2,6 +2,29 @@ import { format as formatDateFns, differenceInMonths, differenceInCalendarDays, 
 import { ru } from 'date-fns/locale';
 
 /**
+ * Единственные способы оплаты, которые можно выбрать в форме — «Терминал»
+ * хранится как 'uzcard' (исторически так писала старая система), но везде
+ * в интерфейсе подписан «Терминал», а не «Uzcard».
+ */
+export const PAYMENT_METHOD_OPTIONS = [
+  { value: 'cash', label: 'Наличные' },
+  { value: 'uzcard', label: 'Терминал' },
+  { value: 'click', label: 'Click' },
+];
+
+const METHOD_LABELS = Object.fromEntries(PAYMENT_METHOD_OPTIONS.map((m) => [m.value, m.label]));
+
+/**
+ * @param {string|null|undefined} method
+ * @returns {string} подпись способа оплаты — для значений, оставшихся от
+ * старой системы (payme/uzum/card/transfer/humo), просто отдаёт значение как есть
+ */
+export function formatMethod(method) {
+  if (!method) return '—';
+  return METHOD_LABELS[method] ?? method;
+}
+
+/**
  * @param {number} amount целое число в сумах
  * @returns {string} "840 000 UZS" (неразрывные пробелы)
  */

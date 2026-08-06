@@ -17,21 +17,11 @@ import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { RevenueChart } from '../components/charts/RevenueChart.jsx';
-import { formatDate, formatDateTime, formatMoney } from '../lib/format.js';
+import { formatDate, formatDateTime, formatMoney, formatMethod, PAYMENT_METHOD_OPTIONS } from '../lib/format.js';
 import { getMonthlyRevenue } from '../lib/stats.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
-const METHOD_OPTIONS = [
-  { value: '', label: 'Метод: все' },
-  { value: 'cash', label: 'Наличные' },
-  { value: 'click', label: 'Click' },
-  { value: 'payme', label: 'Payme' },
-  { value: 'uzum', label: 'Uzum' },
-  { value: 'uzcard', label: 'Uzcard' },
-  { value: 'humo', label: 'Humo' },
-  { value: 'card', label: 'Карта' },
-  { value: 'transfer', label: 'Банковский перевод' },
-];
+const METHOD_OPTIONS = [{ value: '', label: 'Метод: все' }, ...PAYMENT_METHOD_OPTIONS];
 
 const TYPE_TOGGLE = [
   { value: 'payment', label: 'Оплаты' },
@@ -210,7 +200,7 @@ export function PaymentsPage() {
       { key: 'date', label: 'Дата', value: (t) => formatDate(t.date) },
       { key: 'studentName', label: 'Имя', value: (t) => t.studentName },
       { key: 'amount', label: 'Сумма', value: (t) => t.amount },
-      { key: 'method', label: 'Метод оплаты', value: (t) => METHOD_OPTIONS.find((m) => m.value === t.method)?.label ?? '' },
+      { key: 'method', label: 'Метод оплаты', value: (t) => formatMethod(t.method) },
       { key: 'teacherName', label: 'Учитель', value: (t) => t.teacherName ?? '' },
       { key: 'groupCode', label: 'Группа', value: (t) => t.groupCode ?? '' },
       { key: 'comment', label: 'Комментарий', value: (t) => t.comment ?? '' },
@@ -257,7 +247,7 @@ export function PaymentsPage() {
       key: 'method',
       label: 'Метод оплаты',
       sortable: true,
-      render: (t) => METHOD_OPTIONS.find((m) => m.value === t.method)?.label ?? '—',
+      render: (t) => formatMethod(t.method),
     },
     { key: 'teacherName', label: 'Учитель', sortable: true, render: (t) => t.teacherName ?? '—' },
     {
@@ -309,7 +299,7 @@ export function PaymentsPage() {
                   <p className="mb-1 font-bold text-text">По методам оплаты</p>
                   {byMethod.map(([m, sum]) => (
                     <div key={m} className="flex justify-between text-muted">
-                      <span>{METHOD_OPTIONS.find((o) => o.value === m)?.label ?? m ?? '—'}</span>
+                      <span>{formatMethod(m)}</span>
                       <span>{formatMoney(sum)}</span>
                     </div>
                   ))}

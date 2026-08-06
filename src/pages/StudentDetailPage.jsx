@@ -32,7 +32,7 @@ import { CommentsTab } from '../components/shared/CommentsTab.jsx';
 import { HistoryTab } from '../components/shared/HistoryTab.jsx';
 import { CallLogsTab } from '../components/students/CallLogsTab.jsx';
 import { recalcBalance, deleteTransaction } from '../lib/billing.js';
-import { formatDateLong, formatDate, formatMoney, formatMoneySigned, formatMonth, formatPhone } from '../lib/format.js';
+import { formatDateLong, formatDate, formatMoney, formatMoneySigned, formatMonth, formatPhone, formatMethod } from '../lib/format.js';
 
 const TABS = [
   { key: 'groups', label: 'Группы' },
@@ -373,6 +373,12 @@ export function StudentDetailPage() {
                             render: (t) => (
                               <span className={t.amount < 0 ? 'text-danger' : 'text-success'}>{formatMoneySigned(t.amount)}</span>
                             ),
+                          },
+                          {
+                            key: 'method',
+                            label: 'Метод',
+                            width: '90px',
+                            render: (t) => (t.type === 'payment' ? formatMethod(t.method) : '—'),
                           },
                           {
                             key: 'comment',

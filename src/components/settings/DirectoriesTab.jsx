@@ -8,15 +8,7 @@ import { useToast } from '../ui/Toast.jsx';
 import { Card } from '../ui/Card.jsx';
 import { Skeleton } from '../ui/Skeleton.jsx';
 import { TagListEditor } from './TagListEditor.jsx';
-
-const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Наличные' },
-  { value: 'click', label: 'Click' },
-  { value: 'payme', label: 'Payme' },
-  { value: 'uzum', label: 'Uzum' },
-  { value: 'card', label: 'Карта' },
-  { value: 'transfer', label: 'Перечисление' },
-];
+import { PAYMENT_METHOD_OPTIONS as PAYMENT_METHODS } from '../../lib/format.js';
 
 /**
  * Настройки → Справочники: методы оплаты, источники лидов, причины ухода,
