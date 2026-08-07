@@ -4,7 +4,7 @@ import { doc } from 'firebase/firestore';
 import { Pause, Ghost, CheckCircle } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useDoc } from '../../hooks/useDoc.js';
-import { MIN_FREEZE_BALANCE } from '../../lib/billing.js';
+import { MIN_FREEZE_BALANCE, MAX_FREEZES_PER_STUDENT, canFreezeStudent } from '../../lib/billing.js';
 import { Badge } from '../ui/Badge.jsx';
 import { Button } from '../ui/Button.jsx';
 import { formatDate, formatMoney, formatScheduleType } from '../../lib/format.js';
@@ -14,18 +14,23 @@ import { formatDate, formatMoney, formatScheduleType } from '../../lib/format.js
  * @param {Object} props
  * @param {Object} props.enrollment
  * @param {number} props.studentBalance баланс студента — заморозка разрешена только при balance >= MIN_FREEZE_BALANCE
+ * @param {number} [props.studentFreezeCount] сколько раз студент уже замораживался за весь срок обучения
  * @param {(enrollment: Object) => void} props.onFreeze
  * @param {(enrollment: Object) => void} props.onLeave
  * @param {(enrollment: Object) => void} props.onActivate
  * @param {(enrollment: Object) => void} props.onUnfreeze
  */
-export function EnrollmentCard({ enrollment, studentBalance, onFreeze, onLeave, onActivate, onUnfreeze }) {
+export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount, onFreeze, onLeave, onActivate, onUnfreeze }) {
   const navigate = useNavigate();
   const groupRef = useMemo(() => (db ? doc(db, 'groups', enrollment.groupId) : null), [enrollment.groupId]);
   const { data: group } = useDoc(groupRef);
 
   const canAct = enrollment.status === 'active' || enrollment.status === 'trial' || enrollment.status === 'paused';
-  const canFreeze = studentBalance >= MIN_FREEZE_BALANCE;
+  const canFreeze = canFreezeStudent({ balance: studentBalance, freezeCount: studentFreezeCount });
+  const freezeLimitReached = (studentFreezeCount ?? 0) >= MAX_FREEZES_PER_STUDENT;
+  const freezeDisabledTitle = freezeLimitReached
+    ? `Лимит заморозок за весь срок обучения исчерпан (${MAX_FREEZES_PER_STUDENT} из ${MAX_FREEZES_PER_STUDENT})`
+    : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`;
 
   return (
     <div className="rounded-card border border-border bg-surface p-5">
@@ -72,7 +77,7 @@ export function EnrollmentCard({ enrollment, studentBalance, onFreeze, onLeave, 
                 onClick={() => onFreeze(enrollment)}
                 disabled={!canFreeze}
                 aria-label="Заморозить"
-                title={canFreeze ? undefined : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`}
+                title={canFreeze ? undefined : freezeDisabledTitle}
               >
                 <Pause className="h-4 w-4" />
               </Button>

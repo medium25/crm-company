@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { doc, updateDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, increment, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../ui/Toast.jsx';
 import { recomputeStudentAggregates } from '../../lib/students.js';
 import { logActivity } from '../../lib/activityLog.js';
-import { MIN_FREEZE_BALANCE } from '../../lib/billing.js';
+import { MIN_FREEZE_BALANCE, MAX_FREEZES_PER_STUDENT, canFreezeStudent } from '../../lib/billing.js';
 import { formatMoney } from '../../lib/format.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -14,20 +14,24 @@ import { DatePicker } from '../ui/DatePicker.jsx';
 /**
  * Заморозка записи — списания прекращаются со дня заморозки (реализация
  * списаний — фаза 5, здесь только фиксация дат). Разрешена только при
- * balance >= MIN_FREEZE_BALANCE (гейт на кнопке в EnrollmentCard, здесь —
- * повторная проверка на случай прямого открытия модалки).
+ * balance >= MIN_FREEZE_BALANCE и freezeCount < MAX_FREEZES_PER_STUDENT
+ * (гейт на кнопке в EnrollmentCard/RosterRow, здесь — повторная проверка на
+ * случай прямого открытия модалки). freezeCount — счётчик на students,
+ * общий на весь срок обучения, а не на конкретную запись.
  * @param {Object} props
  * @param {Object|null} props.enrollment
  * @param {number} props.studentBalance
+ * @param {number} [props.studentFreezeCount]
  * @param {() => void} props.onClose
  */
-export function FreezeEnrollmentModal({ enrollment, studentBalance, onClose }) {
+export function FreezeEnrollmentModal({ enrollment, studentBalance, studentFreezeCount, onClose }) {
   const { user, staff } = useAuth();
   const { showToast } = useToast();
   const [pausedFrom, setPausedFrom] = useState('');
   const [pausedTo, setPausedTo] = useState('');
   const [saving, setSaving] = useState(false);
-  const canFreeze = studentBalance >= MIN_FREEZE_BALANCE;
+  const canFreeze = canFreezeStudent({ balance: studentBalance, freezeCount: studentFreezeCount });
+  const freezeLimitReached = (studentFreezeCount ?? 0) >= MAX_FREEZES_PER_STUDENT;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,6 +44,9 @@ export function FreezeEnrollmentModal({ enrollment, studentBalance, onClose }) {
         pausedTo: Timestamp.fromDate(new Date(`${pausedTo}T00:00:00`)),
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
+      });
+      await updateDoc(doc(db, 'students', enrollment.studentId), {
+        freezeCount: increment(1),
       });
       await recomputeStudentAggregates(db, enrollment.studentId);
       await logActivity(
@@ -73,7 +80,12 @@ export function FreezeEnrollmentModal({ enrollment, studentBalance, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {!canFreeze && (
+        {!canFreeze && freezeLimitReached && (
+          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+            Лимит заморозок за весь срок обучения исчерпан ({MAX_FREEZES_PER_STUDENT} из {MAX_FREEZES_PER_STUDENT}).
+          </p>
+        )}
+        {!canFreeze && !freezeLimitReached && (
           <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
             Заморозка доступна только при балансе от {formatMoney(MIN_FREEZE_BALANCE)}. Текущий баланс: {formatMoney(studentBalance)}.
           </p>

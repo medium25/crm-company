@@ -28,7 +28,7 @@ import { LeaveGroupModal } from '../components/students/LeaveGroupModal.jsx';
 import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
 import { formatDate, formatMoney, formatPhone, formatScheduleType } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
-import { MIN_FREEZE_BALANCE } from '../lib/billing.js';
+import { MIN_FREEZE_BALANCE, MAX_FREEZES_PER_STUDENT, canFreezeStudent } from '../lib/billing.js';
 
 const TABS = [
   { key: 'attendance', label: 'Посещаемость' },
@@ -50,7 +50,11 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
   const balance = student?.balance ?? 0;
   const isTrial = enrollment.status === 'trial';
   const isPaused = enrollment.status === 'paused';
-  const canFreeze = balance >= MIN_FREEZE_BALANCE;
+  const canFreeze = canFreezeStudent(student);
+  const freezeDisabledTitle =
+    (student?.freezeCount ?? 0) >= MAX_FREEZES_PER_STUDENT
+      ? `Лимит заморозок за весь срок обучения исчерпан (${MAX_FREEZES_PER_STUDENT} из ${MAX_FREEZES_PER_STUDENT})`
+      : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`;
 
   return (
     <li className="flex items-center gap-2 text-[15px] text-text">
@@ -96,7 +100,7 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
                   label: 'Заморозить',
                   onClick: () => onFreeze(enrollment),
                   disabled: !canFreeze,
-                  title: canFreeze ? undefined : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`,
+                  title: canFreeze ? undefined : freezeDisabledTitle,
                 },
               ]),
           { label: 'Перевести в другую группу', onClick: () => showToast('Скоро появится.') },
@@ -330,6 +334,7 @@ export function GroupDetailPage() {
       <FreezeEnrollmentModal
         enrollment={freezeTarget}
         studentBalance={studentsById.get(freezeTarget?.studentId)?.balance}
+        studentFreezeCount={studentsById.get(freezeTarget?.studentId)?.freezeCount}
         onClose={() => setFreezeTarget(null)}
       />
       <LeaveGroupModal enrollment={leaveTarget} onClose={() => setLeaveTarget(null)} />

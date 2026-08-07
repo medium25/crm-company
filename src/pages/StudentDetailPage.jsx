@@ -317,6 +317,7 @@ export function StudentDetailPage() {
                           key={e.id}
                           enrollment={e}
                           studentBalance={student.balance}
+                          studentFreezeCount={student.freezeCount}
                           onFreeze={setFreezeTarget}
                           onLeave={setLeaveTarget}
                           onActivate={setActivateTarget}
@@ -456,7 +457,12 @@ export function StudentDetailPage() {
 
       <StudentFormModal student={editing ? student : null} onClose={() => setEditing(false)} />
       <AddToGroupModal open={addToGroupOpen} student={student} onClose={() => setAddToGroupOpen(false)} />
-      <FreezeEnrollmentModal enrollment={freezeTarget} studentBalance={student.balance} onClose={() => setFreezeTarget(null)} />
+      <FreezeEnrollmentModal
+        enrollment={freezeTarget}
+        studentBalance={student.balance}
+        studentFreezeCount={student.freezeCount}
+        onClose={() => setFreezeTarget(null)}
+      />
       <LeaveGroupModal enrollment={leaveTarget} onClose={() => setLeaveTarget(null)} />
       <UnfreezeEnrollmentModal enrollment={unfreezeTarget} onClose={() => setUnfreezeTarget(null)} />
       <ActivateEnrollmentModal

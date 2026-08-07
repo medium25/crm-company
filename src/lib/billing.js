@@ -18,6 +18,21 @@ import { lessonsInRange } from './schedule.js';
 /** Минимальный положительный баланс студента, при котором разрешена заморозка записи. */
 export const MIN_FREEZE_BALANCE = 140000;
 
+/** Сколько раз студент может замораживать записи за весь срок обучения. */
+export const MAX_FREEZES_PER_STUDENT = 2;
+
+/**
+ * Можно ли студенту заморозить запись — баланс не ниже MIN_FREEZE_BALANCE и
+ * лимит заморозок за весь срок обучения (MAX_FREEZES_PER_STUDENT) не исчерпан.
+ * @param {{balance?: number, freezeCount?: number}} student
+ * @returns {boolean}
+ */
+export function canFreezeStudent(student) {
+  const balance = student?.balance ?? 0;
+  const freezeCount = student?.freezeCount ?? 0;
+  return balance >= MIN_FREEZE_BALANCE && freezeCount < MAX_FREEZES_PER_STUDENT;
+}
+
 /**
  * Цена одного урока для конкретной записи — «03 · Бизнес-логика» §3.1.
  * @param {{price: number}} enrollment
