@@ -50,7 +50,6 @@ export function MonthComparisonChart({ data, currentMonth, prevMonth }) {
             name={formatMonth(prevMonth)}
             stroke="#8B94A3"
             strokeWidth={2}
-            strokeDasharray="4 4"
             dot={{ stroke: '#8B94A3', strokeWidth: 2, fill: '#FFFFFF', r: 4 }}
             activeDot={{ stroke: '#8B94A3', strokeWidth: 2, fill: '#FFFFFF', r: 5 }}
             connectNulls={false}

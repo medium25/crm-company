@@ -16,9 +16,9 @@ import { Table } from '../components/ui/Table.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
-import { RevenueChart } from '../components/charts/RevenueChart.jsx';
+import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
 import { formatDate, formatDateTime, formatMoney, formatMethod, PAYMENT_METHOD_OPTIONS } from '../lib/format.js';
-import { getMonthlyRevenue } from '../lib/stats.js';
+import { getMonthlyRevenue, getDailyRevenueComparison } from '../lib/stats.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
 const METHOD_OPTIONS = [{ value: '', label: 'Метод: все' }, ...PAYMENT_METHOD_OPTIONS];
@@ -45,6 +45,7 @@ export function PaymentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [revenue, setRevenue] = useState([]);
+  const [revenueComparison, setRevenueComparison] = useState(null);
   const [sortKey, setSortKey] = useState('date');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(1);
@@ -96,6 +97,7 @@ export function PaymentsPage() {
   useEffect(() => {
     if (!db || !activeBranchId) return;
     getMonthlyRevenue(db, activeBranchId).then(setRevenue);
+    getDailyRevenueComparison(db, activeBranchId).then(setRevenueComparison);
   }, [activeBranchId]);
 
   const transactionsQuery = useMemo(() => {
@@ -318,7 +320,7 @@ export function PaymentsPage() {
           </Card>
         </div>
         <Card>
-          <RevenueChart data={revenue} />
+          {revenueComparison && <RevenueOverviewChart comparison={revenueComparison} monthly={revenue} />}
         </Card>
       </div>
 
