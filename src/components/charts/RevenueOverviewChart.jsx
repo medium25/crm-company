@@ -31,7 +31,7 @@ function MonthlyTooltip({ active, payload }) {
  * @param {Array<{month: string, amount: number, paymentsCount: number}>} props.monthly
  */
 export function RevenueOverviewChart({ comparison, monthly }) {
-  const [period, setPeriod] = useState('compare');
+  const [period, setPeriod] = useState('all');
 
   const filteredMonthly = useMemo(() => {
     if (period === 'all') return monthly;
