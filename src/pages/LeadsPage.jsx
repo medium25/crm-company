@@ -1,30 +1,31 @@
-import { useState } from 'react';
-import { Inbox, ListChecks } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
-import { Tabs } from '../components/ui/Tabs.jsx';
-import { EmptyState } from '../components/ui/EmptyState.jsx';
-
-const TABS = [
-  { key: 'queue', label: 'Записи' },
-  { key: 'results', label: 'Результаты' },
-];
 
 /**
- * Заглушка на 2 вкладки — раздел временно пустой, наполнение отложено.
- * Рабочая версия со списком лидов/пробных и действиями (звонок, отказ,
- * перевод в пробный) уже реализована в git-истории этого файла — вернуть
- * при готовности, разложив по вкладкам «Записи»/«Результаты».
+ * Заглушка — таблица на 2 столбца («Записи»/«Результаты»), оба пока
+ * пустые, наполнение отложено. Рабочая версия со списком лидов/пробных и
+ * действиями (звонок, отказ, перевод в пробный) есть в git-истории этого
+ * файла — вернуть при готовности, разложив по нужному столбцу.
  */
 export function LeadsPage() {
-  const [tab, setTab] = useState('queue');
-
   return (
     <>
       <PageHeader title="Заявки" />
-      <div className="mb-6">
-        <Tabs tabs={TABS} activeKey={tab} onChange={setTab} />
+      <div className="overflow-hidden rounded-card border border-border">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
+            <tr className="border-b border-border bg-surface-alt">
+              <th className="w-1/2 border-r border-border px-4 py-3 text-left text-[15px] font-bold text-text">Записи</th>
+              <th className="w-1/2 px-4 py-3 text-left text-[15px] font-bold text-text">Результаты</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="h-40 border-r border-border px-4 py-3 align-top text-[15px] text-muted">Раздел появится позже</td>
+              <td className="h-40 px-4 py-3 align-top text-[15px] text-muted">Раздел появится позже</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <EmptyState icon={tab === 'queue' ? Inbox : ListChecks} title="Раздел появится позже" />
     </>
   );
 }
