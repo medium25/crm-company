@@ -6,19 +6,14 @@ import { db, firebaseConfig } from '../../firebase.js';
 import { phoneToAuthEmail } from '../../lib/auth.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
+import { useRole } from '../../hooks/useRole.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
-
-const ROLE_OPTIONS = [
-  { value: 'ceo', label: 'CEO' },
-  { value: 'manager', label: 'Менеджер' },
-  { value: 'admin', label: 'Администратор' },
-  { value: 'teacher', label: 'Учитель' },
-];
+import { ROLE_OPTIONS, assignableRoleOptions } from '../../lib/roles.js';
 
 const teachersQuery = db ? query(collection(db, 'teachers'), where('isArchived', '==', false), orderBy('displayName')) : null;
 
@@ -44,6 +39,7 @@ const localPhone = (phone) => (phone ?? '').replace(/\D/g, '').replace(/^998/, '
 export function AddStaffModal({ member, onClose }) {
   const { user } = useAuth();
   const { activeBranchId } = useBranch();
+  const { role: callerRole } = useRole();
   const { showToast } = useToast();
   const { data: teachers } = useCollection(teachersQuery);
   const [fullName, setFullName] = useState('');
@@ -55,6 +51,10 @@ export function AddStaffModal({ member, onClose }) {
   const [saving, setSaving] = useState(false);
 
   const isEdit = Boolean(member?.id);
+  // admin не может назначать роли выше «Учитель» — ни новым, ни уже
+  // заведённым не-учителям (бэкенд это же требует в firestore.rules).
+  const roleLocked = callerRole === 'admin' && isEdit && member.role !== 'teacher';
+  const roleOptions = assignableRoleOptions(callerRole);
 
   useEffect(() => {
     if (!member) return;
@@ -158,16 +158,27 @@ export function AddStaffModal({ member, onClose }) {
           <Button
             onClick={handleSubmit}
             loading={saving}
-            disabled={!fullName || (!isEdit && (!phone || phone.length < 9 || !password))}
+            disabled={roleLocked || !fullName || (!isEdit && (!phone || phone.length < 9 || !password))}
           >
             {isEdit ? 'Сохранить' : 'Добавить'}
           </Button>
         </>
       }
     >
+      {roleLocked && (
+        <p className="mb-4 rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+          Администратор не может редактировать сотрудников с ролью «{ROLE_OPTIONS.find((o) => o.value === member.role)?.label}».
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input label="Имя" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
-        <Select label="Должность" options={ROLE_OPTIONS} value={role} onChange={(e) => setRole(e.target.value)} />
+        <Input label="Имя" required disabled={roleLocked} value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        <Select
+          label="Должность"
+          options={roleLocked ? ROLE_OPTIONS : roleOptions}
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          disabled={roleLocked}
+        />
 
         {isEdit ? (
           <Input label="Телефон (логин)" value={`+998 ${phone}`} disabled />

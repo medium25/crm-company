@@ -9,6 +9,7 @@ import { useBranch } from '../../hooks/useBranch.js';
 import { useDoc } from '../../hooks/useDoc.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Button } from '../ui/Button.jsx';
+import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { billingRunId, runMonthlyBilling } from '../../lib/billing.js';
 import { formatMoney, formatMonth } from '../../lib/format.js';
 
@@ -23,6 +24,7 @@ export function BillingBanner() {
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [running, setRunning] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const month = format(new Date(), 'yyyy-MM');
   const runRef = useMemo(
@@ -46,6 +48,7 @@ export function BillingBanner() {
       } else {
         showToast(`Начислено ${result.processed} студентам на ${formatMoney(result.totalAmount)}.`);
       }
+      setConfirming(false);
     } catch {
       showToast('Не удалось выполнить начисление.', { type: 'error' });
     } finally {
@@ -54,12 +57,23 @@ export function BillingBanner() {
   };
 
   return (
-    <div className="flex items-center gap-2 rounded-full bg-orange-soft px-4 py-1.5 text-[13px] text-navy">
-      <CircleDollarSign className="h-4 w-4 text-orange" />
-      <span>Начислить за {formatMonth(month)}</span>
-      <Button size="md" className="h-7 px-3 text-[13px]" onClick={handleRun} loading={running}>
-        Начислить
-      </Button>
-    </div>
+    <>
+      <div className="flex items-center gap-2 rounded-full bg-orange-soft px-4 py-1.5 text-[13px] text-navy">
+        <CircleDollarSign className="h-4 w-4 text-orange" />
+        <span>Начислить за {formatMonth(month)}</span>
+        <Button size="md" className="h-7 px-3 text-[13px]" onClick={() => setConfirming(true)}>
+          Начислить
+        </Button>
+      </div>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={handleRun}
+        loading={running}
+        title="Подтвердить начисление"
+        message={`Начислить за ${formatMonth(month)} всем активным студентам филиала? Списания создадутся сразу и повторно не выполнятся.`}
+        confirmLabel="Начислить"
+      />
+    </>
   );
 }

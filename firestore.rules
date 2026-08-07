@@ -16,7 +16,13 @@ service cloud.firestore {
 
     match /staff/{uid} {
       allow read: if request.auth.uid == uid || isAdmin();
-      allow write: if isAdmin();
+      // admin (в отличие от ceo/manager) может заводить и трогать только
+      // учителей — не должен уметь назначать роль ceo/manager/admin себе
+      // или кому-либо ещё. UI это же прячет (lib/roles.js), это отдельная,
+      // непробиваемая через devtools проверка.
+      allow create: if isAdmin() && (role() != 'admin' || request.resource.data.role == 'teacher');
+      allow update: if isAdmin() && (role() != 'admin' || (resource.data.role == 'teacher' && request.resource.data.role == 'teacher'));
+      allow delete: if isAdmin() && (role() != 'admin' || resource.data.role == 'teacher');
     }
 
     match /branches/{id} {

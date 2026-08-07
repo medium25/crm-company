@@ -3,6 +3,7 @@ import { collection, doc, orderBy, query, updateDoc, deleteDoc, serverTimestamp 
 import { Users, Plus, Link as LinkIcon } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { useRole } from '../../hooks/useRole.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Table } from '../ui/Table.jsx';
@@ -15,13 +16,7 @@ import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { AddStaffModal } from './AddStaffModal.jsx';
 import { formatPhone } from '../../lib/format.js';
-
-const ROLE_OPTIONS = [
-  { value: 'ceo', label: 'CEO' },
-  { value: 'manager', label: 'Менеджер' },
-  { value: 'admin', label: 'Администратор' },
-  { value: 'teacher', label: 'Учитель' },
-];
+import { ROLE_OPTIONS, assignableRoleOptions } from '../../lib/roles.js';
 
 const LOGIN_URL = `${window.location.origin}${window.location.pathname}#/login`;
 
@@ -30,6 +25,7 @@ const staffQuery = db ? query(collection(db, 'staff'), orderBy('fullName')) : nu
 
 export function StaffSettingsTab() {
   const { user } = useAuth();
+  const { role: callerRole } = useRole();
   const { showToast } = useToast();
   const { data: staffList, loading, error } = useCollection(staffQuery);
   const [modalMember, setModalMember] = useState(null);
@@ -137,13 +133,20 @@ export function StaffSettingsTab() {
     {
       key: 'role',
       label: 'Роль',
-      render: (m) => (
-        <Select
-          options={ROLE_OPTIONS}
-          value={m.role}
-          onChange={(e) => handleRoleChange(m, e.target.value)}
-        />
-      ),
+      render: (m) => {
+        // Админ не назначает роли выше «Учитель» — ни новым, ни уже
+        // заведённым не-учителям (см. lib/roles.js + firestore.rules).
+        const locked = callerRole === 'admin' && m.role !== 'teacher';
+        return (
+          <Select
+            options={locked ? ROLE_OPTIONS : assignableRoleOptions(callerRole)}
+            value={m.role}
+            onChange={(e) => handleRoleChange(m, e.target.value)}
+            disabled={locked}
+            title={locked ? 'Администратор не может менять роль этого сотрудника' : undefined}
+          />
+        );
+      },
     },
     {
       key: 'isActive',
@@ -168,20 +171,28 @@ export function StaffSettingsTab() {
     {
       key: '__actions',
       label: '',
-      render: (m) => (
-        <DropdownMenu
-          items={[
-            { label: 'Редактировать', onClick: () => setModalMember(m) },
-            {
-              label: 'Удалить',
-              onClick: () => setDeleteTarget(m),
-              danger: true,
-              disabled: m.id === user.uid,
-              title: m.id === user.uid ? 'Нельзя удалить свой же аккаунт' : undefined,
-            },
-          ]}
-        />
-      ),
+      render: (m) => {
+        const editLocked = callerRole === 'admin' && m.role !== 'teacher';
+        return (
+          <DropdownMenu
+            items={[
+              {
+                label: 'Редактировать',
+                onClick: () => setModalMember(m),
+                disabled: editLocked,
+                title: editLocked ? 'Администратор не может редактировать этого сотрудника' : undefined,
+              },
+              {
+                label: 'Удалить',
+                onClick: () => setDeleteTarget(m),
+                danger: true,
+                disabled: m.id === user.uid,
+                title: m.id === user.uid ? 'Нельзя удалить свой же аккаунт' : undefined,
+              },
+            ]}
+          />
+        );
+      },
     },
   ];
 

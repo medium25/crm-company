@@ -54,6 +54,9 @@ export function AddToGroupModal({ open, student, onClose }) {
   }, [open]);
 
   const group = groups.find((g) => g.id === groupId);
+  // Активного без фамилии не создаём — тот же порог, что и в
+  // ActivateEnrollmentModal (trial → active).
+  const missingLastName = status === 'active' && !((student?.fullName ?? '').trim().split(/\s+/).filter(Boolean).length >= 2);
 
   const handleGroupChange = (id) => {
     setGroupId(id);
@@ -63,7 +66,7 @@ export function AddToGroupModal({ open, student, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!group) return;
+    if (!group || missingLastName) return;
     setSaving(true);
     try {
       const priceNum = Number(price);
@@ -135,7 +138,7 @@ export function AddToGroupModal({ open, student, onClose }) {
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit} loading={saving} disabled={!groupId}>
+          <Button onClick={handleSubmit} loading={saving} disabled={!groupId || missingLastName}>
             Добавить
           </Button>
         </>
@@ -150,6 +153,12 @@ export function AddToGroupModal({ open, student, onClose }) {
           onChange={(e) => handleGroupChange(e.target.value)}
         />
         <Select label="Статус" options={STATUS_OPTIONS} value={status} onChange={(e) => setStatus(e.target.value)} />
+        {missingLastName && (
+          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+            У студента не указана фамилия — активный статус без неё создать нельзя. Допишите фамилию в карточке
+            студента.
+          </p>
+        )}
         <Input
           label="Стоимость для студента"
           type="number"

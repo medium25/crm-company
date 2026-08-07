@@ -11,7 +11,8 @@ import { Input } from '../ui/Input.jsx';
 import { MoneyInput } from '../ui/MoneyInput.jsx';
 import { Select } from '../ui/Select.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
-import { formatMoney, PAYMENT_METHOD_OPTIONS } from '../../lib/format.js';
+import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
+import { formatMethod, formatMoney, PAYMENT_METHOD_OPTIONS } from '../../lib/format.js';
 
 /**
  * «Добавить оплату» — с превью нового баланса до сохранения.
@@ -32,6 +33,7 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -40,6 +42,7 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
       setGroupId('');
       setDate(format(new Date(), 'yyyy-MM-dd'));
       setComment('');
+      setConfirming(false);
     }
   }, [open]);
 
@@ -67,6 +70,7 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
         { uid: user.uid, fullName: staff?.fullName ?? '' },
       );
       showToast('Оплата сохранена.', { actionLabel: 'Распечатать', onAction: () => showToast('Печать появится в фазе 7.') });
+      setConfirming(false);
       onClose();
     } catch {
       showToast('Не удалось сохранить оплату.', { type: 'error' });
@@ -75,41 +79,60 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
     }
   };
 
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Добавить оплату"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button onClick={handleSubmit} loading={saving} disabled={!amountNum}>
-            Сохранить
-          </Button>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <MoneyInput label="Сумма" required value={amount} onChange={(e) => setAmount(e.target.value)} />
-        <Select label="Метод оплаты" options={PAYMENT_METHOD_OPTIONS} value={method} onChange={(e) => setMethod(e.target.value)} />
-        {activeEnrollments.length > 1 && (
-          <Select
-            label="Группа"
-            options={[{ value: '', label: 'Не привязана' }, ...activeEnrollments.map((en) => ({ value: en.groupId, label: en.groupCode }))]}
-            value={groupId}
-            onChange={(e) => setGroupId(e.target.value)}
-          />
-        )}
-        <DatePicker label="Дата" required value={date} onChange={(e) => setDate(e.target.value)} />
-        <Input label="Комментарий" value={comment} onChange={(e) => setComment(e.target.value)} />
+  const selectedEnrollment = activeEnrollments.find((en) => en.groupId === groupId);
+  const confirmMessage =
+    `${student?.fullName ?? ''}: оплата ${formatMoney(amountNum)} (${formatMethod(method)}), ` +
+    `дата ${format(new Date(`${date}T00:00:00`), 'dd.MM.yyyy')}` +
+    `${selectedEnrollment ? `, группа ${selectedEnrollment.groupCode}` : ''}` +
+    `${comment ? `, комментарий: «${comment}»` : ''}. ` +
+    `Баланс после оплаты: ${formatMoney(balanceAfter)}.`;
 
-        <p className="text-[15px] text-muted">
-          Баланс после оплаты:{' '}
-          <span className={balanceAfter < 0 ? 'font-bold text-danger' : 'font-bold text-success'}>{formatMoney(balanceAfter)}</span>
-        </p>
-      </form>
-    </Modal>
+  return (
+    <>
+      <Modal
+        open={open}
+        onClose={onClose}
+        title="Добавить оплату"
+        footer={
+          <>
+            <Button variant="secondary" onClick={onClose}>
+              Отмена
+            </Button>
+            <Button onClick={() => setConfirming(true)} disabled={!amountNum}>
+              Сохранить
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={(e) => { e.preventDefault(); setConfirming(true); }} className="flex flex-col gap-4">
+          <MoneyInput label="Сумма" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Select label="Метод оплаты" options={PAYMENT_METHOD_OPTIONS} value={method} onChange={(e) => setMethod(e.target.value)} />
+          {activeEnrollments.length > 1 && (
+            <Select
+              label="Группа"
+              options={[{ value: '', label: 'Не привязана' }, ...activeEnrollments.map((en) => ({ value: en.groupId, label: en.groupCode }))]}
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+            />
+          )}
+          <DatePicker label="Дата" required value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input label="Комментарий" value={comment} onChange={(e) => setComment(e.target.value)} />
+
+          <p className="text-[15px] text-muted">
+            Баланс после оплаты:{' '}
+            <span className={balanceAfter < 0 ? 'font-bold text-danger' : 'font-bold text-success'}>{formatMoney(balanceAfter)}</span>
+          </p>
+        </form>
+      </Modal>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={handleSubmit}
+        loading={saving}
+        title="Подтвердить оплату"
+        message={confirmMessage}
+        confirmLabel="Оплатить"
+      />
+    </>
   );
 }

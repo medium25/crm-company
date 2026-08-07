@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { collection, query, where, orderBy } from 'firebase/firestore';
+import { format } from 'date-fns';
 import { CircleDollarSign } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -12,8 +13,9 @@ import { Button } from '../ui/Button.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { Skeleton } from '../ui/Skeleton.jsx';
+import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { runMonthlyBilling } from '../../lib/billing.js';
-import { formatDateTime, formatMoney } from '../../lib/format.js';
+import { formatDateTime, formatMoney, formatMonth } from '../../lib/format.js';
 
 const STATUS_BADGE = {
   done: { variant: 'status-active', label: 'Готово' },
@@ -31,6 +33,7 @@ export function BillingHistoryTab() {
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [running, setRunning] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const canRun = role === 'ceo' || role === 'manager';
 
   const runsQuery = useMemo(
@@ -44,6 +47,7 @@ export function BillingHistoryTab() {
     try {
       const result = await runMonthlyBilling(db, activeBranchId, { uid: user.uid, fullName: staff?.fullName ?? '' });
       showToast(result.skipped ? 'Уже начислено за этот месяц.' : `Начислено ${result.processed} студентам на ${formatMoney(result.totalAmount)}.`);
+      setConfirming(false);
     } catch {
       showToast('Не удалось выполнить начисление.', { type: 'error' });
     } finally {
@@ -56,7 +60,7 @@ export function BillingHistoryTab() {
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-[15px] font-bold text-text">История запусков</h3>
         {canRun && (
-          <Button onClick={handleRun} loading={running}>
+          <Button onClick={() => setConfirming(true)}>
             <CircleDollarSign className="h-4 w-4" /> Начислить сейчас
           </Button>
         )}
@@ -78,6 +82,16 @@ export function BillingHistoryTab() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={handleRun}
+        loading={running}
+        title="Подтвердить начисление"
+        message={`Начислить за ${formatMonth(format(new Date(), 'yyyy-MM'))} всем активным студентам филиала? Списания создадутся сразу и повторно не выполнятся.`}
+        confirmLabel="Начислить"
+      />
     </Card>
   );
 }

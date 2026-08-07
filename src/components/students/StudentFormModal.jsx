@@ -49,8 +49,14 @@ export function StudentFormModal({ student, onClose, onCreated }) {
     }
   }, [student]);
 
+  const isEdit = Boolean(student?.id);
+  // При создании — обязательно 2 номера, без второго лид не заводится (это
+  // не про редактирование старых карточек, у которых его могло не быть).
+  const missingSecondPhone = !isEdit && !form.phone2.trim();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (missingSecondPhone) return;
     setSaving(true);
     try {
       const payload = {
@@ -109,7 +115,7 @@ export function StudentFormModal({ student, onClose, onCreated }) {
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit} loading={saving}>
+          <Button onClick={handleSubmit} loading={saving} disabled={missingSecondPhone || !form.fullName.trim() || !form.phone.trim()}>
             Сохранить
           </Button>
         </>
@@ -132,9 +138,13 @@ export function StudentFormModal({ student, onClose, onCreated }) {
         <Input
           label="Второй телефон"
           placeholder="998901234567"
+          required={!isEdit}
           value={form.phone2}
           onChange={(e) => setForm((f) => ({ ...f, phone2: e.target.value }))}
         />
+        {missingSecondPhone && (
+          <p className="-mt-2 text-[13px] text-danger">Без второго номера телефона добавить ученика нельзя.</p>
+        )}
         <Select
           label="Источник"
           options={SOURCE_OPTIONS}

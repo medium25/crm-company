@@ -32,8 +32,13 @@ export function ActivateEnrollmentModal({ enrollment, student, onClose }) {
   const [activatedAt, setActivatedAt] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [saving, setSaving] = useState(false);
 
+  // «Иван» не активируем — нужна фамилия (2+ слова в ФИО), иначе карточка
+  // активного студента остаётся неотличимой от лида с одним именем.
+  const missingLastName = !((student?.fullName ?? '').trim().split(/\s+/).filter(Boolean).length >= 2);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (missingLastName) return;
     setSaving(true);
     try {
       const activatedAtTs = Timestamp.fromDate(new Date(`${activatedAt}T00:00:00`));
@@ -76,7 +81,7 @@ export function ActivateEnrollmentModal({ enrollment, student, onClose }) {
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit} loading={saving} disabled={!activatedAt || !group}>
+          <Button onClick={handleSubmit} loading={saving} disabled={missingLastName || !activatedAt || !group}>
             Активировать
           </Button>
         </>
@@ -86,6 +91,12 @@ export function ActivateEnrollmentModal({ enrollment, student, onClose }) {
         <p className="text-[15px] text-text">
           Студент <b>{enrollment?.studentName}</b> перейдёт в статус «Активен» — стартует списание за обучение.
         </p>
+        {missingLastName && (
+          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+            У студента не указана фамилия — без неё активировать нельзя. Допишите фамилию в карточке студента
+            («Редактировать») и вернитесь сюда.
+          </p>
+        )}
         <DatePicker label="Дата активации" required value={activatedAt} onChange={(e) => setActivatedAt(e.target.value)} />
       </form>
     </Modal>
