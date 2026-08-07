@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { db } from '../../firebase.js';
 import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
 import { BillingBanner } from '../billing/BillingBanner.jsx';
+import { countActiveLeads } from '../../lib/stats.js';
 
 /**
  * Оболочка приложения для всех авторизованных маршрутов: сайдбар + топбар + контент.
@@ -14,10 +16,16 @@ import { BillingBanner } from '../billing/BillingBanner.jsx';
 export function AppShell() {
   const { branches, activeBranchId, setActiveBranchId } = useBranch();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [leadsCount, setLeadsCount] = useState(0);
+
+  useEffect(() => {
+    if (!db || !activeBranchId) return;
+    countActiveLeads(db, activeBranchId).then(setLeadsCount);
+  }, [activeBranchId]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
-      <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+      <Sidebar leadsCount={leadsCount} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar
           branches={branches}

@@ -106,7 +106,7 @@ export function LeadsPage() {
   return (
     <>
       <PageHeader
-        title="Лиды"
+        title="Заявки"
         count={leads.length}
         actions={
           <Button onClick={() => setModalStudent({})}>
