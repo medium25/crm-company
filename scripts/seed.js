@@ -1,7 +1,17 @@
 /**
- * Сид справочников из скриншотов референсной системы. Запускается вручную:
+ * Сид справочников из скриншотов референсной системы. Запускается вручную,
+ * ТОЛЬКО на пустой базе (нет ни одного документа в teachers):
  *
  *   node --env-file=.env scripts/seed.js
+ *
+ * Пишет через merge:true, но значениями-литералами — это перезаписывает
+ * любые правки, сделанные потом в приложении (displayName учителя,
+ * lessonsPerMonth филиала и т.п.), а не просто дозаполняет пропущенное.
+ * Проверка ниже — единственная защита от случайного повторного запуска на
+ * боевой базе; без неё 05.08.2026 в проде откатило учителя MR IBROHIM
+ * обратно на плейсхолдер MR SANJAR и branches.lessonsPerMonth 12 обратно на
+ * плейсхолдер 14 (уже исправленный тем же днём миграцией) — оба тихо, без
+ * ошибки, потому что merge:true отработал «успешно».
  *
  * Нужны переменные окружения (кроме VITE_FB_* из .env):
  *   SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD — существующий пользователь Firebase Auth,
@@ -13,7 +23,7 @@
  */
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, getDocs, collection, writeBatch, serverTimestamp } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.VITE_FB_API_KEY,
@@ -56,6 +66,14 @@ async function main() {
   const db = getFirestore(app);
 
   const { user } = await signInWithEmailAndPassword(auth, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD);
+
+  const existing = await getDocs(collection(db, 'teachers'));
+  if (!existing.empty) {
+    throw new Error(
+      `В teachers уже ${existing.size} документ(ов) — сид пишет литералами поверх любых правок и рассчитан только на пустую базу. ` +
+        'Правь справочники через приложение (Учителя/Настройки), не через повторный запуск этого скрипта.',
+    );
+  }
 
   const batch = writeBatch(db);
   const stamp = { createdAt: serverTimestamp(), createdBy: user.uid, updatedAt: serverTimestamp(), updatedBy: user.uid };

@@ -4,6 +4,7 @@ import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
 import { useToast } from '../ui/Toast.jsx';
+import { cascadeTeacherName } from '../../lib/teachers.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
@@ -46,6 +47,9 @@ export function TeacherFormModal({ teacher, onClose }) {
       };
       if (teacher?.id) {
         await updateDoc(doc(db, 'teachers', teacher.id), payload);
+        if (payload.displayName !== teacher.displayName) {
+          await cascadeTeacherName(db, teacher.id, payload.displayName);
+        }
         showToast('Учитель обновлён.');
       } else {
         await addDoc(collection(db, 'teachers'), {
