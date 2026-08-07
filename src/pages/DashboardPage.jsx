@@ -9,9 +9,9 @@ import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { StatCard } from '../components/ui/StatCard.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
-import { MonthComparisonChart } from '../components/charts/MonthComparisonChart.jsx';
+import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
 import { RoomScheduleGrid } from '../components/dashboard/RoomScheduleGrid.jsx';
-import { loadDashboardStats, getDailyRevenueComparison } from '../lib/stats.js';
+import { loadDashboardStats, getDailyRevenueComparison, getMonthlyRevenue } from '../lib/stats.js';
 
 /**
  * 6 KPI-карточек — переходы по клику из «04 · Экраны» §2. Формулы — «03 ·
@@ -27,17 +27,23 @@ export function DashboardPage() {
 
   const [stats, setStats] = useState(null);
   const [revenueComparison, setRevenueComparison] = useState(null);
+  const [monthlyRevenue, setMonthlyRevenue] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!db || !activeBranchId) return undefined;
     let cancelled = false;
     setLoading(true);
-    Promise.all([loadDashboardStats(db, activeBranchId, churnPeriod), getDailyRevenueComparison(db, activeBranchId)])
-      .then(([s, r]) => {
+    Promise.all([
+      loadDashboardStats(db, activeBranchId, churnPeriod),
+      getDailyRevenueComparison(db, activeBranchId),
+      getMonthlyRevenue(db, activeBranchId),
+    ])
+      .then(([s, r, m]) => {
         if (cancelled) return;
         setStats(s);
         setRevenueComparison(r);
+        setMonthlyRevenue(m);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -77,13 +83,7 @@ export function DashboardPage() {
       )}
 
       <Card className="mt-6">
-        {revenueComparison && (
-          <MonthComparisonChart
-            data={revenueComparison.data}
-            currentMonth={revenueComparison.currentMonth}
-            prevMonth={revenueComparison.prevMonth}
-          />
-        )}
+        {revenueComparison && <RevenueOverviewChart comparison={revenueComparison} monthly={monthlyRevenue} />}
       </Card>
 
       <div className="mt-6">
