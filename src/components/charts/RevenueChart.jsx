@@ -1,29 +1,11 @@
 import { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatMoney, formatMoneySigned, formatMonth, formatMonthShort } from '../../lib/format.js';
+import { formatMoney, formatMonth, formatMonthShort } from '../../lib/format.js';
 
 const PERIOD_OPTIONS = [
   { value: 12, label: '12 мес' },
   { value: 'all', label: 'Всё время' },
 ];
-
-/**
- * Сравнение последнего месяца с предыдущим — по последним двум точкам
- * `data` (в хронологическом порядке), независимо от выбранного периода
- * графика.
- * @param {Array<{month: string, amount: number}>} data
- * @returns {{diff: number, percent: number|null}|null}
- */
-function useMonthComparison(data) {
-  return useMemo(() => {
-    if (!data || data.length < 2) return null;
-    const last = data[data.length - 1];
-    const prev = data[data.length - 2];
-    const diff = last.amount - prev.amount;
-    const percent = prev.amount === 0 ? null : (diff / Math.abs(prev.amount)) * 100;
-    return { diff, percent };
-  }, [data]);
-}
 
 function ChartTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
@@ -46,7 +28,6 @@ function ChartTooltip({ active, payload }) {
  */
 export function RevenueChart({ data }) {
   const [period, setPeriod] = useState(12);
-  const comparison = useMonthComparison(data);
 
   const filtered = useMemo(() => {
     if (period === 'all') return data;
@@ -55,32 +36,19 @@ export function RevenueChart({ data }) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-2">
-        {comparison ? (
-          <p className="text-[13px] text-muted">
-            К прошлому месяцу:{' '}
-            <span className={comparison.diff >= 0 ? 'font-bold text-success' : 'font-bold text-danger'}>
-              {formatMoneySigned(comparison.diff)}
-              {comparison.percent !== null && ` (${comparison.diff >= 0 ? '+' : ''}${comparison.percent.toFixed(1)}%)`}
-            </span>
-          </p>
-        ) : (
-          <span />
-        )}
-        <div className="flex gap-2">
-          {PERIOD_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setPeriod(opt.value)}
-              className={`rounded-full px-3 py-1 text-[13px] ${
-                period === opt.value ? 'bg-navy text-white' : 'bg-surface-alt text-muted hover:text-text'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      <div className="mb-4 flex justify-end gap-2">
+        {PERIOD_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setPeriod(opt.value)}
+            className={`rounded-full px-3 py-1 text-[13px] ${
+              period === opt.value ? 'bg-navy text-white' : 'bg-surface-alt text-muted hover:text-text'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       <div className="h-[300px] w-full">

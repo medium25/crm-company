@@ -1,5 +1,5 @@
 import { collection, getCountFromServer, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { format, startOfMonth, startOfQuarter, startOfYear } from 'date-fns';
+import { format, startOfMonth, startOfQuarter, startOfYear, subMonths, getDaysInMonth } from 'date-fns';
 
 /**
  * Диапазон периода оттока для двух KPI-карточек («Ушли из активной группы»,
@@ -141,4 +141,60 @@ export async function loadDashboardStats(db, branchId, churnPeriod = 'year') {
 export async function getMonthlyRevenue(db, branchId) {
   const snap = await getDocs(query(collection(db, 'monthlyRevenue'), where('branchId', '==', branchId), orderBy('month')));
   return snap.docs.map((d) => d.data());
+}
+
+/**
+ * Текущий месяц против предыдущего, по дням, нарастающим итогом — для
+ * графика с 2 линиями на дашборде. Читает `transactions` напрямую (не
+ * `monthlyRevenue`), т.к. нужна разбивка по дню, а не по месяцу целиком;
+ * только type=payment, как и в агрегате monthlyRevenue.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @param {Date} [today]
+ * @returns {Promise<{data: Array<{day: number, current: number|null, previous: number|null}>, currentMonth: string, prevMonth: string}>}
+ */
+export async function getDailyRevenueComparison(db, branchId, today = new Date()) {
+  const currentMonth = format(today, 'yyyy-MM');
+  const prevMonthDate = subMonths(today, 1);
+  const prevMonth = format(prevMonthDate, 'yyyy-MM');
+
+  const snap = await getDocs(
+    query(
+      collection(db, 'transactions'),
+      where('branchId', '==', branchId),
+      where('type', '==', 'payment'),
+      where('month', 'in', [currentMonth, prevMonth]),
+    ),
+  );
+
+  const byDay = { [currentMonth]: {}, [prevMonth]: {} };
+  for (const d of snap.docs) {
+    const tx = d.data();
+    const day = tx.date.toDate().getDate();
+    byDay[tx.month][day] = (byDay[tx.month][day] ?? 0) + tx.amount;
+  }
+
+  const todayDay = today.getDate();
+  const currentDays = getDaysInMonth(today);
+  const prevDays = getDaysInMonth(prevMonthDate);
+  const maxDays = Math.max(currentDays, prevDays);
+
+  let curCum = 0;
+  let prevCum = 0;
+  const data = [];
+  for (let day = 1; day <= maxDays; day += 1) {
+    let current = null;
+    if (day <= currentDays && day <= todayDay) {
+      curCum += byDay[currentMonth][day] ?? 0;
+      current = curCum;
+    }
+    let previous = null;
+    if (day <= prevDays) {
+      prevCum += byDay[prevMonth][day] ?? 0;
+      previous = prevCum;
+    }
+    data.push({ day, current, previous });
+  }
+
+  return { data, currentMonth, prevMonth };
 }

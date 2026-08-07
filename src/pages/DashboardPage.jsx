@@ -9,9 +9,9 @@ import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { StatCard } from '../components/ui/StatCard.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
-import { RevenueChart } from '../components/charts/RevenueChart.jsx';
+import { MonthComparisonChart } from '../components/charts/MonthComparisonChart.jsx';
 import { RoomScheduleGrid } from '../components/dashboard/RoomScheduleGrid.jsx';
-import { loadDashboardStats, getMonthlyRevenue } from '../lib/stats.js';
+import { loadDashboardStats, getDailyRevenueComparison } from '../lib/stats.js';
 
 /**
  * 6 KPI-карточек — переходы по клику из «04 · Экраны» §2. Формулы — «03 ·
@@ -26,18 +26,18 @@ export function DashboardPage() {
   const churnPeriod = settings?.churnPeriod ?? 'year';
 
   const [stats, setStats] = useState(null);
-  const [revenue, setRevenue] = useState([]);
+  const [revenueComparison, setRevenueComparison] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!db || !activeBranchId) return undefined;
     let cancelled = false;
     setLoading(true);
-    Promise.all([loadDashboardStats(db, activeBranchId, churnPeriod), getMonthlyRevenue(db, activeBranchId)])
+    Promise.all([loadDashboardStats(db, activeBranchId, churnPeriod), getDailyRevenueComparison(db, activeBranchId)])
       .then(([s, r]) => {
         if (cancelled) return;
         setStats(s);
-        setRevenue(r);
+        setRevenueComparison(r);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -77,7 +77,13 @@ export function DashboardPage() {
       )}
 
       <Card className="mt-6">
-        <RevenueChart data={revenue} />
+        {revenueComparison && (
+          <MonthComparisonChart
+            data={revenueComparison.data}
+            currentMonth={revenueComparison.currentMonth}
+            prevMonth={revenueComparison.prevMonth}
+          />
+        )}
       </Card>
 
       <div className="mt-6">
