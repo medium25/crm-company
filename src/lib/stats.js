@@ -41,15 +41,17 @@ export function countTrial(db, branchId) {
 }
 
 /**
- * Должники: активные студенты с отрицательным балансом. `getCountFromServer`
- * не умеет `<` + равенство статуса в одном месте без нужного индекса под саму
- * count-агрегацию, поэтому берём студентов status=='active' и считаем
- * должников клиентски — на масштабе одного филиала (сотни, не тысячи) дешевле,
- * чем заводить ещё один точный composite-индекс только под счётчик.
+ * Должники: студенты с отрицательным балансом, ещё не ушедшие насовсем
+ * (active/trial/paused — не только active: пробный или замороженный тоже
+ * может быть в минусе, старая система (icon.modme.uz) считает их тоже).
+ * `getCountFromServer` не умеет `<` + `in` в одном месте без композитного
+ * индекса под саму count-агрегацию, поэтому берём студентов и считаем
+ * должников клиентски — на масштабе одного филиала (сотни, не тысячи)
+ * дешевле, чем заводить ещё один индекс только под счётчик.
  */
 export async function countDebtors(db, branchId) {
   const snap = await getDocs(
-    query(collection(db, 'students'), where('branchId', '==', branchId), where('status', '==', 'active'), where('isArchived', '==', false)),
+    query(collection(db, 'students'), where('branchId', '==', branchId), where('status', 'in', ['active', 'trial', 'paused']), where('isArchived', '==', false)),
   );
   return snap.docs.filter((d) => d.data().balance < 0).length;
 }

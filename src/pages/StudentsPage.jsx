@@ -141,7 +141,7 @@ export function StudentsPage() {
     const counts = { all: 0, debtors: 0, trial: 0, paused: 0, leftThisMonth: 0 };
     for (const s of summaryStudents) {
       if (s.status !== 'paused') counts.all += 1;
-      if (s.status === 'active' && s.balance < 0) counts.debtors += 1;
+      if (s.status !== 'left' && s.balance < 0) counts.debtors += 1;
       if (s.status === 'trial') counts.trial += 1;
       if (s.status === 'paused') counts.paused += 1;
       if (s.status === 'left' && s.leftAt && s.leftAt.toDate() >= monthStart) counts.leftThisMonth += 1;

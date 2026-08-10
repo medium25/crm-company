@@ -60,7 +60,7 @@ export function DebtorsByTeacher() {
   const studentsQuery = useMemo(
     () =>
       db && activeBranchId
-        ? query(collection(db, 'students'), where('branchId', '==', activeBranchId), where('isArchived', '==', false), where('status', '==', 'active'))
+        ? query(collection(db, 'students'), where('branchId', '==', activeBranchId), where('isArchived', '==', false), where('status', 'in', ['active', 'trial', 'paused']))
         : null,
     [activeBranchId],
   );
