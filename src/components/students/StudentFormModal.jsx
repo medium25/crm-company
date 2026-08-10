@@ -81,6 +81,8 @@ export function StudentFormModal({ student, onClose, onCreated }) {
           photoUrl: null,
           status: 'lead',
           statusReason: null,
+          leadStage: 'today',
+          leadResult: null,
           balance: 0,
           balanceUpdatedAt: serverTimestamp(),
           note: '',
