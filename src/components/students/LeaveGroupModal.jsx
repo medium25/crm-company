@@ -9,9 +9,18 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
 import { Input } from '../ui/Input.jsx';
+import { Select } from '../ui/Select.jsx';
+
+const RETURN_INTENT_OPTIONS = [
+  { value: '', label: 'Не выбрано' },
+  { value: 'return', label: 'Хочет вернуться' },
+  { value: 'no_return', label: 'Не хочет возвращаться' },
+];
 
 /**
- * Вывод студента из группы — записывает дату и причину, group.studentsCount −1.
+ * Вывод студента из группы — записывает дату, причину и желание
+ * вернуться, group.studentsCount −1. Желание вернуться обязательно —
+ * делит раздел «Покинувшие» на две группы для повторных продаж.
  * @param {Object} props
  * @param {Object|null} props.enrollment
  * @param {() => void} props.onClose
@@ -21,6 +30,7 @@ export function LeaveGroupModal({ enrollment, onClose }) {
   const { showToast } = useToast();
   const [leftAt, setLeftAt] = useState('');
   const [leftReason, setLeftReason] = useState('');
+  const [returnIntent, setReturnIntent] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -33,6 +43,7 @@ export function LeaveGroupModal({ enrollment, onClose }) {
         status: 'left',
         leftAt: Timestamp.fromDate(leftAtDate),
         leftReason: leftReason.trim(),
+        returnIntent,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });
@@ -63,7 +74,7 @@ export function LeaveGroupModal({ enrollment, onClose }) {
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button variant="danger" onClick={handleSubmit} loading={saving} disabled={!leftAt}>
+          <Button variant="danger" onClick={handleSubmit} loading={saving} disabled={!leftAt || !returnIntent}>
             Вывести
           </Button>
         </>
@@ -72,6 +83,13 @@ export function LeaveGroupModal({ enrollment, onClose }) {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <DatePicker label="Дата ухода" required value={leftAt} onChange={(e) => setLeftAt(e.target.value)} />
         <Input label="Причина" value={leftReason} onChange={(e) => setLeftReason(e.target.value)} />
+        <Select
+          label="Желание вернуться"
+          required
+          options={RETURN_INTENT_OPTIONS}
+          value={returnIntent}
+          onChange={(e) => setReturnIntent(e.target.value)}
+        />
       </form>
     </Modal>
   );

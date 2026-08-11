@@ -71,6 +71,7 @@ export function StudentsPage() {
   const status = searchParams.get('status') || 'all';
   const onlyDebtors = searchParams.get('debtors') === '1';
   const page = Math.max(1, Number(searchParams.get('page') || 1));
+  const leftView = searchParams.get('leftView') || 'month';
 
   // «Покинувшие»/«Замороженные»/«На пробном» — отдельные секции с
   // фиксированным фильтром статуса; общий фильтр «Статус» из «Все ученики»
@@ -164,12 +165,41 @@ export function StudentsPage() {
     return map;
   }, [section, leftEnrollments, churnPeriod]);
 
-  const leftStudents = useMemo(() => {
+  // «Покинувшие» — 3 отдела: ушли в этом месяце (по дате ухода из
+  // конкретной группы), и по желанию вернуться (returnIntent с
+  // LeaveGroupModal — старые записи до этого поля ни туда, ни туда не
+  // попадают, только в «в этом месяце», если подходят по дате).
+  const leftAllStudents = useMemo(() => {
     if (section !== 'left') return [];
     return allStudents
       .filter((s) => leftEnrollmentByStudent.has(s.id))
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
   }, [section, allStudents, leftEnrollmentByStudent]);
+
+  const leftViewCounts = useMemo(() => {
+    if (section !== 'left') return { month: 0, return: 0, no_return: 0 };
+    const monthStart = startOfMonth(new Date());
+    let month = 0;
+    let ret = 0;
+    let noRet = 0;
+    for (const s of leftAllStudents) {
+      const enr = leftEnrollmentByStudent.get(s.id);
+      if (enr.leftAt.toDate() >= monthStart) month += 1;
+      if (enr.returnIntent === 'return') ret += 1;
+      else if (enr.returnIntent === 'no_return') noRet += 1;
+    }
+    return { month, return: ret, no_return: noRet };
+  }, [section, leftAllStudents, leftEnrollmentByStudent]);
+
+  const leftStudents = useMemo(() => {
+    if (section !== 'left') return [];
+    const monthStart = startOfMonth(new Date());
+    return leftAllStudents.filter((s) => {
+      const enr = leftEnrollmentByStudent.get(s.id);
+      if (leftView === 'month') return enr.leftAt.toDate() >= monthStart;
+      return enr.returnIntent === leftView;
+    });
+  }, [section, leftAllStudents, leftEnrollmentByStudent, leftView]);
 
   const rawStudents = section === 'left' ? leftStudents : statusStudents;
   const loading = section === 'left' ? leftEnrollmentsLoading || allStudentsLoading : statusLoading;
@@ -666,6 +696,27 @@ export function StudentsPage() {
         <>
           {section === 'all' && !loading && rawStudents.length > 0 && (
             <AllStudentsSummary total={nonPausedStudents.length} breakdown={teacherBreakdown} />
+          )}
+
+          {section === 'left' && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {[
+                { key: 'month', label: 'В этом месяце', count: leftViewCounts.month },
+                { key: 'return', label: 'С желанием вернуться', count: leftViewCounts.return },
+                { key: 'no_return', label: 'Без желания вернуться', count: leftViewCounts.no_return },
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setFilter({ leftView: t.key })}
+                  className={`rounded-full px-4 py-2 text-[14px] font-bold ${
+                    leftView === t.key ? 'bg-navy text-white' : 'bg-surface-alt text-muted hover:text-text'
+                  }`}
+                >
+                  {t.label} ({t.count})
+                </button>
+              ))}
+            </div>
           )}
 
           <FilterBar onReset={resetFilters}>
