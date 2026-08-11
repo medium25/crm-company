@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, getDocs, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, format, startOfMonth, subDays } from 'date-fns';
-import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, ShieldCheck, Pencil, CalendarDays, UserCheck } from 'lucide-react';
+import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, ShieldCheck, Pencil, CalendarDays, UserCheck, Archive } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -177,22 +177,21 @@ export function StudentsPage() {
   }, [section, allStudents, leftEnrollmentByStudent]);
 
   const leftViewCounts = useMemo(() => {
-    if (section !== 'left') return { month: 0, return: 0, no_return: 0 };
+    if (section !== 'left') return { month: 0, return: 0, all: 0 };
     const monthStart = startOfMonth(new Date());
     let month = 0;
     let ret = 0;
-    let noRet = 0;
     for (const s of leftAllStudents) {
       const enr = leftEnrollmentByStudent.get(s.id);
       if (enr.leftAt.toDate() >= monthStart) month += 1;
       if (enr.returnIntent === 'return') ret += 1;
-      else if (enr.returnIntent === 'no_return') noRet += 1;
     }
-    return { month, return: ret, no_return: noRet };
+    return { month, return: ret, all: leftAllStudents.length };
   }, [section, leftAllStudents, leftEnrollmentByStudent]);
 
   const leftStudents = useMemo(() => {
     if (section !== 'left') return [];
+    if (leftView === 'all') return leftAllStudents;
     const monthStart = startOfMonth(new Date());
     return leftAllStudents.filter((s) => {
       const enr = leftEnrollmentByStudent.get(s.id);
@@ -697,7 +696,7 @@ export function StudentsPage() {
           {[
             { key: 'month', label: 'В этом месяце', count: leftViewCounts.month, icon: CalendarDays },
             { key: 'return', label: 'С желанием вернуться', count: leftViewCounts.return, icon: UserCheck },
-            { key: 'no_return', label: 'Без желания вернуться', count: leftViewCounts.no_return, icon: UserX },
+            { key: 'all', label: 'Архив всех покинувших', count: leftViewCounts.all, icon: Archive },
           ].map((t) => {
             const Icon = t.icon;
             return (
