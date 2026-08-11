@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, getDocs, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, format, startOfMonth, subDays } from 'date-fns';
-import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, ShieldCheck, Pencil } from 'lucide-react';
+import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, ShieldCheck, Pencil, CalendarDays, UserCheck } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -71,7 +71,7 @@ export function StudentsPage() {
   const status = searchParams.get('status') || 'all';
   const onlyDebtors = searchParams.get('debtors') === '1';
   const page = Math.max(1, Number(searchParams.get('page') || 1));
-  const leftView = searchParams.get('leftView') || 'month';
+  const leftView = searchParams.get('leftView') || null;
 
   // «Покинувшие»/«Замороженные»/«На пробном» — отдельные секции с
   // фиксированным фильтром статуса; общий фильтр «Статус» из «Все ученики»
@@ -121,7 +121,7 @@ export function StudentsPage() {
     if (effectiveStatus !== 'all' && effectiveStatus !== 'archived') clauses.push(where('status', '==', effectiveStatus));
     return query(collection(db, 'students'), ...clauses, orderBy('fullName'));
   }, [activeBranchId, effectiveStatus, section]);
-  const showTable = section === 'all' || section === 'left' || section === 'paused' || section === 'trial';
+  const showTable = section === 'all' || (section === 'left' && leftView) || section === 'paused' || section === 'trial';
   const { data: statusStudents, loading: statusLoading, error } = useCollection(section === 'left' ? null : (showTable ? studentsQuery : null));
 
   const enrollmentsQuery = useMemo(
@@ -651,7 +651,7 @@ export function StudentsPage() {
     );
   }
 
-  const hideHeaderExtras = section === 'attendance' || section === 'debtors' || section === 'noChargeHistory';
+  const hideHeaderExtras = section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' || (section === 'left' && !leftView);
 
   return (
     <>
@@ -692,31 +692,36 @@ export function StudentsPage() {
         <DebtorsByTeacher />
       ) : section === 'noChargeHistory' ? (
         <NoChargeHistoryList />
+      ) : section === 'left' && !leftView ? (
+        <div className="flex flex-col gap-3">
+          {[
+            { key: 'month', label: 'В этом месяце', count: leftViewCounts.month, icon: CalendarDays },
+            { key: 'return', label: 'С желанием вернуться', count: leftViewCounts.return, icon: UserCheck },
+            { key: 'no_return', label: 'Без желания вернуться', count: leftViewCounts.no_return, icon: UserX },
+          ].map((t) => {
+            const Icon = t.icon;
+            return (
+              <Card key={t.key} hoverable className="flex cursor-pointer items-center gap-4 p-5" onClick={() => setFilter({ leftView: t.key })}>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
+                  <Icon className="h-6 w-6" strokeWidth={1.75} />
+                </span>
+                <span className="flex-1 text-[17px] font-bold text-text">{t.label}</span>
+                <span className="text-[15px] text-muted">{t.count} {pluralize(t.count, ['студент', 'студента', 'студентов'])}</span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
+              </Card>
+            );
+          })}
+        </div>
       ) : (
         <>
           {section === 'all' && !loading && rawStudents.length > 0 && (
             <AllStudentsSummary total={nonPausedStudents.length} breakdown={teacherBreakdown} />
           )}
 
-          {section === 'left' && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {[
-                { key: 'month', label: 'В этом месяце', count: leftViewCounts.month },
-                { key: 'return', label: 'С желанием вернуться', count: leftViewCounts.return },
-                { key: 'no_return', label: 'Без желания вернуться', count: leftViewCounts.no_return },
-              ].map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setFilter({ leftView: t.key })}
-                  className={`rounded-full px-4 py-2 text-[14px] font-bold ${
-                    leftView === t.key ? 'bg-navy text-white' : 'bg-surface-alt text-muted hover:text-text'
-                  }`}
-                >
-                  {t.label} ({t.count})
-                </button>
-              ))}
-            </div>
+          {section === 'left' && leftView && (
+            <button type="button" onClick={() => setFilter({ leftView: null })} className="mb-4 flex items-center gap-1 text-[15px] text-link">
+              <ArrowLeft className="h-4 w-4" /> Назад к разделам
+            </button>
           )}
 
           <FilterBar onReset={resetFilters}>
