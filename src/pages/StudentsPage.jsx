@@ -7,7 +7,9 @@ import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
+import { useDoc } from '../hooks/useDoc.js';
 import { useToast } from '../components/ui/Toast.jsx';
+import { churnPeriodRange } from '../lib/stats.js';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { FilterBar } from '../components/layout/FilterBar.jsx';
 import { Card } from '../components/ui/Card.jsx';
@@ -113,19 +115,64 @@ export function StudentsPage() {
   const resetFilters = () => setSearchParams(new URLSearchParams());
 
   const studentsQuery = useMemo(() => {
-    if (!db || !activeBranchId) return null;
+    if (!db || !activeBranchId || section === 'left') return null;
     const clauses = [where('branchId', '==', activeBranchId), where('isArchived', '==', effectiveStatus === 'archived')];
     if (effectiveStatus !== 'all' && effectiveStatus !== 'archived') clauses.push(where('status', '==', effectiveStatus));
     return query(collection(db, 'students'), ...clauses, orderBy('fullName'));
-  }, [activeBranchId, effectiveStatus]);
+  }, [activeBranchId, effectiveStatus, section]);
   const showTable = section === 'all' || section === 'left' || section === 'paused' || section === 'trial';
-  const { data: rawStudents, loading, error } = useCollection(showTable ? studentsQuery : null);
+  const { data: statusStudents, loading: statusLoading, error } = useCollection(section === 'left' ? null : (showTable ? studentsQuery : null));
 
   const enrollmentsQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
     [activeBranchId],
   );
   const { data: enrollments } = useCollection(enrollmentsQuery);
+
+  // «Покинувшие» — та же метрика, что карточка дашборда «Ушли из активной
+  // группы»: уникальные студенты с enrollment.status=='left' в текущем
+  // churnPeriod, а НЕ students.status=='left' (студент мог уйти из одной
+  // группы и тут же стать trial/active в другой — карточка его всё равно
+  // считает, а students.status уже не 'left').
+  const settingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
+  const { data: settings } = useDoc(settingsRef);
+  const churnPeriod = settings?.churnPeriod ?? 'year';
+
+  const leftEnrollmentsQuery = useMemo(
+    () => (db && activeBranchId && section === 'left' ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('status', '==', 'left')) : null),
+    [activeBranchId, section],
+  );
+  const { data: leftEnrollments, loading: leftEnrollmentsLoading } = useCollection(leftEnrollmentsQuery);
+
+  const allStudentsQuery = useMemo(
+    () => (db && activeBranchId && section === 'left' ? query(collection(db, 'students'), where('branchId', '==', activeBranchId)) : null),
+    [activeBranchId, section],
+  );
+  const { data: allStudents, loading: allStudentsLoading } = useCollection(allStudentsQuery);
+
+  const leftEnrollmentByStudent = useMemo(() => {
+    if (section !== 'left') return new Map();
+    const { start, end } = churnPeriodRange(churnPeriod);
+    const map = new Map();
+    for (const e of leftEnrollments) {
+      if (!e.activatedAt || !e.leftAt) continue;
+      const leftAt = e.leftAt.toDate();
+      if (leftAt < start || leftAt > end) continue;
+      const current = map.get(e.studentId);
+      if (!current || leftAt > current.leftAt.toDate()) map.set(e.studentId, e);
+    }
+    return map;
+  }, [section, leftEnrollments, churnPeriod]);
+
+  const leftStudents = useMemo(() => {
+    if (section !== 'left') return [];
+    return allStudents
+      .filter((s) => leftEnrollmentByStudent.has(s.id))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }, [section, allStudents, leftEnrollmentByStudent]);
+
+  const rawStudents = section === 'left' ? leftStudents : statusStudents;
+  const loading = section === 'left' ? leftEnrollmentsLoading || allStudentsLoading : statusLoading;
 
   // Плитки лендинга «Студенты» — свой запрос без фильтров таблицы (`status`/`q`
   // могут остаться в URL после захода в «Все ученики» и обратно), иначе счётчики
@@ -379,22 +426,30 @@ export function StudentsPage() {
     },
     {
       key: 'groups',
-      label: 'Группы',
-      render: (st) => (
-        <span className="flex flex-wrap gap-1">
-          {(enrollmentsByStudent.get(st.id) ?? []).map((e) => (
-            <Badge key={e.id} variant="group-code">
-              {e.groupCode}
-            </Badge>
-          ))}
-        </span>
-      ),
+      label: section === 'left' ? 'Ушли из группы' : 'Группы',
+      render: (st) => {
+        if (section === 'left') {
+          const enr = leftEnrollmentByStudent.get(st.id);
+          return enr ? <Badge variant="group-code">{enr.groupCode}</Badge> : '—';
+        }
+        return (
+          <span className="flex flex-wrap gap-1">
+            {(enrollmentsByStudent.get(st.id) ?? []).map((e) => (
+              <Badge key={e.id} variant="group-code">
+                {e.groupCode}
+              </Badge>
+            ))}
+          </span>
+        );
+      },
     },
     {
       key: 'teachers',
       label: 'Учителя',
       render: (st) =>
-        [...new Set((enrollmentsByStudent.get(st.id) ?? []).map((e) => e.teacherName))].join(', ') || '—',
+        section === 'left'
+          ? leftEnrollmentByStudent.get(st.id)?.teacherName || '—'
+          : [...new Set((enrollmentsByStudent.get(st.id) ?? []).map((e) => e.teacherName))].join(', ') || '—',
     },
     {
       key: 'createdAt',
@@ -406,7 +461,7 @@ export function StudentsPage() {
           {
             key: 'duration',
             label: 'Обучается',
-            render: (st) => formatDuration(st.createdAt, section === 'left' ? st.leftAt : null),
+            render: (st) => formatDuration(st.createdAt, section === 'left' ? leftEnrollmentByStudent.get(st.id)?.leftAt : null),
           },
         ]
       : []),
