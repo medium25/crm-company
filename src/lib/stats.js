@@ -65,21 +65,31 @@ export async function countPaidThisMonth(db, branchId, month) {
 }
 
 /**
- * Ушли из активной группы: enrollments со `status: 'left'`, `leftAt` в
- * периоде, у которых `activatedAt` когда-либо был проставлен (единственный
- * надёжный признак «был активен» — отдельного поля с историей статусов в
- * схеме нет). Уникальные студенты.
+ * Ушли из активной группы: enrollments со `status: 'left'` ИЛИ `'archived'`,
+ * у которых `activatedAt` когда-либо был проставлен (единственный надёжный
+ * признак «был активен» — отдельного поля с историей статусов в схеме нет).
+ * Персонал иногда оформляет уход студента кнопкой «Архивировать» вместо
+ * «Ушёл из группы» — тогда `status` становится `archived`, а не `left`, но
+ * `leftAt` при этом сохраняется как было (архивация его не трогает).
+ * Специально не подставляем `updatedAt` вместо отсутствующего `leftAt`:
+ * так ловятся старые батч-архивации (июльский бэкфилл прошлой сессии) под
+ * датой самого бэкфилла, а не под настоящей датой ухода — сдвигает их в
+ * чужой месяц. Записи без `leftAt` — почини `leftAt` самим документом, не
+ * подменой здесь. Сверено построчно со старой системой за август 2026.
+ * Уникальные студенты.
  */
 export async function countLeftActiveGroup(db, branchId, periodStart, periodEnd) {
   const snap = await getDocs(
-    query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', '==', 'left')),
+    query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', 'in', ['left', 'archived'])),
   );
   const studentIds = new Set();
   for (const d of snap.docs) {
     const e = d.data();
-    if (!e.activatedAt || !e.leftAt) continue;
-    const leftAt = e.leftAt.toDate();
-    if (leftAt >= periodStart && leftAt <= periodEnd) studentIds.add(e.studentId);
+    if (!e.activatedAt) continue;
+    const churnedAt = e.leftAt;
+    if (!churnedAt) continue;
+    const date = churnedAt.toDate();
+    if (date >= periodStart && date <= periodEnd) studentIds.add(e.studentId);
   }
   return studentIds.size;
 }

@@ -140,7 +140,7 @@ export function StudentsPage() {
   const churnPeriod = settings?.churnPeriod ?? 'year';
 
   const leftEnrollmentsQuery = useMemo(
-    () => (db && activeBranchId && section === 'left' ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('status', '==', 'left')) : null),
+    () => (db && activeBranchId && section === 'left' ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('status', 'in', ['left', 'archived'])) : null),
     [activeBranchId, section],
   );
   const { data: leftEnrollments, loading: leftEnrollmentsLoading } = useCollection(leftEnrollmentsQuery);
@@ -151,6 +151,13 @@ export function StudentsPage() {
   );
   const { data: allStudents, loading: allStudentsLoading } = useCollection(allStudentsQuery);
 
+  // Персонал иногда архивирует студента напрямую вместо «Ушёл из группы» —
+  // тогда status='archived', но leftAt архивация не трогает (остаётся, если
+  // был). Специально НЕ подставляем updatedAt вместо отсутствующего leftAt —
+  // старые батч-архивации сдвигали бы в чужой месяц (дата бэкфилла, не
+  // настоящая дата ухода). Записи без leftAt почини самим документом, не
+  // подменой здесь. Тот же приём, что countLeftActiveGroup в stats.js —
+  // иначе карточка дашборда и этот список снова разойдутся (469ea6a).
   const leftEnrollmentByStudent = useMemo(() => {
     if (section !== 'left') return new Map();
     const { start, end } = churnPeriodRange(churnPeriod);
