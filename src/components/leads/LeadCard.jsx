@@ -65,7 +65,7 @@ export function LeadCard({ lead, operatorColor, operatorName, onOpen, onCall, on
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-bold text-text">{lead.fullName}</p>
-        <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="text-[13px] text-link">
+        <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="block truncate text-[13px] text-link">
           {formatPhone(lead.phone)}
         </a>
       </div>
