@@ -21,6 +21,7 @@ const MAX_ATTEMPTS = 5;
  */
 function CallAttemptDots({ attempts, onMark }) {
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -53,9 +54,10 @@ function CallAttemptDots({ attempts, onMark }) {
               <div key={i} ref={ref} className="relative">
                 <button
                   type="button"
+                  disabled={pending}
                   onClick={() => setOpen((v) => !v)}
                   aria-label={`Попытка ${i + 1}: отметить результат звонка`}
-                  className="flex h-4 w-4 items-center justify-center text-border hover:text-navy"
+                  className="flex h-4 w-4 items-center justify-center text-border hover:text-navy disabled:opacity-50"
                 >
                   <Circle className="h-4 w-4" />
                 </button>
@@ -63,9 +65,11 @@ function CallAttemptDots({ attempts, onMark }) {
                   <div className="absolute left-1/2 top-6 z-10 w-40 -translate-x-1/2 rounded-field border border-border bg-surface py-1 shadow-hover">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setOpen(false);
-                        onMark('success');
+                        setPending(true);
+                        await onMark('success');
+                        setPending(false);
                       }}
                       className="block w-full px-3 py-1.5 text-left text-[13px] text-text hover:bg-surface-alt"
                     >
@@ -73,9 +77,11 @@ function CallAttemptDots({ attempts, onMark }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setOpen(false);
-                        onMark('fail');
+                        setPending(true);
+                        await onMark('fail');
+                        setPending(false);
                       }}
                       className="block w-full px-3 py-1.5 text-left text-[13px] text-danger hover:bg-surface-alt"
                     >
