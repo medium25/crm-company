@@ -1,11 +1,12 @@
 // src/pages/LeadsPage.jsx
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, query, where, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { Plus } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
+import { useAuth } from '../hooks/useAuth.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Button } from '../components/ui/Button.jsx';
@@ -25,6 +26,7 @@ export function LeadsPage() {
   const navigate = useNavigate();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
+  const { user, staff } = useAuth();
 
   const leadsQuery = useMemo(
     () =>
@@ -76,6 +78,34 @@ export function LeadsPage() {
     }
   };
 
+  const markAttempt = async (lead, result) => {
+    const attempts = lead.callAttempts ?? [];
+    if (attempts.length >= 5) return;
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(collection(db, 'callLogs')), {
+        studentId: lead.id,
+        direction: 'out',
+        result: result === 'success' ? 'reached' : 'no_answer',
+        comment: '',
+        durationSec: 0,
+        quickMark: true,
+        userId: user.uid,
+        userName: staff?.fullName ?? '',
+        createdAt: serverTimestamp(),
+      });
+      // serverTimestamp() внутри элемента массива не поддерживается Firestore —
+      // для callAttempts используем клиентское время, updatedAt документа ниже уже серверное.
+      batch.update(doc(db, 'students', lead.id), {
+        callAttempts: [...attempts, { result, at: new Date() }],
+        updatedAt: serverTimestamp(),
+      });
+      await batch.commit();
+    } catch {
+      showToast('Не удалось отметить попытку.', { type: 'error' });
+    }
+  };
+
   const moveLead = (lead, columnKey) => {
     if (columnKeyOf(lead) === columnKey) return;
     if (STAGE_KEYS.includes(columnKey)) {
@@ -110,6 +140,7 @@ export function LeadsPage() {
     onDecline: (lead) => setDeclineTarget(lead),
     onMarkTrial: (lead) => patch(lead, { status: 'trial', trialAt: serverTimestamp() }, `${lead.fullName} записан(а) на пробный.`),
     onMove: moveLead,
+    onMarkAttempt: markAttempt,
   };
 
   return (
