@@ -14,8 +14,7 @@ import { Input } from '../components/ui/Input.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { formatMoney } from '../lib/format.js';
-
-const PALETTE = ['#22406B', '#E5842B', '#34A853', '#2563EB', '#C0392B', '#8B94A3'];
+import { PALETTE } from '../lib/colors.js';
 
 const EMPTY_FORM = { name: '', defaultPrice: '', defaultDurationMonths: '', color: PALETTE[0] };
 
