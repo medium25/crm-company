@@ -16,6 +16,7 @@ import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { AddStaffModal } from './AddStaffModal.jsx';
 import { formatPhone } from '../../lib/format.js';
+import { PALETTE } from '../../lib/colors.js';
 import { ROLE_OPTIONS, assignableRoleOptions } from '../../lib/roles.js';
 
 const LOGIN_URL = `${window.location.origin}${window.location.pathname}#/login`;
@@ -60,6 +61,15 @@ export function StaffSettingsTab() {
       showToast(member.isActive ? 'Сотрудник деактивирован.' : 'Сотрудник активирован.');
     } catch {
       showToast('Не удалось изменить статус.', { type: 'error' });
+    }
+  };
+
+  const handleColorChange = async (member, color) => {
+    try {
+      await updateDoc(doc(db, 'staff', member.id), { color, updatedAt: serverTimestamp(), updatedBy: user.uid });
+      showToast('Цвет обновлён.');
+    } catch {
+      showToast('Не удалось изменить цвет.', { type: 'error' });
     }
   };
 
@@ -145,6 +155,34 @@ export function StaffSettingsTab() {
             disabled={locked}
             title={locked ? 'Администратор не может менять роль этого сотрудника' : undefined}
           />
+        );
+      },
+    },
+    {
+      key: 'color',
+      label: 'Цвет',
+      render: (m) => {
+        // Тот же расклад прав, что у 'role'/'__actions' выше: admin не
+        // может трогать документы не-учителей (firestore.rules — update на
+        // staff требует role()!='admin' ИЛИ resource.role=='teacher').
+        const locked = callerRole === 'admin' && m.role !== 'teacher';
+        return (
+          <div className="flex gap-1.5">
+            {PALETTE.map((c) => (
+              <button
+                key={c}
+                type="button"
+                disabled={locked}
+                title={locked ? 'Администратор не может менять цвет этого сотрудника' : undefined}
+                onClick={() => handleColorChange(m, c)}
+                className={`h-6 w-6 shrink-0 rounded-full disabled:cursor-not-allowed disabled:opacity-40 ${
+                  m.color === c ? 'ring-2 ring-navy ring-offset-1' : ''
+                }`}
+                style={{ backgroundColor: c }}
+                aria-label={c}
+              />
+            ))}
+          </div>
         );
       },
     },
