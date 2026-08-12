@@ -54,36 +54,47 @@ export function LeadCard({ lead, operatorColor, operatorName, onOpen, onCall, on
       }}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className="flex cursor-grab items-center gap-3 rounded-field border border-border bg-surface px-3 py-2.5 hover:bg-surface-alt active:cursor-grabbing"
+      className="group flex cursor-grab flex-col gap-2.5 rounded-xl border border-border bg-surface p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md active:cursor-grabbing"
     >
-      <div
-        title={operatorName}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
-        style={{ backgroundColor: operatorColor || '#8B94A3' }}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div
+            title={operatorName}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
+            style={{ backgroundColor: operatorColor || '#8B94A3' }}
+          >
+            {initials(lead.fullName)}
+          </div>
+          <p className="truncate text-[14px] font-bold leading-tight text-text">{lead.fullName}</p>
+        </div>
+        <Badge variant={STATUS_BADGE[lead.status].variant} className="shrink-0">
+          {STATUS_BADGE[lead.status].label}
+        </Badge>
+      </div>
+
+      <a
+        href={`tel:+${lead.phone}`}
+        onClick={(e) => e.stopPropagation()}
+        className="flex items-center gap-1.5 truncate text-[13px] text-link"
       >
-        {initials(lead.fullName)}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-bold text-text">{lead.fullName}</p>
-        <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="block truncate text-[13px] text-link">
-          {formatPhone(lead.phone)}
-        </a>
-      </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <Badge variant={STATUS_BADGE[lead.status].variant}>{STATUS_BADGE[lead.status].label}</Badge>
+        <Phone className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        <span className="truncate">{formatPhone(lead.phone)}</span>
+      </a>
+
+      <div className="flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         <span className="text-[12px] text-muted">{formatDate(lead.createdAt)}</span>
-      </div>
-      <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => onCall(lead)}
-          aria-label="Позвонить"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt hover:text-navy"
-        >
-          <Phone className="h-4 w-4" />
-        </button>
-        <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />
-        <DropdownMenu items={menuItems} />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => onCall(lead)}
+            aria-label="Позвонить"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-alt hover:text-navy"
+          >
+            <Phone className="h-3.5 w-3.5" />
+          </button>
+          <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />
+          <DropdownMenu items={menuItems} />
+        </div>
       </div>
     </div>
   );
