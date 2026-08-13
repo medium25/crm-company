@@ -1,5 +1,5 @@
 // src/pages/LeadsPage.jsx
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, query, where, orderBy, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { Plus } from 'lucide-react';
@@ -13,14 +13,19 @@ import { Button } from '../components/ui/Button.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
 import { CallLogModal } from '../components/students/CallLogModal.jsx';
+import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
-import { COLUMNS, STAGE_KEYS, columnKeyOf } from '../components/leads/columns.js';
+import { COLUMNS, columnKeyOf, isForwardAllowed } from '../components/leads/columns.js';
+import { advanceStage } from '../lib/leadFunnel.js';
+
+const WON_LOST_VISIBLE_DAYS = 30;
+const TERMINAL_STAGES = ['won', 'lost'];
 
 /**
- * Заявки — лиды и пробные (`students` с `status` in [lead, trial]), единая
- * kanban-доска в 6 колонок (2026-08-12-leads-kanban-design.md). Перенос
- * между колонками — drag-n-drop или кнопка «→» на карточке (LeadCard).
- * Клик по карточке — на `/students/:id` (там комментарии/история/звонки).
+ * Заявки — 7-стадийная воронка продаж (2026-08-13-leads-funnel-redesign.md).
+ * Перенос между стадиями — только вперёд (drag-n-drop или кнопка «→»),
+ * кроме «Отказ» — туда можно с любой нетерминальной стадии. Клик по
+ * карточке — на `/students/:id`.
  */
 export function LeadsPage() {
   const navigate = useNavigate();
@@ -28,20 +33,40 @@ export function LeadsPage() {
   const { showToast } = useToast();
   const { user, staff } = useAuth();
 
+  // Форс-перерисовка раз в минуту — иначе просроченный SLA-бейдж не
+  // появится сам по себе (Firestore не «уведомляет» о течении времени).
+  const [, forceTick] = useReducer((n) => n + 1, 0);
+  useEffect(() => {
+    const id = setInterval(forceTick, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const leadsQuery = useMemo(
     () =>
       db && activeBranchId
         ? query(
             collection(db, 'students'),
             where('branchId', '==', activeBranchId),
-            where('isArchived', '==', false),
-            where('status', 'in', ['lead', 'trial']),
+            where('funnelStage', 'in', COLUMNS.map((c) => c.key)),
             orderBy('createdAt', 'desc'),
           )
         : null,
     [activeBranchId],
   );
-  const { data: leads } = useCollection(leadsQuery);
+  const { data: allLeads } = useCollection(leadsQuery);
+
+  // won/lost старше 30 дней не показываем на доске — иначе терминальные
+  // колонки бесконечно растут за месяцы работы (см. план, «Важное
+  // архитектурное решение»). Документ никуда не девается, просто не
+  // рендерится в этом списке.
+  const leads = useMemo(() => {
+    const cutoff = Date.now() - WON_LOST_VISIBLE_DAYS * 86_400_000;
+    return allLeads.filter((l) => {
+      if (!TERMINAL_STAGES.includes(columnKeyOf(l))) return true;
+      const at = (l.paidAt ?? l.lostAt ?? l.updatedAt)?.toDate?.();
+      return at ? at.getTime() >= cutoff : true;
+    });
+  }, [allLeads]);
 
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
@@ -59,6 +84,7 @@ export function LeadsPage() {
   const [pendingTarget, setPendingTarget] = useState(null);
   const [declineTarget, setDeclineTarget] = useState(null);
   const [callTarget, setCallTarget] = useState(null);
+  const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
 
   const byColumn = useMemo(() => {
     const map = {};
@@ -81,6 +107,8 @@ export function LeadsPage() {
   const markAttempt = async (lead, result) => {
     const attempts = lead.callAttempts ?? [];
     if (attempts.length >= 5) return;
+    const nextAttempts = [...attempts, { result, at: new Date() }];
+    const isCold = nextAttempts.length === 5 && nextAttempts.every((a) => a.result === 'fail');
     try {
       const batch = writeBatch(db);
       batch.set(doc(collection(db, 'callLogs')), {
@@ -94,43 +122,57 @@ export function LeadsPage() {
         userName: staff?.fullName ?? '',
         createdAt: serverTimestamp(),
       });
+      const stageFields = {};
+      if (lead.funnelStage === 'new') {
+        stageFields.funnelStage = 'calling';
+        stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: new Date() }];
+      } else if (isCold) {
+        stageFields.funnelStage = 'lost';
+        stageFields.lostReason = 'no_answer';
+        stageFields.lostAt = serverTimestamp();
+        stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }];
+      }
       // serverTimestamp() внутри элемента массива не поддерживается Firestore —
-      // для callAttempts используем клиентское время, updatedAt документа ниже уже серверное.
+      // callAttempts.at/stageHistory.enteredAt используют клиентское время,
+      // updatedAt/lostAt документа ниже — уже верхнеуровневые поля, им можно.
       batch.update(doc(db, 'students', lead.id), {
-        callAttempts: [...attempts, { result, at: new Date() }],
+        callAttempts: nextAttempts,
+        ...stageFields,
         updatedAt: serverTimestamp(),
       });
       await batch.commit();
+      if (stageFields.funnelStage === 'lost') showToast(`${lead.fullName}: 5 неудачных попыток, лид отмечен как отказ.`);
     } catch {
       showToast('Не удалось отметить попытку.', { type: 'error' });
     }
   };
 
-  const moveLead = (lead, columnKey) => {
-    if (columnKeyOf(lead) === columnKey) return;
-    if (STAGE_KEYS.includes(columnKey)) {
-      patch(lead, { leadStage: columnKey, leadResult: null });
-    } else {
-      patch(lead, { leadResult: columnKey });
+  const moveLead = (lead, stageKey) => {
+    if (columnKeyOf(lead) === stageKey) return;
+    if (!isForwardAllowed(columnKeyOf(lead), stageKey)) {
+      showToast('Нельзя вернуть лида на предыдущую стадию.', { type: 'error' });
+      return;
     }
+    if (stageKey === 'won' || stageKey === 'lost') return; // эти переходы — через оплату/DeclineLeadModal, не через drag
+    advanceStage(db, lead, stageKey, {}, user).catch(() => showToast('Не удалось обновить лид.', { type: 'error' }));
   };
 
-  const openAddForm = (columnKey) => {
-    setPendingTarget({ columnKey });
+  const markTouch = (lead) => {
+    const nextNumber = (lead.closingTouchNumber ?? 0) + 1;
+    const daysToAdd = nextNumber === 1 ? 1 : 4;
+    const nextTouchAt = nextNumber >= 3 ? null : new Date(Date.now() + daysToAdd * 86_400_000);
+    patch(lead, { closingTouchNumber: nextNumber, nextTouchAt }, `Касание ${nextNumber} отмечено.`);
+  };
+
+  const openAddForm = () => {
+    setPendingTarget(true);
     setFormLead({});
   };
 
-  const handleCreated = async (id) => {
-    if (!pendingTarget) return;
-    const { columnKey } = pendingTarget;
+  const handleCreated = () => {
     setPendingTarget(null);
-    if (columnKey === 'today') return; // дефолт нового лида уже 'today' — писать нечего
-    const data = STAGE_KEYS.includes(columnKey) ? { leadStage: columnKey } : { leadResult: columnKey };
-    try {
-      await updateDoc(doc(db, 'students', id), { ...data, updatedAt: serverTimestamp() });
-    } catch {
-      showToast('Не удалось определить лида в раздел.', { type: 'error' });
-    }
+    // новый лид уже создан с funnelStage:'new' в StudentFormModal — писать
+    // здесь больше нечего, доска подхватит его через onSnapshot.
   };
 
   const cardActions = {
@@ -138,7 +180,13 @@ export function LeadsPage() {
     onCall: (lead) => setCallTarget(lead),
     onEdit: (lead) => setFormLead(lead),
     onDecline: (lead) => setDeclineTarget(lead),
-    onMarkTrial: (lead) => patch(lead, { status: 'trial', trialAt: serverTimestamp() }, `${lead.fullName} записан(а) на пробный.`),
+    onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
+    onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
+    onMarkAttended: (lead, engagementScore) =>
+      advanceStage(db, lead, 'trial_completed', { attended: true, engagementScore }, user).catch(() =>
+        showToast('Не удалось сохранить явку.', { type: 'error' }),
+      ),
+    onMarkTouch: markTouch,
     onMove: moveLead,
     onMarkAttempt: markAttempt,
   };
@@ -148,7 +196,7 @@ export function LeadsPage() {
       <PageHeader
         title="Заявки"
         actions={
-          <Button onClick={() => setFormLead({})}>
+          <Button onClick={openAddForm}>
             <Plus className="h-4 w-4" /> Добавить лида
           </Button>
         }
@@ -160,7 +208,7 @@ export function LeadsPage() {
             column={column}
             leads={byColumn[column.key]}
             operatorByUid={operatorByUid}
-            onAdd={() => openAddForm(column.key)}
+            onAdd={column.key === 'new' ? openAddForm : undefined}
             onDropLead={(leadId, columnKey) => {
               const lead = leadsById.get(leadId);
               if (lead) moveLead(lead, columnKey);
@@ -180,6 +228,7 @@ export function LeadsPage() {
       />
       <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
       <CallLogModal open={Boolean(callTarget)} studentId={callTarget?.id} onClose={() => setCallTarget(null)} />
+      <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
     </>
   );
 }
