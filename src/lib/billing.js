@@ -278,7 +278,16 @@ export async function recordPayment(db, { student, branchId, amount, method, dat
   });
 
   if (!student.firstPaymentAt) {
-    await updateDoc(doc(db, 'students', student.id), { firstPaymentAt: serverTimestamp() });
+    const wonFields = ['trial_completed', 'closing'].includes(student.funnelStage)
+      ? {
+          funnelStage: 'won',
+          stageHistory: [...(student.stageHistory ?? []), { stage: 'won', enteredAt: new Date() }],
+          paidAt: serverTimestamp(),
+          paidAmount: amount,
+          groupId: groupId ?? null,
+        }
+      : {};
+    await updateDoc(doc(db, 'students', student.id), { firstPaymentAt: serverTimestamp(), ...wonFields });
   }
   return txId;
 }
