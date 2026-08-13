@@ -164,3 +164,55 @@ export async function debtAging(db, branchId, today = new Date()) {
   }
   return buckets;
 }
+
+/**
+ * Воронка по операторам за период (2026-08-13-leads-funnel-redesign.md
+ * §10): по каждому `assignedOperator` — новых лидов, % дозвона (хотя бы
+ * одна запись 'calling' в stageHistory), % записи на пробный, % явки,
+ * % оплаты после пробного, доля no_answer+no_show среди всех lost этого
+ * оператора (индикатор проблемы с номерами/каналом, не со скриптом/ценой).
+ */
+export async function funnelByOperator(db, branchId, periodStart, periodEnd) {
+  // funnelStage не фильтруется в самом запросе: Firestore не разрешает
+  // inequality-фильтр (funnelStage != null) на одном поле вместе с
+  // range-фильтром (createdAt >=/<=) на другом без специального
+  // multi-inequality индекса — проще и надёжнее отсеять на клиенте.
+  const snap = await getDocs(
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('createdAt', '>=', Timestamp.fromDate(periodStart)),
+      where('createdAt', '<=', Timestamp.fromDate(periodEnd)),
+    ),
+  );
+  const leads = snap.docs.map((d) => d.data()).filter((s) => Boolean(s.funnelStage));
+
+  const byOperator = new Map();
+  for (const lead of leads) {
+    const opId = lead.assignedOperator ?? 'unassigned';
+    if (!byOperator.has(opId)) byOperator.set(opId, []);
+    byOperator.get(opId).push(lead);
+  }
+
+  const hasStage = (lead, stage) => (lead.stageHistory ?? []).some((h) => h.stage === stage);
+
+  return [...byOperator.entries()].map(([operatorId, opLeads]) => {
+    const total = opLeads.length;
+    const dozvon = opLeads.filter((l) => hasStage(l, 'calling')).length;
+    const trialScheduled = opLeads.filter((l) => hasStage(l, 'trial_scheduled')).length;
+    const attended = opLeads.filter((l) => l.attended === true).length;
+    const won = opLeads.filter((l) => l.funnelStage === 'won').length;
+    const lost = opLeads.filter((l) => l.funnelStage === 'lost');
+    const noAnswerOrNoShow = lost.filter((l) => l.lostReason === 'no_answer' || l.lostReason === 'no_show').length;
+    return {
+      operatorId,
+      total,
+      dozvonRate: total > 0 ? Math.round((dozvon / total) * 100) : 0,
+      trialScheduledRate: total > 0 ? Math.round((trialScheduled / total) * 100) : 0,
+      attendedRate: total > 0 ? Math.round((attended / total) * 100) : 0,
+      wonRate: total > 0 ? Math.round((won / total) * 100) : 0,
+      noAnswerShare: lost.length > 0 ? Math.round((noAnswerOrNoShow / lost.length) * 100) : 0,
+      lostCount: lost.length,
+    };
+  });
+}

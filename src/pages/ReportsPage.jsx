@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format, startOfYear } from 'date-fns';
+import { collection, query, where } from 'firebase/firestore';
 import { Download, BarChart3 } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
+import { useCollection } from '../hooks/useCollection.js';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
@@ -14,7 +16,7 @@ import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { RevenueChart } from '../components/charts/RevenueChart.jsx';
 import { formatMoney } from '../lib/format.js';
 import { getMonthlyRevenue } from '../lib/stats.js';
-import { revenueByCourse, revenueByTeacher, attendanceByGroup, churnReport, conversionFunnel, debtAging } from '../lib/reports.js';
+import { revenueByCourse, revenueByTeacher, attendanceByGroup, churnReport, conversionFunnel, debtAging, funnelByOperator } from '../lib/reports.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
 const TABS = [
@@ -25,6 +27,7 @@ const TABS = [
   { key: 'churn', label: 'Отток и причины ухода' },
   { key: 'conversion', label: 'Конверсия' },
   { key: 'debts', label: 'Долги по срокам' },
+  { key: 'funnel', label: 'Воронка по операторам' },
 ];
 
 function fmtDate(d) {
@@ -33,6 +36,12 @@ function fmtDate(d) {
 
 export function ReportsPage() {
   const { activeBranchId } = useBranch();
+  const staffQuery = useMemo(
+    () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
+    [activeBranchId],
+  );
+  const { data: staffList } = useCollection(staffQuery);
+  const operatorName = (uid) => (uid === 'unassigned' ? 'Без оператора' : staffList.find((s) => s.id === uid)?.fullName ?? uid);
   const [tab, setTab] = useState('revenue');
 
   const today = new Date();
@@ -48,6 +57,7 @@ export function ReportsPage() {
   const [churn, setChurn] = useState(null);
   const [funnel, setFunnel] = useState(null);
   const [debts, setDebts] = useState([]);
+  const [funnelByOp, setFunnelByOp] = useState([]);
 
   const fromDate = useMemo(() => new Date(`${from}T00:00:00`), [from]);
   const toDate = useMemo(() => new Date(`${to}T23:59:59`), [to]);
@@ -78,6 +88,9 @@ export function ReportsPage() {
       } else if (tab === 'debts') {
         const data = await debtAging(db, activeBranchId);
         if (!cancelled) setDebts(data);
+      } else if (tab === 'funnel') {
+        const data = await funnelByOperator(db, activeBranchId, fromDate, toDate);
+        if (!cancelled) setFunnelByOp(data);
       }
       if (!cancelled) setLoading(false);
     };
@@ -321,6 +334,25 @@ export function ReportsPage() {
                 ))}
               </div>
             </>
+          )}
+
+          {!loading && tab === 'funnel' && (
+            funnelByOp.length === 0 ? (
+              <EmptyState icon={BarChart3} title="Нет лидов за период" />
+            ) : (
+              <Table
+                columns={[
+                  { key: 'operator', label: 'Оператор', render: (r) => operatorName(r.operatorId) },
+                  { key: 'total', label: 'Новых лидов' },
+                  { key: 'dozvonRate', label: '% дозвона', render: (r) => `${r.dozvonRate}%` },
+                  { key: 'trialScheduledRate', label: '% на пробный', render: (r) => `${r.trialScheduledRate}%` },
+                  { key: 'attendedRate', label: '% явки', render: (r) => `${r.attendedRate}%` },
+                  { key: 'wonRate', label: '% оплаты', render: (r) => `${r.wonRate}%` },
+                  { key: 'noAnswerShare', label: 'Доля no_answer/no_show в отказах', render: (r) => `${r.noAnswerShare}%` },
+                ]}
+                rows={funnelByOp.map((r) => ({ id: r.operatorId, ...r }))}
+              />
+            )
           )}
         </div>
       </Card>
