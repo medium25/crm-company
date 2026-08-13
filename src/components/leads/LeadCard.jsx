@@ -144,33 +144,36 @@ export function LeadCard({ lead, operatorColor, operatorName, onOpen, onCall, on
       }}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className="group flex cursor-grab flex-col gap-2 rounded-xl border border-border bg-surface p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md active:cursor-grabbing"
+      className="group flex cursor-grab flex-col gap-1.5 rounded-xl border border-border bg-surface p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md active:cursor-grabbing"
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 truncate text-[14px] font-bold leading-tight text-text">{lead.fullName}</p>
-        <Badge variant={STATUS_BADGE[lead.status].variant} className="shrink-0">
+        <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
+        <Badge variant={STATUS_BADGE[lead.status].variant} className="shrink-0 !px-1.5 !py-0 !text-[10px]">
           {STATUS_BADGE[lead.status].label}
         </Badge>
       </div>
 
-      {operatorLabel && (
-        <span
-          className="inline-flex w-fit items-center rounded-badge px-2 py-0.5 text-[11px] font-bold text-white"
-          style={{ backgroundColor: operatorColor || '#8B94A3' }}
-        >
-          {operatorLabel}
-        </span>
-      )}
-
-      <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="block truncate text-[13px] text-link">
-        {formatPhone(lead.phone)}
-      </a>
+      <div className="flex items-center justify-between gap-2">
+        {operatorLabel ? (
+          <span
+            className="inline-flex w-fit items-center truncate rounded-badge px-1.5 py-0.5 text-[10px] font-bold text-white"
+            style={{ backgroundColor: operatorColor || '#8B94A3' }}
+          >
+            {operatorLabel}
+          </span>
+        ) : (
+          <span />
+        )}
+        <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="truncate text-[12px] text-link">
+          {formatPhone(lead.phone)}
+        </a>
+      </div>
 
       <div onClick={(e) => e.stopPropagation()}>
         <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} />
       </div>
 
-      <div className="flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
         <span className="text-[12px] text-muted">{formatDate(lead.createdAt)}</span>
         <div className="flex shrink-0 items-center gap-0.5">
           <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />
