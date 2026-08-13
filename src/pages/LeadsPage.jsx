@@ -81,7 +81,6 @@ export function LeadsPage() {
   }, [staffList]);
 
   const [formLead, setFormLead] = useState(null);
-  const [pendingTarget, setPendingTarget] = useState(null);
   const [declineTarget, setDeclineTarget] = useState(null);
   const [callTarget, setCallTarget] = useState(null);
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
@@ -164,13 +163,9 @@ export function LeadsPage() {
     patch(lead, { closingTouchNumber: nextNumber, nextTouchAt }, `Касание ${nextNumber} отмечено.`);
   };
 
-  const openAddForm = () => {
-    setPendingTarget(true);
-    setFormLead({});
-  };
+  const openAddForm = () => setFormLead({});
 
   const handleCreated = () => {
-    setPendingTarget(null);
     // новый лид уже создан с funnelStage:'new' в StudentFormModal — писать
     // здесь больше нечего, доска подхватит его через onSnapshot.
   };
@@ -218,14 +213,7 @@ export function LeadsPage() {
         ))}
       </div>
 
-      <StudentFormModal
-        student={formLead}
-        onClose={() => {
-          setFormLead(null);
-          setPendingTarget(null);
-        }}
-        onCreated={handleCreated}
-      />
+      <StudentFormModal student={formLead} onClose={() => setFormLead(null)} onCreated={handleCreated} />
       <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
       <CallLogModal open={Boolean(callTarget)} studentId={callTarget?.id} onClose={() => setCallTarget(null)} />
       <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
