@@ -1,30 +1,44 @@
 // src/components/leads/columns.js
 /**
- * Единая модель 6 колонок kanban-доски «Заявки». Первые 4 — `leadStage`
- * (лид ещё не отработан), последние 2 — `leadResult` (лид на пробном уроке
- * с исходом). Порядок — порядок колонок слева направо на доске.
+ * 7 стадий воронки продаж (2026-08-13-leads-funnel-redesign.md). Порядок —
+ * порядок колонок слева направо на доске «Заявки» и порядок разрешённых
+ * переходов вперёд (нельзя двигать карточку назад по списку).
  */
 export const COLUMNS = [
-  { key: 'today', label: 'Сегодня' },
-  { key: 'tomorrow', label: 'Следующий день' },
-  { key: 'next_week', label: 'На следующей неделе' },
-  { key: 'later', label: 'В будущем' },
-  { key: 'came', label: 'Пришли' },
-  { key: 'not_came', label: 'Не пришли' },
+  { key: 'new', label: 'Новый лид' },
+  { key: 'calling', label: 'Дозвон' },
+  { key: 'trial_scheduled', label: 'Пробный назначен' },
+  { key: 'trial_completed', label: 'Пробный проведён' },
+  { key: 'closing', label: 'Дожим' },
+  { key: 'won', label: 'Оплачено' },
+  { key: 'lost', label: 'Отказ' },
 ];
 
-export const STAGE_KEYS = COLUMNS.slice(0, 4).map((c) => c.key);
+const FORWARD_ORDER = COLUMNS.filter((c) => c.key !== 'lost').map((c) => c.key);
 
 /**
- * Колонка, в которой сейчас находится лид. Лид без `leadResult` живёт по
- * `leadStage` (дефолт 'today', если поле пустое или содержит не наше
- * значение); лид с `leadResult` — во второй паре колонок, `leadStage`
- * игнорируется (та же логика, что в исходном `byStage`/`byResult` до
- * объединения в одну доску).
+ * Стадия, в которой сейчас находится лид. Дефолт 'new' — для лидов без
+ * funnelStage (до миграции, см. scripts/backfill-funnel-stage.mjs) и для
+ * newly-created документов до записи поля.
  * @param {Object} lead
  * @returns {string} один из ключей COLUMNS
  */
 export function columnKeyOf(lead) {
-  if (lead.leadResult === 'came' || lead.leadResult === 'not_came') return lead.leadResult;
-  return STAGE_KEYS.includes(lead.leadStage) ? lead.leadStage : 'today';
+  return COLUMNS.some((c) => c.key === lead.funnelStage) ? lead.funnelStage : 'new';
+}
+
+/**
+ * Разрешён ли переход `from → to`: только вперёд по FORWARD_ORDER (можно
+ * пропускать стадии), либо в 'lost' из любой нетерминальной стадии.
+ * 'won'/'lost' — терминальные, из них переходов нет вовсе.
+ * @param {string} from
+ * @param {string} to
+ * @returns {boolean}
+ */
+export function isForwardAllowed(from, to) {
+  if (from === 'won' || from === 'lost') return false;
+  if (to === 'lost') return true;
+  const fromIndex = FORWARD_ORDER.indexOf(from);
+  const toIndex = FORWARD_ORDER.indexOf(to);
+  return toIndex > fromIndex;
 }
