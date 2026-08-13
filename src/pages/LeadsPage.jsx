@@ -177,10 +177,25 @@ export function LeadsPage() {
     onDecline: (lead) => setDeclineTarget(lead),
     onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
     onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
-    onMarkAttended: (lead, engagementScore) =>
-      advanceStage(db, lead, 'trial_completed', { attended: true, engagementScore }, user).catch(() =>
-        showToast('Не удалось сохранить явку.', { type: 'error' }),
-      ),
+    onMarkAttended: (lead, engagementScore) => {
+      // Проходим через 'trial_completed' в 'closing' одним обновлением —
+      // без оплаты в момент отметки явки лид сразу уходит в дожим (спека
+      // §6), но обе стадии остаются в stageHistory для отчёта по воронке.
+      const stageHistory = [
+        ...(lead.stageHistory ?? []),
+        { stage: 'trial_completed', enteredAt: new Date() },
+        { stage: 'closing', enteredAt: new Date() },
+      ];
+      updateDoc(doc(db, 'students', lead.id), {
+        funnelStage: 'closing',
+        attended: true,
+        engagementScore,
+        closingTouchNumber: 0,
+        stageHistory,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+      }).catch(() => showToast('Не удалось сохранить явку.', { type: 'error' }));
+    },
     onMarkTouch: markTouch,
     onMove: moveLead,
     onMarkAttempt: markAttempt,
