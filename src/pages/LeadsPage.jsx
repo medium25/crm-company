@@ -123,7 +123,7 @@ export function LeadsPage() {
         createdAt: serverTimestamp(),
       });
       const stageFields = {};
-      if (lead.funnelStage === 'new') {
+      if (columnKeyOf(lead) === 'new') {
         stageFields.funnelStage = 'calling';
         stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: new Date() }];
       } else if (isCold) {
