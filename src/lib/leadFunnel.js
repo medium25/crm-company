@@ -78,6 +78,65 @@ export function callScheduleHint(attempts) {
   return 'Послезавтра';
 }
 
+const END_OF_DAY_HOUR = 18;
+
+function endOfDayIn(daysAhead) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  d.setHours(END_OF_DAY_HOUR, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Дедлайн следующей попытки дозвона — та же сетка 2 сегодня/2 завтра/1
+ * послезавтра, что и `callScheduleHint`, но как реальная дата (конец
+ * рабочего дня), а не текст. Пишется на документ лида при каждой отметке
+ * попытки (`markAttempt`), чтобы карточка не «зависала» в «Дозвоне»
+ * незамеченной. `null` — попыток не осталось (5 уже сделано).
+ * @param {Array<{result: 'success'|'fail'}>} attempts
+ * @returns {Date|null}
+ */
+export function nextCallDueAt(attempts) {
+  const n = attempts.length;
+  if (n === 0 || n >= 5) return null;
+  const daysAhead = n < 2 ? 0 : n < 4 ? 1 : 2;
+  return endOfDayIn(daysAhead);
+}
+
+/**
+ * Дедлайн первого касания при входе в «Дожим» — вечер того же дня (21:00),
+ * либо прямо сейчас, если пробный отмечен уже вечером (спека §6). Дальше
+ * `markTouch` пересчитывает дедлайн следующего касания сам при каждой
+ * отметке — здесь только точка входа в стадию.
+ * @returns {Date}
+ */
+export function firstTouchDueAt() {
+  const d = new Date();
+  if (d.getHours() < 21) {
+    d.setHours(21, 0, 0, 0);
+    return d;
+  }
+  return d;
+}
+
+/**
+ * Дедлайн следующего действия по лиду — единая проверка «не залежалась ли
+ * карточка» для всех нетерминальных стадий (каждое следующее действие
+ * переназначает его заново, см. соответствующие вызовы в LeadsPage.jsx).
+ * `null` для стадий без операторского действия (`trial_completed` —
+ * мгновенный переход) и терминальных (`won`/`lost`).
+ * @param {Object} lead
+ * @returns {Date|null}
+ */
+export function stageDeadline(lead) {
+  const stage = lead.funnelStage ?? 'new';
+  if (stage === 'new') return lead.createdAt?.toDate ? slaDeadline(lead.createdAt.toDate()) : null;
+  if (stage === 'calling') return lead.nextCallDueAt?.toDate?.() ?? null;
+  if (stage === 'trial_scheduled') return lead.trialDate?.toDate?.() ?? null;
+  if (stage === 'closing') return lead.nextTouchAt?.toDate?.() ?? null;
+  return null;
+}
+
 /**
  * Round-robin назначение оператора при создании лида. Список операторов
  * читается снаружи транзакции (обычный getDocs — сам список меняется

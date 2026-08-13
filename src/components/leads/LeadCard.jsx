@@ -3,7 +3,7 @@ import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle } f
 import { Badge } from '../ui/Badge.jsx';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
-import { isPriorityLead, slaDeadline, callScheduleHint, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
+import { isPriorityLead, stageDeadline, callScheduleHint, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDate, formatDateTime } from '../../lib/format.js';
 
 const STATUS_BADGE = {
@@ -191,8 +191,11 @@ export function LeadCard({
   const operatorLabel = (operatorName ?? '').split(' ')[0];
 
   const createdAt = lead.createdAt?.toDate?.();
-  const overdue = stage === 'new' && createdAt ? Date.now() > slaDeadline(createdAt).getTime() : false;
-  const priority = createdAt ? isPriorityLead(createdAt) : false;
+  const deadline = stageDeadline(lead);
+  const overdue = deadline ? Date.now() > deadline.getTime() : false;
+  // priority — метка «лид пришёл вне рабочих часов», актуальна только пока
+  // не отработан первый SLA на стадии 'new'; дальше по воронке не показываем.
+  const priority = stage === 'new' && createdAt ? isPriorityLead(createdAt) : false;
 
   const menuItems = [
     ...(stage === 'new' || stage === 'calling' ? [{ label: 'Записать на пробный', onClick: () => onScheduleTrial(lead) }] : []),
@@ -224,7 +227,7 @@ export function LeadCard({
       <div className="flex items-start justify-between gap-2">
         <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
         <div className="flex shrink-0 items-center gap-1">
-          {overdue && <AlertTriangle className="h-3.5 w-3.5 text-danger" aria-label="Просрочен ответ по SLA" />}
+          {overdue && <AlertTriangle className="h-3.5 w-3.5 text-danger" aria-label="Дедлайн этапа просрочен" />}
           <Badge variant={STATUS_BADGE[lead.status]?.variant ?? 'type-system'} className="!px-1.5 !py-0 !text-[10px]">
             {STATUS_BADGE[lead.status]?.label ?? lead.status}
           </Badge>
@@ -271,7 +274,9 @@ export function LeadCard({
 
       {stage === 'closing' && (
         <div className="flex items-center justify-between gap-2 text-[12px]" onClick={(e) => e.stopPropagation()}>
-          <span className="text-muted">Касание {lead.closingTouchNumber ?? 0}/3</span>
+          <span className="truncate text-muted">
+            Касание {lead.closingTouchNumber ?? 0}/3{lead.nextTouchAt && ` · до ${formatDate(lead.nextTouchAt)}`}
+          </span>
           {(lead.closingTouchNumber ?? 0) < 3 && (
             <button
               type="button"

@@ -16,7 +16,7 @@ import { CallLogModal } from '../components/students/CallLogModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed } from '../components/leads/columns.js';
-import { advanceStage } from '../lib/leadFunnel.js';
+import { advanceStage, nextCallDueAt, firstTouchDueAt } from '../lib/leadFunnel.js';
 
 const WON_LOST_VISIBLE_DAYS = 30;
 const TERMINAL_STAGES = ['won', 'lost'];
@@ -136,6 +136,7 @@ export function LeadsPage() {
       // updatedAt/lostAt документа ниже — уже верхнеуровневые поля, им можно.
       batch.update(doc(db, 'students', lead.id), {
         callAttempts: nextAttempts,
+        nextCallDueAt: isCold ? null : nextCallDueAt(nextAttempts),
         ...stageFields,
         updatedAt: serverTimestamp(),
       });
@@ -191,6 +192,7 @@ export function LeadsPage() {
         attended: true,
         engagementScore,
         closingTouchNumber: 0,
+        nextTouchAt: firstTouchDueAt(),
         stageHistory,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
