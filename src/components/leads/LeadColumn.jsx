@@ -23,14 +23,16 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, ..
         <span className="text-[15px] font-bold text-text">{column.label}</span>
         <span className="flex items-center gap-3">
           <span className="text-[13px] font-bold text-muted">{leads.length}</span>
-          <button
-            type="button"
-            onClick={onAdd}
-            aria-label={`Добавить лида: ${column.label}`}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+          {onAdd && (
+            <button
+              type="button"
+              onClick={onAdd}
+              aria-label={`Добавить лида: ${column.label}`}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
         </span>
       </div>
       <div
@@ -51,7 +53,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, ..
           <p className="py-4 text-center text-[14px] text-muted">Пусто</p>
         ) : (
           leads.map((lead) => {
-            const op = operatorByUid.get(lead.createdBy);
+            const op = operatorByUid.get(lead.assignedOperator);
             return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
           })
         )}

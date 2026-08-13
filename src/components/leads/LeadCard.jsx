@@ -1,24 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Badge } from '../ui/Badge.jsx';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
-import { COLUMNS } from './columns.js';
-import { formatPhone, formatDate } from '../../lib/format.js';
+import { COLUMNS, isForwardAllowed } from './columns.js';
+import { isPriorityLead, slaDeadline, callScheduleHint, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
+import { formatPhone, formatDate, formatDateTime } from '../../lib/format.js';
 
 const STATUS_BADGE = {
   lead: { variant: 'type-system', label: 'Лид' },
   trial: { variant: 'status-active', label: 'Пробный' },
 };
 
+const ENGAGEMENT_OPTIONS = [
+  { value: 'low', label: 'Низкая' },
+  { value: 'medium', label: 'Средняя' },
+  { value: 'high', label: 'Высокая' },
+];
+
 const MAX_ATTEMPTS = 5;
 
-/**
- * Ряд из 5 точек — попытки дозвона (2026-08-12-lead-card-call-attempts-design.md).
- * Кликабельна только следующая пустая точка — попытки идут по порядку.
- * Клик открывает попап «Успешно / Не успешно»; выбор красит точку и
- * закрывает попап. Заполненные точки не кликабельны. Если все 5 —
- * неудача, рядом появляется значок «холодный лид».
- */
+/** Ряд из 5 точек — попытки дозвона, см. 2026-08-12-lead-card-call-attempts-design.md. */
 function CallAttemptDots({ attempts, onMark }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -39,6 +40,7 @@ function CallAttemptDots({ attempts, onMark }) {
   }, [open]);
 
   const isCold = attempts.length === MAX_ATTEMPTS && attempts.every((a) => a.result === 'fail');
+  const hint = callScheduleHint(attempts);
 
   return (
     <div className="flex items-center gap-2">
@@ -100,57 +102,133 @@ function CallAttemptDots({ attempts, onMark }) {
           <Snowflake className="h-4 w-4 text-danger" />
         </span>
       )}
+      {!isCold && hint && <span className="text-[11px] text-muted">{hint}</span>}
+    </div>
+  );
+}
+
+/** Попап выбора вовлечённости после отметки явки на пробный — см. Task 6 брифа. */
+function EngagementPopover({ onPick }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="rounded-field border border-border px-2 py-1 text-[12px] font-bold text-text hover:bg-surface-alt"
+      >
+        Пришёл
+      </button>
+      {open && (
+        <div className="absolute left-0 top-8 z-10 w-40 rounded-field border border-border bg-surface py-1 shadow-hover">
+          {ENGAGEMENT_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onPick(o.value);
+              }}
+              className="block w-full px-3 py-1.5 text-left text-[13px] text-text hover:bg-surface-alt"
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 /**
- * Карточка лида на kanban-доске «Заявки». Перетаскивается мышью (native
- * HTML5 DnD — `draggable`, кладёт свой id в dataTransfer) в любую колонку
- * LeadColumn. Кнопка «→» — то же перемещение по тапу, для тачскринов, где
- * HTML5 DnD не работает вовсе (см. 2026-08-12-leads-kanban-design.md).
+ * Карточка лида на 7-стадийной воронке «Заявки» (2026-08-13-leads-funnel-
+ * redesign.md). Перетаскивается мышью (native HTML5 DnD) только вперёд по
+ * стадиям — терминальные (won/lost) не draggable вовсе.
  * @param {Object} props
- * @param {Object} props.lead документ `students` со `status` in [lead, trial]
- * @param {string} [props.operatorColor] hex-цвет создателя лида (`staff.color`); без него — нейтральный серый
- * @param {string} [props.operatorName] имя создателя лида — первое слово идёт в тег на карточке
+ * @param {Object} props.lead документ `students`
+ * @param {string} [props.operatorColor] hex-цвет назначенного оператора (`staff.color`)
+ * @param {string} [props.operatorName] имя назначенного оператора
  * @param {(lead: Object) => void} props.onOpen
  * @param {(lead: Object) => void} props.onCall открывает полную форму записи звонка
  * @param {(lead: Object) => void} props.onEdit
  * @param {(lead: Object) => void} props.onDecline
- * @param {(lead: Object) => void} props.onMarkTrial
- * @param {(lead: Object, columnKey: string) => void} props.onMove
- * @param {(lead: Object, result: 'success'|'fail') => void} props.onMarkAttempt быстрая отметка попытки дозвона
+ * @param {(lead: Object) => void} props.onScheduleTrial
+ * @param {(lead: Object) => void} props.onRescheduleTrial
+ * @param {(lead: Object, engagementScore: 'low'|'medium'|'high') => void} props.onMarkAttended
+ * @param {(lead: Object) => void} props.onMarkTouch
+ * @param {(lead: Object, stageKey: string) => void} props.onMove
+ * @param {(lead: Object, result: 'success'|'fail') => void} props.onMarkAttempt
  */
-export function LeadCard({ lead, operatorColor, operatorName, onOpen, onCall, onEdit, onDecline, onMarkTrial, onMove, onMarkAttempt }) {
-  const menuItems = [
-    ...(lead.status === 'lead' ? [{ label: 'Записать на пробный', onClick: () => onMarkTrial(lead) }] : []),
-    { label: 'Записать звонок', onClick: () => onCall(lead) },
-    { label: 'Редактировать', onClick: () => onEdit(lead) },
-    { label: 'Отказ', danger: true, onClick: () => onDecline(lead) },
-  ];
-
-  const moveItems = COLUMNS.map((c) => ({ label: c.label, onClick: () => onMove(lead, c.key) }));
+export function LeadCard({
+  lead,
+  operatorColor,
+  operatorName,
+  onOpen,
+  onCall,
+  onEdit,
+  onDecline,
+  onScheduleTrial,
+  onRescheduleTrial,
+  onMarkAttended,
+  onMarkTouch,
+  onMove,
+  onMarkAttempt,
+}) {
+  const stage = lead.funnelStage ?? 'new';
+  const isTerminal = stage === 'won' || stage === 'lost';
   const attempts = lead.callAttempts ?? [];
   const operatorLabel = (operatorName ?? '').split(' ')[0];
+
+  const createdAt = lead.createdAt?.toDate?.();
+  const overdue = stage === 'new' && createdAt ? Date.now() > slaDeadline(createdAt).getTime() : false;
+  const priority = createdAt ? isPriorityLead(createdAt) : false;
+
+  const menuItems = [
+    ...(stage === 'new' || stage === 'calling' ? [{ label: 'Записать на пробный', onClick: () => onScheduleTrial(lead) }] : []),
+    { label: 'Записать звонок', onClick: () => onCall(lead) },
+    { label: 'Редактировать', onClick: () => onEdit(lead) },
+    ...(!isTerminal ? [{ label: 'Отказ', danger: true, onClick: () => onDecline(lead) }] : []),
+  ];
+
+  const moveItems = COLUMNS.filter((c) => isForwardAllowed(stage, c.key) && c.key !== 'lost').map((c) => ({
+    label: c.label,
+    onClick: () => onMove(lead, c.key),
+  }));
 
   return (
     <div
       role="button"
       tabIndex={0}
-      draggable
+      draggable={!isTerminal}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', lead.id);
         e.dataTransfer.effectAllowed = 'move';
       }}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className="group flex cursor-grab flex-col gap-1.5 rounded-xl border border-border bg-surface p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md active:cursor-grabbing"
+      className={`group flex flex-col gap-1.5 rounded-xl border bg-surface p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
+      } ${overdue ? 'border-danger ring-1 ring-danger/40' : ''} ${priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
-        <Badge variant={STATUS_BADGE[lead.status].variant} className="shrink-0 !px-1.5 !py-0 !text-[10px]">
-          {STATUS_BADGE[lead.status].label}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          {overdue && <AlertTriangle className="h-3.5 w-3.5 text-danger" aria-label="Просрочен ответ по SLA" />}
+          <Badge variant={STATUS_BADGE[lead.status]?.variant ?? 'type-system'} className="!px-1.5 !py-0 !text-[10px]">
+            {STATUS_BADGE[lead.status]?.label ?? lead.status}
+          </Badge>
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-2">
@@ -169,14 +247,53 @@ export function LeadCard({ lead, operatorColor, operatorName, onOpen, onCall, on
         </a>
       </div>
 
-      <div onClick={(e) => e.stopPropagation()}>
-        <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} />
-      </div>
+      {(stage === 'new' || stage === 'calling') && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} />
+        </div>
+      )}
+
+      {stage === 'trial_scheduled' && (
+        <div className="flex items-center justify-between gap-2 text-[12px]" onClick={(e) => e.stopPropagation()}>
+          <span className="truncate text-muted">{lead.trialDate ? formatDateTime(lead.trialDate) : 'Дата не указана'}</span>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onRescheduleTrial(lead)}
+              className="rounded-field border border-border px-2 py-1 text-[12px] text-muted hover:bg-surface-alt"
+            >
+              Не пришёл
+            </button>
+            <EngagementPopover onPick={(score) => onMarkAttended(lead, score)} />
+          </div>
+        </div>
+      )}
+
+      {stage === 'closing' && (
+        <div className="flex items-center justify-between gap-2 text-[12px]" onClick={(e) => e.stopPropagation()}>
+          <span className="text-muted">Касание {lead.closingTouchNumber ?? 0}/3</span>
+          {(lead.closingTouchNumber ?? 0) < 3 && (
+            <button
+              type="button"
+              onClick={() => onMarkTouch(lead)}
+              className="rounded-field border border-border px-2 py-1 text-[12px] font-bold text-text hover:bg-surface-alt"
+            >
+              Отметить касание
+            </button>
+          )}
+        </div>
+      )}
+
+      {stage === 'lost' && lead.lostReason && (
+        <p className="text-[12px] text-danger">
+          Причина: {LOST_REASON_OPTIONS.find((o) => o.value === lead.lostReason)?.label ?? lead.lostReason}
+        </p>
+      )}
 
       <div className="flex items-center justify-between border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
         <span className="text-[12px] text-muted">{formatDate(lead.createdAt)}</span>
         <div className="flex shrink-0 items-center gap-0.5">
-          <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />
+          {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
           <DropdownMenu items={menuItems} />
         </div>
       </div>
