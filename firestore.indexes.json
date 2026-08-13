@@ -162,6 +162,15 @@
       ]
     },
     {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "branchId", "order": "ASCENDING" },
+        { "fieldPath": "funnelStage", "order": "ASCENDING" },
+        { "fieldPath": "lostReason", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "teachers",
       "queryScope": "COLLECTION",
       "fields": [

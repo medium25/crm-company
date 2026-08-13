@@ -14,9 +14,9 @@ import { Table } from '../components/ui/Table.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { RevenueChart } from '../components/charts/RevenueChart.jsx';
-import { formatMoney } from '../lib/format.js';
+import { formatMoney, formatPhone } from '../lib/format.js';
 import { getMonthlyRevenue } from '../lib/stats.js';
-import { revenueByCourse, revenueByTeacher, attendanceByGroup, churnReport, conversionFunnel, debtAging, funnelByOperator } from '../lib/reports.js';
+import { revenueByCourse, revenueByTeacher, attendanceByGroup, churnReport, conversionFunnel, debtAging, funnelByOperator, remarketingCandidates } from '../lib/reports.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 
 const TABS = [
@@ -28,6 +28,7 @@ const TABS = [
   { key: 'conversion', label: 'Конверсия' },
   { key: 'debts', label: 'Долги по срокам' },
   { key: 'funnel', label: 'Воронка по операторам' },
+  { key: 'remarketing', label: 'Ремаркетинг' },
 ];
 
 function fmtDate(d) {
@@ -58,6 +59,7 @@ export function ReportsPage() {
   const [funnel, setFunnel] = useState(null);
   const [debts, setDebts] = useState([]);
   const [funnelByOp, setFunnelByOp] = useState([]);
+  const [remarketing, setRemarketing] = useState([]);
 
   const fromDate = useMemo(() => new Date(`${from}T00:00:00`), [from]);
   const toDate = useMemo(() => new Date(`${to}T23:59:59`), [to]);
@@ -91,6 +93,9 @@ export function ReportsPage() {
       } else if (tab === 'funnel') {
         const data = await funnelByOperator(db, activeBranchId, fromDate, toDate);
         if (!cancelled) setFunnelByOp(data);
+      } else if (tab === 'remarketing') {
+        const data = await remarketingCandidates(db, activeBranchId);
+        if (!cancelled) setRemarketing(data);
       }
       if (!cancelled) setLoading(false);
     };
@@ -174,7 +179,7 @@ export function ReportsPage() {
         <Tabs tabs={TABS} activeKey={tab} onChange={setTab} />
 
         <div className="mt-4 flex flex-wrap items-end gap-3">
-          {tab !== 'attendance' && (
+          {tab !== 'attendance' && tab !== 'remarketing' && (
             <>
               <DatePicker label="От" value={from} onChange={(e) => setFrom(e.target.value)} />
               <DatePicker label="До" value={to} onChange={(e) => setTo(e.target.value)} />
@@ -351,6 +356,22 @@ export function ReportsPage() {
                   { key: 'noAnswerShare', label: 'Доля no_answer/no_show в отказах', render: (r) => `${r.noAnswerShare}%` },
                 ]}
                 rows={funnelByOp.map((r) => ({ id: r.operatorId, ...r }))}
+              />
+            )
+          )}
+
+          {!loading && tab === 'remarketing' && (
+            remarketing.length === 0 ? (
+              <EmptyState icon={BarChart3} title="Нет отказов старше 30 дней с причиной no_answer/no_show" />
+            ) : (
+              <Table
+                columns={[
+                  { key: 'studentName', label: 'Имя' },
+                  { key: 'phone', label: 'Телефон', render: (r) => formatPhone(r.phone) },
+                  { key: 'lostReason', label: 'Причина', render: (r) => (r.lostReason === 'no_answer' ? 'Не дозвонились' : 'Не пришёл на пробный') },
+                  { key: 'lostAt', label: 'Дата отказа', render: (r) => fmtDate(r.lostAt) },
+                ]}
+                rows={remarketing.map((r) => ({ id: r.studentId, ...r }))}
               />
             )
           )}

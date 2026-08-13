@@ -216,3 +216,20 @@ export async function funnelByOperator(db, branchId, periodStart, periodEnd) {
     };
   });
 }
+
+/**
+ * Отказы, доступные для повторного маркетинга: `lostReason` — no_answer
+ * или no_show (не смогли связаться, а не явный отказ), прошло ≥30 дней с
+ * `lostAt` (2026-08-13-leads-funnel-redesign.md §7).
+ */
+export async function remarketingCandidates(db, branchId, today = new Date()) {
+  const snap = await getDocs(
+    query(collection(db, 'students'), where('branchId', '==', branchId), where('funnelStage', '==', 'lost'), where('lostReason', 'in', ['no_answer', 'no_show'])),
+  );
+  const cutoff = today.getTime() - 30 * 86_400_000;
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((s) => s.lostAt && s.lostAt.toDate().getTime() <= cutoff)
+    .map((s) => ({ studentId: s.id, studentName: s.fullName, phone: s.phone, lostReason: s.lostReason, lostAt: s.lostAt.toDate() }))
+    .sort((a, b) => b.lostAt - a.lostAt);
+}
