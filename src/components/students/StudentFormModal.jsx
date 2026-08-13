@@ -76,7 +76,9 @@ export function StudentFormModal({ student, onClose, onCreated }) {
         const operatorsSnap = await getDocs(
           query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId), where('role', 'in', ['ceo', 'manager', 'admin'])),
         );
-        const operatorIds = operatorsSnap.docs.map((d) => d.id).sort();
+        const operatorIds = operatorsSnap.docs
+          .sort((a, b) => (a.data().fullName ?? '').localeCompare(b.data().fullName ?? ''))
+          .map((d) => d.id);
         const assignedOperator = await assignRoundRobinOperator(db, activeBranchId, operatorIds);
         const created = await addDoc(collection(db, 'students'), {
           ...payload,

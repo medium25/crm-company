@@ -287,7 +287,7 @@ export async function recordPayment(db, { student, branchId, amount, method, dat
           groupId: groupId ?? null,
         }
       : {};
-    await updateDoc(doc(db, 'students', student.id), { firstPaymentAt: serverTimestamp(), ...wonFields });
+    await updateDoc(doc(db, 'students', student.id), { firstPaymentAt: serverTimestamp(), updatedAt: serverTimestamp(), ...wonFields });
   }
   return txId;
 }
