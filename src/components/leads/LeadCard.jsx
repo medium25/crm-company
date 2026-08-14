@@ -230,6 +230,11 @@ export function LeadCard({
 
   const createdAt = lead.createdAt?.toDate?.();
   const trialDateJs = lead.trialDate?.toDate?.();
+  // Риск-бейдж независим от даты (в отличие от overdue) — загорается сразу
+  // после первой неудачной попытки подтверждения, даже если до дедлайна
+  // ещё далеко (спек «Риск-бейдж»).
+  const trialConfirmAttempts = lead.trialConfirmAttempts ?? [];
+  const trialConfirmAtRisk = stage === 'trial_scheduled' && trialConfirmAttempts[trialConfirmAttempts.length - 1]?.result === 'fail';
   const deadline = stageDeadline(lead);
   const overdue = deadline ? Date.now() > deadline.getTime() : false;
   // priority — метка «лид пришёл вне рабочих часов», актуальна только пока
@@ -269,6 +274,7 @@ export function LeadCard({
         <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
         <div className="flex shrink-0 items-center gap-1">
           {overdue && <AlertTriangle className="h-3.5 w-3.5 text-danger" aria-label="Дедлайн этапа просрочен" />}
+          {trialConfirmAtRisk && <PhoneOff className="h-3.5 w-3.5 text-orange" aria-label="Не берёт трубку — подтверждение пробного" />}
           <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="truncate text-[12px] text-link">
             {formatPhone(lead.phone)}
           </a>
