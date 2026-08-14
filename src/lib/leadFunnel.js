@@ -1,5 +1,6 @@
 // src/lib/leadFunnel.js
 import { doc, updateDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { differenceInCalendarDays } from 'date-fns';
 
 /** Причины отказа — фиксированный список, свободный текст не допускается (см. спек §7). */
 export const LOST_REASON_OPTIONS = [
@@ -120,6 +121,29 @@ export function firstTouchDueAt() {
 }
 
 /**
+ * Дедлайн звонка-подтверждения перед пробным — trialDate минус 24 часа
+ * (спек «Данные»). Пишется на документ лида при назначении и при каждом
+ * переносе пробного (TrialFormModal), читается в stageDeadline.
+ * @param {Date} trialDate
+ * @returns {Date}
+ */
+export function trialConfirmDueAt(trialDate) {
+  return new Date(trialDate.getTime() - 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Наступил ли уже календарный день пробного (или прошёл) — сравнение по
+ * дате, не по времени суток. С этого момента карточка показывает
+ * «Пришёл»/«Не пришёл» вместо звонка-подтверждения (LeadCard), и дедлайн
+ * стадии возвращается к самому trialDate (см. stageDeadline ниже).
+ * @param {Date} trialDate
+ * @returns {boolean}
+ */
+export function isTrialDay(trialDate) {
+  return differenceInCalendarDays(trialDate, new Date()) <= 0;
+}
+
+/**
  * Дедлайн следующего действия по лиду — единая проверка «не залежалась ли
  * карточка» для всех нетерминальных стадий (каждое следующее действие
  * переназначает его заново, см. соответствующие вызовы в LeadsPage.jsx).
@@ -132,7 +156,15 @@ export function stageDeadline(lead) {
   const stage = lead.funnelStage ?? 'new';
   if (stage === 'new') return lead.createdAt?.toDate ? slaDeadline(lead.createdAt.toDate()) : null;
   if (stage === 'calling') return lead.nextCallDueAt?.toDate?.() ?? null;
-  if (stage === 'trial_scheduled') return lead.trialDate?.toDate?.() ?? null;
+  if (stage === 'trial_scheduled') {
+    const trialDate = lead.trialDate?.toDate?.();
+    if (!trialDate) return null;
+    if (isTrialDay(trialDate)) return trialDate;
+    const attempts = lead.trialConfirmAttempts ?? [];
+    const lastAttempt = attempts[attempts.length - 1];
+    if (lastAttempt?.result === 'success') return null;
+    return lead.trialConfirmDueAt?.toDate?.() ?? null;
+  }
   if (stage === 'closing') return lead.nextTouchAt?.toDate?.() ?? null;
   return null;
 }
