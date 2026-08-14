@@ -6,7 +6,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
-import { advanceStage } from '../../lib/leadFunnel.js';
+import { advanceStage, trialConfirmDueAt } from '../../lib/leadFunnel.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
@@ -55,13 +55,20 @@ export function TrialFormModal({ target, onClose }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const trialDate = Timestamp.fromDate(new Date(`${date}T${time}:00`));
+      const trialDateJs = new Date(`${date}T${time}:00`);
+      const trialDate = Timestamp.fromDate(trialDateJs);
+      // Перенос тоже пересчитывает confirmDueAt и обнуляет попытки — старые
+      // попытки дозвона относились к прежней дате пробного (спец «Перенос
+      // пробного сбрасывает цикл подтверждения»).
+      const confirmDueAt = Timestamp.fromDate(trialConfirmDueAt(trialDateJs));
       if (mode === 'schedule') {
         await advanceStage(db, lead, 'trial_scheduled', {
           status: 'trial',
           trialAt: serverTimestamp(),
           trialDate,
           trialTeacherId: teacherId || null,
+          trialConfirmDueAt: confirmDueAt,
+          trialConfirmAttempts: [],
         }, user);
         showToast(`${lead.fullName}: пробный назначен.`);
       } else {
@@ -69,6 +76,8 @@ export function TrialFormModal({ target, onClose }) {
         await updateDoc(doc(db, 'students', lead.id), {
           trialDate,
           trialTeacherId: teacherId || null,
+          trialConfirmDueAt: confirmDueAt,
+          trialConfirmAttempts: [],
           rescheduleCount: (lead.rescheduleCount ?? 0) + 1,
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
