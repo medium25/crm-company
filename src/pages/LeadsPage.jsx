@@ -237,6 +237,14 @@ export function LeadsPage() {
     });
   };
 
+  // Без DeadlineModal — дата подтверждения фиксирована (trialDate минус
+  // 24ч, см. TrialFormModal), у оператора нет нового выбора при каждой
+  // отметке, попыток сколько угодно (спек «Звонок-подтверждение»).
+  const markTrialConfirm = (lead, result) => {
+    const attempts = [...(lead.trialConfirmAttempts ?? []), { result, at: new Date() }];
+    patch(lead, { trialConfirmAttempts: attempts });
+  };
+
   const openAddForm = () => setFormLead({});
 
   const handleCreated = () => {
@@ -276,6 +284,7 @@ export function LeadsPage() {
     onMarkTouch: markTouch,
     onMove: moveLead,
     onMarkAttempt: markAttempt,
+    onMarkTrialConfirm: markTrialConfirm,
   };
 
   return (
