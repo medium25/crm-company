@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle } from 'lucide-react';
-import { Badge } from '../ui/Badge.jsx';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, stageDeadline, callScheduleHint, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDate, formatDateTime } from '../../lib/format.js';
-
-const STATUS_BADGE = {
-  lead: { variant: 'type-system', label: 'Лид' },
-  trial: { variant: 'status-active', label: 'Пробный' },
-};
 
 const ENGAGEMENT_OPTIONS = [
   { value: 'low', label: 'Низкая' },
@@ -184,6 +178,7 @@ export function LeadCard({
   onMarkTouch,
   onMove,
   onMarkAttempt,
+  columns = COLUMNS,
 }) {
   const stage = lead.funnelStage ?? 'new';
   const isTerminal = stage === 'won' || stage === 'lost';
@@ -204,7 +199,9 @@ export function LeadCard({
     ...(!isTerminal ? [{ label: 'Отказ', danger: true, onClick: () => onDecline(lead) }] : []),
   ];
 
-  const moveItems = COLUMNS.filter((c) => isForwardAllowed(stage, c.key) && c.key !== 'lost').map((c) => ({
+  const moveItems = columns.filter(
+    (c) => isForwardAllowed(stage, c.key) && c.key !== 'lost' && c.key !== 'won' && c.key !== 'trial_scheduled',
+  ).map((c) => ({
     label: c.label,
     onClick: () => onMove(lead, c.key),
   }));
@@ -224,31 +221,26 @@ export function LeadCard({
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
       } ${overdue ? 'border-danger ring-1 ring-danger/40' : ''} ${priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''}`}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
         <div className="flex shrink-0 items-center gap-1">
           {overdue && <AlertTriangle className="h-3.5 w-3.5 text-danger" aria-label="Дедлайн этапа просрочен" />}
-          <Badge variant={STATUS_BADGE[lead.status]?.variant ?? 'type-system'} className="!px-1.5 !py-0 !text-[10px]">
-            {STATUS_BADGE[lead.status]?.label ?? lead.status}
-          </Badge>
+          <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="truncate text-[12px] text-link">
+            {formatPhone(lead.phone)}
+          </a>
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        {operatorLabel ? (
+      {operatorLabel && (
+        <div className="flex items-center">
           <span
             className="inline-flex w-fit items-center truncate rounded-badge px-1.5 py-0.5 text-[10px] font-bold text-white"
             style={{ backgroundColor: operatorColor || '#8B94A3' }}
           >
             {operatorLabel}
           </span>
-        ) : (
-          <span />
-        )}
-        <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="truncate text-[12px] text-link">
-          {formatPhone(lead.phone)}
-        </a>
-      </div>
+        </div>
+      )}
 
       {(stage === 'new' || stage === 'calling') && (
         <div onClick={(e) => e.stopPropagation()}>

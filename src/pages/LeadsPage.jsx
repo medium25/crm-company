@@ -1,11 +1,12 @@
 // src/pages/LeadsPage.jsx
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, query, where, orderBy, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, updateDoc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { Plus } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
+import { useDoc } from '../hooks/useDoc.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
@@ -14,8 +15,9 @@ import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
 import { CallLogModal } from '../components/students/CallLogModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
+import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
-import { COLUMNS, columnKeyOf, isForwardAllowed } from '../components/leads/columns.js';
+import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt } from '../lib/leadFunnel.js';
 
 const WON_LOST_VISIBLE_DAYS = 30;
@@ -55,6 +57,24 @@ export function LeadsPage() {
   );
   const { data: allLeads } = useCollection(leadsQuery);
 
+  // Название и цвет стадии редактируются через ⚙ в заголовке колонки и
+  // хранятся per-branch, а не в самом COLUMNS — ключ и порядок стадий
+  // остаются фиксированными (на них завязаны isForwardAllowed/
+  // stageDeadline/markAttempt), правится только то, что видит оператор.
+  const branchSettingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
+  const { data: branchSettings } = useDoc(branchSettingsRef);
+  const resolvedColumns = useMemo(() => withStageOverrides(branchSettings?.leadStageOverrides), [branchSettings]);
+
+  const editStageColumn = (stageKey, patch) => {
+    if (!branchSettingsRef) return;
+    // set+merge, не update — settings/{branchId} может ещё не существовать
+    // (создаётся лениво, см. assignRoundRobinOperator), а merge на
+    // вложенный объект сохраняет overrides остальных стадий как есть.
+    setDoc(branchSettingsRef, { leadStageOverrides: { [stageKey]: patch } }, { merge: true }).catch(() =>
+      showToast('Не удалось сохранить стадию.', { type: 'error' }),
+    );
+  };
+
   // won/lost старше 30 дней не показываем на доске — иначе терминальные
   // колонки бесконечно растут за месяцы работы (см. план, «Важное
   // архитектурное решение»). Документ никуда не девается, просто не
@@ -84,6 +104,7 @@ export function LeadsPage() {
   const [declineTarget, setDeclineTarget] = useState(null);
   const [callTarget, setCallTarget] = useState(null);
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
+  const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
 
   const byColumn = useMemo(() => {
     const map = {};
@@ -103,48 +124,63 @@ export function LeadsPage() {
     }
   };
 
-  const markAttempt = async (lead, result) => {
+  // Любое действие, что продвигает лида на нетерминальную стадию, обязано
+  // назначить дедлайн следующего шага — и оператор обязан его увидеть и
+  // подтвердить (или поправить) перед сохранением, а не получить тихий
+  // автовычисленный дедлайн в фоне. Отсюда общий паттерн ниже: посчитать
+  // предложенную дату, открыть DeadlineModal, а сама запись в Firestore
+  // происходит только в её onConfirm.
+  const markAttempt = (lead, result) => {
     const attempts = lead.callAttempts ?? [];
     if (attempts.length >= 5) return;
     const nextAttempts = [...attempts, { result, at: new Date() }];
     const isCold = nextAttempts.length === 5 && nextAttempts.every((a) => a.result === 'fail');
-    try {
-      const batch = writeBatch(db);
-      batch.set(doc(collection(db, 'callLogs')), {
-        studentId: lead.id,
-        direction: 'out',
-        result: result === 'success' ? 'reached' : 'no_answer',
-        comment: '',
-        durationSec: 0,
-        quickMark: true,
-        userId: user.uid,
-        userName: staff?.fullName ?? '',
-        createdAt: serverTimestamp(),
-      });
-      const stageFields = {};
-      if (columnKeyOf(lead) === 'new') {
-        stageFields.funnelStage = 'calling';
-        stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: new Date() }];
-      } else if (isCold) {
-        stageFields.funnelStage = 'lost';
-        stageFields.lostReason = 'no_answer';
-        stageFields.lostAt = serverTimestamp();
-        stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }];
+
+    const commit = async (dueDate) => {
+      try {
+        const batch = writeBatch(db);
+        batch.set(doc(collection(db, 'callLogs')), {
+          studentId: lead.id,
+          direction: 'out',
+          result: result === 'success' ? 'reached' : 'no_answer',
+          comment: '',
+          durationSec: 0,
+          quickMark: true,
+          userId: user.uid,
+          userName: staff?.fullName ?? '',
+          createdAt: serverTimestamp(),
+        });
+        const stageFields = {};
+        if (columnKeyOf(lead) === 'new') {
+          stageFields.funnelStage = 'calling';
+          stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: new Date() }];
+        } else if (isCold) {
+          stageFields.funnelStage = 'lost';
+          stageFields.lostReason = 'no_answer';
+          stageFields.lostAt = serverTimestamp();
+          stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }];
+        }
+        // serverTimestamp() внутри элемента массива не поддерживается Firestore —
+        // callAttempts.at/stageHistory.enteredAt используют клиентское время,
+        // updatedAt/lostAt документа ниже — уже верхнеуровневые поля, им можно.
+        batch.update(doc(db, 'students', lead.id), {
+          callAttempts: nextAttempts,
+          nextCallDueAt: isCold ? null : dueDate,
+          ...stageFields,
+          updatedAt: serverTimestamp(),
+        });
+        await batch.commit();
+        if (stageFields.funnelStage === 'lost') showToast(`${lead.fullName}: 5 неудачных попыток, лид отмечен как отказ.`);
+      } catch {
+        showToast('Не удалось отметить попытку.', { type: 'error' });
       }
-      // serverTimestamp() внутри элемента массива не поддерживается Firestore —
-      // callAttempts.at/stageHistory.enteredAt используют клиентское время,
-      // updatedAt/lostAt документа ниже — уже верхнеуровневые поля, им можно.
-      batch.update(doc(db, 'students', lead.id), {
-        callAttempts: nextAttempts,
-        nextCallDueAt: isCold ? null : nextCallDueAt(nextAttempts),
-        ...stageFields,
-        updatedAt: serverTimestamp(),
-      });
-      await batch.commit();
-      if (stageFields.funnelStage === 'lost') showToast(`${lead.fullName}: 5 неудачных попыток, лид отмечен как отказ.`);
-    } catch {
-      showToast('Не удалось отметить попытку.', { type: 'error' });
+    };
+
+    if (isCold) {
+      commit(null); // терминальная стадия «Отказ» — дедлайну неоткуда взяться, спрашивать нечего
+      return;
     }
+    setDeadlineTarget({ lead, title: 'Дедлайн следующего звонка', suggestedDate: nextCallDueAt(nextAttempts), onConfirm: commit });
   };
 
   const moveLead = (lead, stageKey) => {
@@ -154,14 +190,51 @@ export function LeadsPage() {
       return;
     }
     if (stageKey === 'won' || stageKey === 'lost') return; // эти переходы — через оплату/DeclineLeadModal, не через drag
-    advanceStage(db, lead, stageKey, {}, user).catch(() => showToast('Не удалось обновить лид.', { type: 'error' }));
+    if (stageKey === 'trial_scheduled') {
+      showToast('Укажите дату пробного: меню «⋮» → «Записать на пробный».', { type: 'error' });
+      return;
+    }
+    const commit = (extraFields) =>
+      advanceStage(db, lead, stageKey, extraFields, user).catch(() => showToast('Не удалось обновить лид.', { type: 'error' }));
+
+    if (stageKey === 'calling') {
+      setDeadlineTarget({
+        lead,
+        title: 'Дедлайн следующего звонка',
+        suggestedDate: nextCallDueAt(lead.callAttempts ?? []),
+        onConfirm: (dueDate) => commit({ nextCallDueAt: dueDate }),
+      });
+      return;
+    }
+    if (stageKey === 'closing') {
+      setDeadlineTarget({
+        lead,
+        title: 'Дедлайн первого касания в «Дожиме»',
+        suggestedDate: firstTouchDueAt(),
+        onConfirm: (dueDate) => commit({ closingTouchNumber: 0, nextTouchAt: dueDate }),
+      });
+      return;
+    }
+    commit({}); // 'trial_completed' — мгновенный проходной этап, дедлайну взяться неоткуда
   };
 
   const markTouch = (lead) => {
     const nextNumber = (lead.closingTouchNumber ?? 0) + 1;
     const daysToAdd = nextNumber === 1 ? 1 : 4;
-    const nextTouchAt = nextNumber >= 3 ? null : new Date(Date.now() + daysToAdd * 86_400_000);
-    patch(lead, { closingTouchNumber: nextNumber, nextTouchAt }, `Касание ${nextNumber} отмечено.`);
+    const isFinal = nextNumber >= 3;
+    const commit = (dueDate) =>
+      patch(lead, { closingTouchNumber: nextNumber, nextTouchAt: isFinal ? null : dueDate }, `Касание ${nextNumber} отмечено.`);
+
+    if (isFinal) {
+      commit(null); // 3-е касание финальное — дальше дожима нет, дедлайну взяться неоткуда
+      return;
+    }
+    setDeadlineTarget({
+      lead,
+      title: 'Дедлайн следующего касания',
+      suggestedDate: new Date(Date.now() + daysToAdd * 86_400_000),
+      onConfirm: commit,
+    });
   };
 
   const openAddForm = () => setFormLead({});
@@ -187,16 +260,18 @@ export function LeadsPage() {
         { stage: 'trial_completed', enteredAt: new Date() },
         { stage: 'closing', enteredAt: new Date() },
       ];
-      updateDoc(doc(db, 'students', lead.id), {
-        funnelStage: 'closing',
-        attended: true,
-        engagementScore,
-        closingTouchNumber: 0,
-        nextTouchAt: firstTouchDueAt(),
-        stageHistory,
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
-      }).catch(() => showToast('Не удалось сохранить явку.', { type: 'error' }));
+      const commit = (dueDate) =>
+        updateDoc(doc(db, 'students', lead.id), {
+          funnelStage: 'closing',
+          attended: true,
+          engagementScore,
+          closingTouchNumber: 0,
+          nextTouchAt: dueDate,
+          stageHistory,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        }).catch(() => showToast('Не удалось сохранить явку.', { type: 'error' }));
+      setDeadlineTarget({ lead, title: 'Дедлайн первого касания в «Дожиме»', suggestedDate: firstTouchDueAt(), onConfirm: commit });
     },
     onMarkTouch: markTouch,
     onMove: moveLead,
@@ -214,13 +289,15 @@ export function LeadsPage() {
         }
       />
       <div className="flex gap-4 overflow-x-auto pb-2">
-        {COLUMNS.map((column) => (
+        {resolvedColumns.map((column) => (
           <LeadColumn
             key={column.key}
             column={column}
             leads={byColumn[column.key]}
             operatorByUid={operatorByUid}
             onAdd={column.key === 'new' ? openAddForm : undefined}
+            onEditColumn={editStageColumn}
+            columns={resolvedColumns}
             onDropLead={(leadId, columnKey) => {
               const lead = leadsById.get(leadId);
               if (lead) moveLead(lead, columnKey);
@@ -234,6 +311,7 @@ export function LeadsPage() {
       <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
       <CallLogModal open={Boolean(callTarget)} studentId={callTarget?.id} onClose={() => setCallTarget(null)} />
       <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
+      <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
     </>
   );
 }

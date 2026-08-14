@@ -8,6 +8,7 @@ export const COLUMNS = [
   {
     key: 'new',
     label: 'Новый лид',
+    color: '#2F6FE4',
     hint: {
       summary: 'Лид только что создан, оператор назначен автоматически по очереди (round-robin).',
       steps: [
@@ -20,6 +21,7 @@ export const COLUMNS = [
   {
     key: 'calling',
     label: 'Дозвон',
+    color: '#E5842B',
     hint: {
       summary: 'До 5 попыток дозвона. Сюда карточка попадает автоматически после первой отметки в «Новый лид».',
       steps: [
@@ -34,6 +36,7 @@ export const COLUMNS = [
   {
     key: 'trial_scheduled',
     label: 'Пробный назначен',
+    color: '#D6336C',
     hint: {
       summary: 'Дата, время и учитель пробного урока зафиксированы — дождитесь дня занятия.',
       steps: [
@@ -46,6 +49,7 @@ export const COLUMNS = [
   {
     key: 'trial_completed',
     label: 'Пробный проведён',
+    color: '#0F9D8C',
     hint: {
       summary: 'Промежуточная стадия — карточка задерживается здесь на долю секунды.',
       steps: [
@@ -57,6 +61,7 @@ export const COLUMNS = [
   {
     key: 'closing',
     label: 'Дожим',
+    color: '#7C5CBF',
     hint: {
       summary: '3 обязательных касания, чтобы довести ученика до оплаты.',
       steps: [
@@ -72,6 +77,7 @@ export const COLUMNS = [
   {
     key: 'won',
     label: 'Оплачено',
+    color: '#34A853',
     hint: {
       summary: 'Финал воронки: лид стал студентом.',
       steps: [
@@ -83,6 +89,7 @@ export const COLUMNS = [
   {
     key: 'lost',
     label: 'Отказ',
+    color: '#C0392B',
     hint: {
       summary: 'Финал воронки с отрицательным исходом.',
       steps: [
@@ -93,6 +100,37 @@ export const COLUMNS = [
     },
   },
 ];
+
+// Набор для выбора цвета колонки в редакторе стадий — специально не
+// шаблонные Tailwind-токены проекта (те бледные, для фона/текста), а
+// насыщенные, далеко разнесённые по тону цвета, чтобы 7 колонок подряд не
+// сливались друг с другом.
+export const STAGE_COLOR_SWATCHES = [
+  '#2F6FE4', // синий
+  '#E5842B', // оранжевый
+  '#D6336C', // малиновый
+  '#0F9D8C', // бирюзовый
+  '#7C5CBF', // фиолетовый
+  '#34A853', // зелёный
+  '#C0392B', // красный
+  '#D4A017', // янтарный
+  '#0891B2', // голубой
+  '#4B5563', // графитовый
+];
+
+/**
+ * Применяет пользовательские правки названия/цвета стадии (см.
+ * `settings/{branchId}.leadStageOverrides`, редактируется через ⚙ в
+ * заголовке колонки) поверх дефолтных COLUMNS. Ключ и порядок стадий
+ * править нельзя — только `label` и `color`, чтобы не сломать
+ * `isForwardAllowed`/`stageDeadline`, которые матчатся на `key`.
+ * @param {Record<string, {label?: string, color?: string}>} [overrides]
+ * @returns {typeof COLUMNS}
+ */
+export function withStageOverrides(overrides) {
+  if (!overrides) return COLUMNS;
+  return COLUMNS.map((c) => (overrides[c.key] ? { ...c, ...overrides[c.key] } : c));
+}
 
 const FORWARD_ORDER = COLUMNS.filter((c) => c.key !== 'lost').map((c) => c.key);
 
