@@ -23,6 +23,7 @@ import { AddToGroupModal } from '../components/students/AddToGroupModal.jsx';
 import { EnrollmentCard } from '../components/students/EnrollmentCard.jsx';
 import { FreezeEnrollmentModal } from '../components/students/FreezeEnrollmentModal.jsx';
 import { LeaveGroupModal } from '../components/students/LeaveGroupModal.jsx';
+import { TransferGroupModal } from '../components/students/TransferGroupModal.jsx';
 import { UnfreezeEnrollmentModal } from '../components/students/UnfreezeEnrollmentModal.jsx';
 import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
 import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
@@ -83,6 +84,7 @@ export function StudentDetailPage() {
   const [freezeTarget, setFreezeTarget] = useState(null);
   const [leaveTarget, setLeaveTarget] = useState(null);
   const [activateTarget, setActivateTarget] = useState(null);
+  const [transferTarget, setTransferTarget] = useState(null);
   const [unfreezeTarget, setUnfreezeTarget] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -322,6 +324,7 @@ export function StudentDetailPage() {
                           onLeave={setLeaveTarget}
                           onActivate={setActivateTarget}
                           onUnfreeze={setUnfreezeTarget}
+                          onTransfer={setTransferTarget}
                         />
                       ))}
                     </div>
@@ -464,6 +467,7 @@ export function StudentDetailPage() {
         onClose={() => setFreezeTarget(null)}
       />
       <LeaveGroupModal enrollment={leaveTarget} onClose={() => setLeaveTarget(null)} />
+      <TransferGroupModal enrollment={transferTarget} student={student} onClose={() => setTransferTarget(null)} />
       <UnfreezeEnrollmentModal enrollment={unfreezeTarget} onClose={() => setUnfreezeTarget(null)} />
       <ActivateEnrollmentModal
         enrollment={activateTarget}

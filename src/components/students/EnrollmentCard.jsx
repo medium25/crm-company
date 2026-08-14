@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc } from 'firebase/firestore';
-import { Pause, Ghost, CheckCircle } from 'lucide-react';
+import { Pause, Ghost, CheckCircle, ArrowRightLeft } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useDoc } from '../../hooks/useDoc.js';
 import { MIN_FREEZE_BALANCE, MAX_FREEZES_PER_STUDENT, canFreezeStudent } from '../../lib/billing.js';
@@ -19,8 +19,9 @@ import { formatDate, formatMoney, formatScheduleType } from '../../lib/format.js
  * @param {(enrollment: Object) => void} props.onLeave
  * @param {(enrollment: Object) => void} props.onActivate
  * @param {(enrollment: Object) => void} props.onUnfreeze
+ * @param {(enrollment: Object) => void} props.onTransfer
  */
-export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount, onFreeze, onLeave, onActivate, onUnfreeze }) {
+export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount, onFreeze, onLeave, onActivate, onUnfreeze, onTransfer }) {
   const navigate = useNavigate();
   const groupRef = useMemo(() => (db ? doc(db, 'groups', enrollment.groupId) : null), [enrollment.groupId]);
   const { data: group } = useDoc(groupRef);
@@ -80,6 +81,11 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
                 title={canFreeze ? undefined : freezeDisabledTitle}
               >
                 <Pause className="h-4 w-4" />
+              </Button>
+            )}
+            {canAct && (
+              <Button variant="icon-round" tone="navy" onClick={() => onTransfer(enrollment)} aria-label="Перевести в другую группу">
+                <ArrowRightLeft className="h-4 w-4" />
               </Button>
             )}
             {canAct && (

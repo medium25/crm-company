@@ -25,6 +25,7 @@ import { HistoryTab } from '../components/shared/HistoryTab.jsx';
 import { SmsSendModal } from '../components/shared/SmsSendModal.jsx';
 import { FreezeEnrollmentModal } from '../components/students/FreezeEnrollmentModal.jsx';
 import { LeaveGroupModal } from '../components/students/LeaveGroupModal.jsx';
+import { TransferGroupModal } from '../components/students/TransferGroupModal.jsx';
 import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
 import { formatDate, formatMoney, formatPhone, formatScheduleType } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
@@ -46,7 +47,7 @@ const SORT_OPTIONS = [
   { value: 'addedAt', label: 'По дате добавления' },
 ];
 
-function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, onActivate, showToast }) {
+function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, onActivate, onTransfer }) {
   const balance = student?.balance ?? 0;
   const isTrial = enrollment.status === 'trial';
   const isPaused = enrollment.status === 'paused';
@@ -103,7 +104,7 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
                   title: canFreeze ? undefined : freezeDisabledTitle,
                 },
               ]),
-          { label: 'Перевести в другую группу', onClick: () => showToast('Скоро появится.') },
+          { label: 'Перевести в другую группу', onClick: () => onTransfer(enrollment) },
           { label: 'Убрать из группы', onClick: () => onLeave(enrollment), danger: true },
         ]}
       />
@@ -144,6 +145,7 @@ export function GroupDetailPage() {
   const [freezeTarget, setFreezeTarget] = useState(null);
   const [leaveTarget, setLeaveTarget] = useState(null);
   const [activateTarget, setActivateTarget] = useState(null);
+  const [transferTarget, setTransferTarget] = useState(null);
 
   const enrollmentsQuery = useMemo(() => {
     if (!db) return null;
@@ -270,7 +272,7 @@ export function GroupDetailPage() {
                   onFreeze={setFreezeTarget}
                   onLeave={setLeaveTarget}
                   onActivate={setActivateTarget}
-                  showToast={showToast}
+                  onTransfer={setTransferTarget}
                 />
               ))}
             </ul>
@@ -342,6 +344,11 @@ export function GroupDetailPage() {
         enrollment={activateTarget}
         student={studentsById.get(activateTarget?.studentId)}
         onClose={() => setActivateTarget(null)}
+      />
+      <TransferGroupModal
+        enrollment={transferTarget}
+        student={studentsById.get(transferTarget?.studentId)}
+        onClose={() => setTransferTarget(null)}
       />
 
       <SmsSendModal
