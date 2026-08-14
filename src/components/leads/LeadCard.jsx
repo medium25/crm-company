@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle, PhoneOff } from 'lucide-react';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
-import { isPriorityLead, stageDeadline, callScheduleHint, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
+import { isPriorityLead, stageDeadline, callScheduleHint, isTrialDay, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDate, formatDateTime } from '../../lib/format.js';
 
 const ENGAGEMENT_OPTIONS = [
@@ -146,6 +146,47 @@ function EngagementPopover({ onPick }) {
 }
 
 /**
+ * Блок звонка-подтверждения на стадии «Пробный назначен» до дня пробного
+ * (заменяет собой текст с датой) — см. 2026-08-14-trial-confirmation-call-
+ * design.md. Попыток сколько угодно, без DeadlineModal: дата дедлайна уже
+ * фиксирована (trialDate минус 24ч), тут нечего выбирать.
+ * @param {(result: 'success'|'fail') => Promise<void>|void} onMark
+ */
+function TrialConfirmBlock({ onMark }) {
+  const [pending, setPending] = useState(false);
+
+  const mark = async (result) => {
+    setPending(true);
+    await onMark(result);
+    setPending(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-2 text-[12px]">
+      <span className="truncate text-muted">Подтвердить пробный</span>
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => mark('fail')}
+          className="rounded-field border border-border px-2 py-1 text-[12px] text-muted hover:bg-surface-alt disabled:opacity-50"
+        >
+          Не берёт трубку
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => mark('success')}
+          className="rounded-field border border-border px-2 py-1 text-[12px] font-bold text-text hover:bg-surface-alt disabled:opacity-50"
+        >
+          Дозвонились
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Карточка лида на 7-стадийной воронке «Заявки» (2026-08-13-leads-funnel-
  * redesign.md). Перетаскивается мышью (native HTML5 DnD) только вперёд по
  * стадиям — терминальные (won/lost) не draggable вовсе.
@@ -163,6 +204,7 @@ function EngagementPopover({ onPick }) {
  * @param {(lead: Object) => void} props.onMarkTouch
  * @param {(lead: Object, stageKey: string) => void} props.onMove
  * @param {(lead: Object, result: 'success'|'fail') => void} props.onMarkAttempt
+ * @param {(lead: Object, result: 'success'|'fail') => void} props.onMarkTrialConfirm
  */
 export function LeadCard({
   lead,
@@ -178,6 +220,7 @@ export function LeadCard({
   onMarkTouch,
   onMove,
   onMarkAttempt,
+  onMarkTrialConfirm,
   columns = COLUMNS,
 }) {
   const stage = lead.funnelStage ?? 'new';
@@ -186,6 +229,7 @@ export function LeadCard({
   const operatorLabel = (operatorName ?? '').split(' ')[0];
 
   const createdAt = lead.createdAt?.toDate?.();
+  const trialDateJs = lead.trialDate?.toDate?.();
   const deadline = stageDeadline(lead);
   const overdue = deadline ? Date.now() > deadline.getTime() : false;
   // priority — метка «лид пришёл вне рабочих часов», актуальна только пока
@@ -248,7 +292,13 @@ export function LeadCard({
         </div>
       )}
 
-      {stage === 'trial_scheduled' && (
+      {stage === 'trial_scheduled' && trialDateJs && !isTrialDay(trialDateJs) && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <TrialConfirmBlock onMark={(result) => onMarkTrialConfirm(lead, result)} />
+        </div>
+      )}
+
+      {stage === 'trial_scheduled' && (!trialDateJs || isTrialDay(trialDateJs)) && (
         <div className="flex items-center justify-between gap-2 text-[12px]" onClick={(e) => e.stopPropagation()}>
           <span className="truncate text-muted">{lead.trialDate ? formatDateTime(lead.trialDate) : 'Дата не указана'}</span>
           <div className="flex shrink-0 items-center gap-1">
