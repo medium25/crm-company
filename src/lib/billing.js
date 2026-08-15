@@ -58,20 +58,6 @@ export function chargeAmountForLessons(enrollment, group, lessonsCount) {
   return amount === 0 ? 0 : amount;
 }
 
-/**
- * Дефолтная сумма оплаты, переносимая на новую группу при переводе студента
- * посреди месяца — пропорционально доле оставшихся уроков. Только
- * предзаполнение поля формы, пользователь может изменить вручную —
- * см. TransferGroupModal.
- * @param {number} paymentAmount
- * @param {number} remainingLessons
- * @param {number} totalLessons
- * @returns {number}
- */
-export function defaultPaymentSplitAmount(paymentAmount, remainingLessons, totalLessons) {
-  if (totalLessons <= 0) return 0;
-  return Math.round((paymentAmount * remainingLessons) / totalLessons);
-}
 
 /**
  * Пишет транзакцию и одной batch-операцией обновляет `students.balance` и
