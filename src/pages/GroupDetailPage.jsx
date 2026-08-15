@@ -168,7 +168,9 @@ export function GroupDetailPage() {
     // enrollment иногда остаётся неархивированным (старые данные до фикса
     // каскадной архивации). Подстраховка: не показываем в ростере тех, чей
     // студент фактически архивен.
-    const list = enrollments.filter((e) => !studentsById.get(e.studentId)?.isArchived);
+    const list = enrollments.filter(
+      (e) => !studentsById.get(e.studentId)?.isArchived && (showArchivedStudents || e.status !== 'left'),
+    );
     if (sort === 'balance') {
       list.sort((a, b) => (studentsById.get(a.studentId)?.balance ?? 0) - (studentsById.get(b.studentId)?.balance ?? 0));
     } else if (sort === 'addedAt') {
@@ -177,7 +179,7 @@ export function GroupDetailPage() {
       list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'ru'));
     }
     return list;
-  }, [enrollments, sort, studentsById]);
+  }, [enrollments, sort, studentsById, showArchivedStudents]);
 
   if (loading) {
     return (
