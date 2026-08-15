@@ -1,5 +1,5 @@
 // src/lib/leadFunnel.js
-import { doc, getDoc, updateDoc, collection, query, where, getCountFromServer, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getCountFromServer, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore';
 import { differenceInCalendarDays } from 'date-fns';
 
 /** Причины отказа — фиксированный список, свободный текст не допускается (см. спек §7). */
@@ -291,4 +291,47 @@ export async function assignOperatorForLead(db, branchId, operators, createdAt) 
   const onShiftIds = selectOnShiftOperatorIds(operators, createdAt);
   const candidateIds = onShiftIds.length > 0 ? onShiftIds : operators.map((op) => op.id);
   return assignLeastLoadedOperator(db, branchId, candidateIds);
+}
+
+/** Нетерминальные стадии воронки — "активный" лид для целей ручного перевода между операторами. */
+export const NON_TERMINAL_STAGES = ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing'];
+
+/**
+ * id всех активных лидов оператора — для «Перевести всех» (без разворота
+ * списка в LeadAssignmentTab).
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} operatorId
+ * @returns {Promise<Array<string>>}
+ */
+export async function getActiveLeadIdsForOperator(db, operatorId) {
+  const snap = await getDocs(
+    query(collection(db, 'students'), where('assignedOperator', '==', operatorId), where('funnelStage', 'in', NON_TERMINAL_STAGES)),
+  );
+  return snap.docs.map((d) => d.id);
+}
+
+/**
+ * Массовый перевод лидов другому оператору — меняет только владельца
+ * (assignedOperator), funnelStage/stageHistory/дедлайны не трогаются:
+ * прогресс по воронке остаётся как есть, переезжает только ответственный.
+ * Чанки по 400 — лимит Firestore batch 500, запас на случай большого списка
+ * у одного оператора.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {Array<string>} leadIds
+ * @param {string} newOperatorId
+ * @param {{uid: string}} user
+ */
+export async function reassignLeadsToOperator(db, leadIds, newOperatorId, user) {
+  const CHUNK = 400;
+  for (let i = 0; i < leadIds.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    for (const id of leadIds.slice(i, i + CHUNK)) {
+      batch.update(doc(db, 'students', id), {
+        assignedOperator: newOperatorId,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+      });
+    }
+    await batch.commit();
+  }
 }
