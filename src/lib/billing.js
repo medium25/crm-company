@@ -44,6 +44,35 @@ export function pricePerLesson(enrollment, group) {
 }
 
 /**
+ * Сумма списания за заданное число уроков по цене конкретной записи —
+ * общая формула для частичного списания (chargePartialMonth,
+ * computeMonthlyChargeAmount) и для дробления списания при переводе
+ * студента в другую группу посреди месяца (TransferGroupModal).
+ * @param {{price: number}} enrollment
+ * @param {{lessonsPerMonth: number}} group
+ * @param {number} lessonsCount
+ * @returns {number} отрицательное число (списание) или 0
+ */
+export function chargeAmountForLessons(enrollment, group, lessonsCount) {
+  return -Math.round(pricePerLesson(enrollment, group) * lessonsCount);
+}
+
+/**
+ * Дефолтная сумма оплаты, переносимая на новую группу при переводе студента
+ * посреди месяца — пропорционально доле оставшихся уроков. Только
+ * предзаполнение поля формы, пользователь может изменить вручную —
+ * см. TransferGroupModal.
+ * @param {number} paymentAmount
+ * @param {number} remainingLessons
+ * @param {number} totalLessons
+ * @returns {number}
+ */
+export function defaultPaymentSplitAmount(paymentAmount, remainingLessons, totalLessons) {
+  if (totalLessons <= 0) return 0;
+  return Math.round((paymentAmount * remainingLessons) / totalLessons);
+}
+
+/**
  * Пишет транзакцию и одной batch-операцией обновляет `students.balance` и
  * `monthlyBalances/{studentId}_{month}` — «02 · Модель данных»,
  * «Денормализация: что и когда пересчитывать».
