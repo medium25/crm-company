@@ -92,10 +92,12 @@ service cloud.firestore {
       allow read:   if isAdmin();
       allow create: if isAdmin();
       allow delete: if isAdmin();
-      // updateTransaction правит только сумму/комментарий/дату/месяц записи
-      // на месте (без компенсирующих проводок).
+      // updateTransaction правит сумму/комментарий/дату/месяц записи на
+      // месте (без компенсирующих проводок). lessonsCount — дополнительно
+      // для дробления списания при переводе студента посреди месяца
+      // (TransferGroupModal, billing.chargeAmountForLessons).
       allow update: if isAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'comment', 'date', 'month', 'updatedAt', 'updatedBy']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'comment', 'date', 'month', 'lessonsCount', 'updatedAt', 'updatedBy']);
     }
 
     match /enrollments/{id} {
