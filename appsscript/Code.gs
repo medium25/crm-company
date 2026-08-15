@@ -311,13 +311,6 @@ function findRecentDuplicate_(phone, phone2) {
 }
 
 /**
- * Наименее загруженный из активных операторов — то же самое, что
- * assignLeastLoadedOperator в src/lib/leadFunnel.js (Настройки →
- * Распределение лидов). settings/{branchId}.activeLeadOperators не задан —
- * используем весь пул ceo/manager/admin этого филиала (тот же дефолт, что
- * в React-версии, чтобы поведение не расходилось до первой настройки).
- */
-/**
  * Работает ли оператор в указанный момент — то же самое, что
  * isOperatorWorkingAt в src/lib/leadFunnel.js, портировано вручную (общего
  * модуля между React и Apps Script рантаймами нет).
@@ -333,6 +326,13 @@ function isOperatorWorkingAt_(workSchedule, date) {
   return hhmm >= today.start && hhmm < today.end;
 }
 
+/**
+ * Наименее загруженный из активных операторов — то же самое, что
+ * assignLeastLoadedOperator в src/lib/leadFunnel.js (Настройки →
+ * Распределение лидов). settings/{branchId}.activeLeadOperators не задан —
+ * используем весь пул ceo/manager/admin этого филиала (тот же дефолт, что
+ * в React-версии, чтобы поведение не расходилось до первой настройки).
+ */
 function nextLeastLoadedOperator_(branchId, createdAt) {
   const settings = fromFsDoc_(fsGetOptional_(`/settings/${branchId}`) || { fields: {} });
   let ids = settings.activeLeadOperators;
