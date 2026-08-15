@@ -47,18 +47,35 @@ export function LeadAssignmentTab() {
   const activeOperators = settingsDoc?.activeLeadOperators ?? null;
 
   const [counts, setCounts] = useState({});
+  const [countsVersion, setCountsVersion] = useState(0);
   const [savingId, setSavingId] = useState(null);
   const [scheduleTarget, setScheduleTarget] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [transferAllTarget, setTransferAllTarget] = useState(null);
 
+  // Переключатель филиала в топбаре не размонтирует компонент — сбрасываем
+  // всё, что указывает на оператора/лида из СТАРОГО branchId, иначе
+  // staffList.find(...) после переключения либо вернёт undefined (крэш в
+  // OperatorLeadsPanel), либо молча подсунет оператора чужого филиала в
+  // модалки расписания/перевода.
   useEffect(() => {
-    if (!db || staffList.length === 0) return;
+    setExpandedId(null);
+    setScheduleTarget(null);
+    setTransferAllTarget(null);
+  }, [activeBranchId]);
+
+  useEffect(() => {
+    if (!db || !activeBranchId || staffList.length === 0) return;
     let cancelled = false;
     Promise.all(
       staffList.map((m) =>
         getCountFromServer(
-          query(collection(db, 'students'), where('assignedOperator', '==', m.id), where('funnelStage', 'in', ['new', 'calling'])),
+          query(
+            collection(db, 'students'),
+            where('branchId', '==', activeBranchId),
+            where('assignedOperator', '==', m.id),
+            where('funnelStage', 'in', ['new', 'calling']),
+          ),
         ).then((snap) => [m.id, snap.data().count]),
       ),
     ).then((pairs) => {
@@ -67,7 +84,7 @@ export function LeadAssignmentTab() {
     return () => {
       cancelled = true;
     };
-  }, [staffList]);
+  }, [staffList, activeBranchId, countsVersion]);
 
   if (staffLoading || settingsLoading) {
     return (
@@ -154,6 +171,8 @@ export function LeadAssignmentTab() {
     },
   ];
 
+  const expandedOperator = staffList.find((m) => m.id === expandedId) ?? null;
+
   return (
     <div className="max-w-4xl">
       <p className="mb-4 text-[15px] text-muted">
@@ -162,12 +181,13 @@ export function LeadAssignmentTab() {
         загруженный среди всех активных.
       </p>
       <Table columns={columns} rows={staffList} />
-      {expandedId && (
+      {expandedOperator && (
         <OperatorLeadsPanel
-          operator={staffList.find((m) => m.id === expandedId)}
+          operator={expandedOperator}
           operators={staffList.filter((m) => isActive(m.id))}
           stageOverrides={settingsDoc?.leadStageOverrides}
           onClose={() => setExpandedId(null)}
+          onTransferred={() => setCountsVersion((v) => v + 1)}
         />
       )}
       <OperatorScheduleModal
@@ -179,6 +199,7 @@ export function LeadAssignmentTab() {
         operator={transferAllTarget}
         operators={staffList.filter((m) => isActive(m.id))}
         onClose={() => setTransferAllTarget(null)}
+        onTransferred={() => setCountsVersion((v) => v + 1)}
       />
     </div>
   );

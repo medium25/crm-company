@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { useBranch } from '../../hooks/useBranch.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -14,9 +15,11 @@ import { getActiveLeadIdsForOperator, reassignLeadsToOperator } from '../../lib/
  * @param {{id: string, fullName: string}|null} props.operator оператор-источник, null — закрыто
  * @param {Array<{id: string, fullName: string}>} props.operators все операторы для выбора получателя (источник исключается внутри)
  * @param {() => void} props.onClose
+ * @param {() => void} [props.onTransferred] вызывается после успешного перевода — родитель пересчитывает счётчики «Сейчас лидов»
  */
-export function TransferAllLeadsModal({ operator, operators, onClose }) {
+export function TransferAllLeadsModal({ operator, operators, onClose, onTransferred }) {
   const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [targetId, setTargetId] = useState('');
   const [transferring, setTransferring] = useState(false);
@@ -31,7 +34,7 @@ export function TransferAllLeadsModal({ operator, operators, onClose }) {
     if (!targetId || !operator) return;
     setTransferring(true);
     try {
-      const leadIds = await getActiveLeadIdsForOperator(db, operator.id);
+      const leadIds = await getActiveLeadIdsForOperator(db, operator.id, activeBranchId);
       if (leadIds.length === 0) {
         showToast('У оператора нет активных лидов.');
         onClose();
@@ -39,6 +42,7 @@ export function TransferAllLeadsModal({ operator, operators, onClose }) {
       }
       await reassignLeadsToOperator(db, leadIds, targetId, user);
       showToast(`Переведено лидов: ${leadIds.length}.`);
+      onTransferred?.();
       onClose();
     } catch {
       showToast('Не удалось перевести лиды.', { type: 'error' });

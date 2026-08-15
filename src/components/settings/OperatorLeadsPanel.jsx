@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { collection, query, where } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -19,21 +20,24 @@ import { formatPhone } from '../../lib/format.js';
  * @param {Array<{id: string, fullName: string}>} props.operators все операторы для выбора получателя (источник исключается внутри)
  * @param {Record<string, {label?: string, color?: string}>} [props.stageOverrides]
  * @param {() => void} props.onClose
+ * @param {() => void} [props.onTransferred] вызывается после успешного перевода — родитель пересчитывает счётчики «Сейчас лидов»
  */
-export function OperatorLeadsPanel({ operator, operators, stageOverrides, onClose }) {
+export function OperatorLeadsPanel({ operator, operators, stageOverrides, onClose, onTransferred }) {
   const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const { showToast } = useToast();
 
   const leadsQuery = useMemo(
     () =>
-      db
+      db && activeBranchId
         ? query(
             collection(db, 'students'),
+            where('branchId', '==', activeBranchId),
             where('assignedOperator', '==', operator.id),
             where('funnelStage', 'in', NON_TERMINAL_STAGES),
           )
         : null,
-    [operator.id],
+    [operator.id, activeBranchId],
   );
   const { data: leads, loading } = useCollection(leadsQuery);
 
@@ -82,6 +86,7 @@ export function OperatorLeadsPanel({ operator, operators, stageOverrides, onClos
     try {
       await reassignLeadsToOperator(db, Array.from(selected), targetId, user);
       showToast(`Переведено лидов: ${selected.size}.`);
+      onTransferred?.();
       onClose();
     } catch {
       showToast('Не удалось перевести лиды.', { type: 'error' });

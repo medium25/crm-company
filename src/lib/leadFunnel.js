@@ -298,14 +298,23 @@ export const NON_TERMINAL_STAGES = ['new', 'calling', 'trial_scheduled', 'trial_
 
 /**
  * id всех активных лидов оператора — для «Перевести всех» (без разворота
- * списка в LeadAssignmentTab).
+ * списка в LeadAssignmentTab). Отфильтровано по branchId — у оператора с
+ * несколькими branchIds не должно попадать в перевод то, что относится к
+ * другому филиалу (иначе batch на students упадёт целиком из-за
+ * firestore.rules isBranch-проверки на чужом документе).
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} operatorId
+ * @param {string} branchId
  * @returns {Promise<Array<string>>}
  */
-export async function getActiveLeadIdsForOperator(db, operatorId) {
+export async function getActiveLeadIdsForOperator(db, operatorId, branchId) {
   const snap = await getDocs(
-    query(collection(db, 'students'), where('assignedOperator', '==', operatorId), where('funnelStage', 'in', NON_TERMINAL_STAGES)),
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('assignedOperator', '==', operatorId),
+      where('funnelStage', 'in', NON_TERMINAL_STAGES),
+    ),
   );
   return snap.docs.map((d) => d.id);
 }
