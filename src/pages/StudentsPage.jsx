@@ -207,7 +207,14 @@ export function StudentsPage() {
     });
   }, [section, leftAllStudents, leftEnrollmentByStudent, leftView]);
 
-  const rawStudents = section === 'left' ? leftStudents : statusStudents;
+  // Лиды (status:'lead') на эту страницу не относятся — свой раздел
+  // «Заявки». studentsQuery (effectiveStatus==='all') не фильтрует по
+  // status вообще, так что без этого лиды попадали бы и в таблицу, и в счётчик,
+  // и в разбивку по учителям (искусственно раздувая «Всего учеников»).
+  const rawStudents = useMemo(
+    () => (section === 'left' ? leftStudents : statusStudents.filter((st) => st.status !== 'lead')),
+    [section, leftStudents, statusStudents],
+  );
   const loading = section === 'left' ? leftEnrollmentsLoading || allStudentsLoading : statusLoading;
 
   // Плитки лендинга «Студенты» — свой запрос без фильтров таблицы (`status`/`q`
@@ -223,6 +230,10 @@ export function StudentsPage() {
     const monthStart = startOfMonth(new Date());
     const counts = { all: 0, debtors: 0, trial: 0, paused: 0, leftThisMonth: 0 };
     for (const s of summaryStudents) {
+      // Лиды (status:'lead', ещё ни разу не зачислены в группу) — не
+      // ученики, у них свой раздел «Заявки». STATUS_OPTIONS ниже сознательно
+      // не даёт выбрать 'lead' фильтром — тот же смысл здесь, явно.
+      if (s.status === 'lead') continue;
       if (s.status !== 'paused') counts.all += 1;
       if (s.status !== 'left' && s.balance < 0) counts.debtors += 1;
       if (s.status === 'trial') counts.trial += 1;
