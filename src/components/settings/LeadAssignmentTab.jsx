@@ -14,6 +14,7 @@ import { SkeletonRow } from '../ui/Skeleton.jsx';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { OperatorScheduleModal } from './OperatorScheduleModal.jsx';
 import { OperatorLeadsPanel } from './OperatorLeadsPanel.jsx';
+import { TransferAllLeadsModal } from './TransferAllLeadsModal.jsx';
 
 /**
  * Кто получает новых лидов и с каким приоритетом — настройка вместо
@@ -49,6 +50,7 @@ export function LeadAssignmentTab() {
   const [savingId, setSavingId] = useState(null);
   const [scheduleTarget, setScheduleTarget] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [transferAllTarget, setTransferAllTarget] = useState(null);
 
   useEffect(() => {
     if (!db || staffList.length === 0) return;
@@ -142,7 +144,12 @@ export function LeadAssignmentTab() {
       label: '',
       width: '48px',
       render: (m) => (
-        <DropdownMenu items={[{ label: 'Расписание', onClick: () => setScheduleTarget(m) }]} />
+        <DropdownMenu
+          items={[
+            { label: 'Расписание', onClick: () => setScheduleTarget(m) },
+            { label: 'Перевести все лиды', onClick: () => setTransferAllTarget(m) },
+          ]}
+        />
       ),
     },
   ];
@@ -167,6 +174,11 @@ export function LeadAssignmentTab() {
         operator={scheduleTarget}
         schedule={settingsDoc?.operatorSchedules?.[scheduleTarget?.id]}
         onClose={() => setScheduleTarget(null)}
+      />
+      <TransferAllLeadsModal
+        operator={transferAllTarget}
+        operators={staffList.filter((m) => isActive(m.id))}
+        onClose={() => setTransferAllTarget(null)}
       />
     </div>
   );
