@@ -10,7 +10,7 @@ const enrollment = { price: 600000 };
 const group = { lessonsPerMonth: 12 };
 
 assert.equal(chargeAmountForLessons(enrollment, group, 6), -300000, '6 из 12 уроков — половина суммы');
-assert.ok(chargeAmountForLessons(enrollment, group, 0) === 0, '0 уроков — 0 списания');
+assert.ok(Object.is(chargeAmountForLessons(enrollment, group, 0), 0), '0 уроков — чистый 0, не -0');
 assert.equal(chargeAmountForLessons(enrollment, group, 12), -600000, 'все 12 — полная сумма');
 
 // округление: цена не делится ровно на число уроков

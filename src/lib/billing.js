@@ -54,6 +54,7 @@ export function pricePerLesson(enrollment, group) {
  * @returns {number} отрицательное число (списание) или 0
  */
 export function chargeAmountForLessons(enrollment, group, lessonsCount) {
+  if (lessonsCount === 0) return 0;
   return -Math.round(pricePerLesson(enrollment, group) * lessonsCount);
 }
 
