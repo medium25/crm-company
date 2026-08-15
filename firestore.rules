@@ -51,7 +51,12 @@ service cloud.firestore {
       allow read:   if isAdmin();
       allow create: if isAdmin() && inBranch(request.resource.data.branchId);
       allow update: if isAdmin() && inBranch(resource.data.branchId);
-      allow delete: if false;
+      // Жёсткое удаление — только для настоящих лидов (status=='lead',
+      // ещё ни разу не было enrollment/оплаты — recomputeStudentAggregates
+      // переводит status в trial/active/paused/left при первой записи в
+      // группу, назад в 'lead' не возвращает). Реальных студентов с
+      // историей платежей удалить нельзя, только архивировать.
+      allow delete: if isAdmin() && inBranch(resource.data.branchId) && resource.data.status == 'lead';
     }
 
     match /groups/{id} {
@@ -153,6 +158,17 @@ service cloud.firestore {
     }
 
     match /tasks/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // Ключи внешнего API (Apps Script → Firestore REST, приём лидов из
+    // Google Sheets). Читает/пишет только scripts/manage-api-keys.mjs от
+    // имени staff-администратора; сам Apps Script ходит в Firestore под
+    // отдельным сервис-аккаунтом, который эти правила не проверяют — они
+    // нужны только чтобы клиентский SDK (админка/скрипты) не мог читать
+    // чужие хэши без прав. Сырое значение ключа в Firestore не хранится,
+    // только sha256-хэш (см. API.md).
+    match /apiKeys/{id} {
       allow read, write: if isAdmin();
     }
   }
