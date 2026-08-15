@@ -317,7 +317,23 @@ function findRecentDuplicate_(phone, phone2) {
  * используем весь пул ceo/manager/admin этого филиала (тот же дефолт, что
  * в React-версии, чтобы поведение не расходилось до первой настройки).
  */
-function nextLeastLoadedOperator_(branchId) {
+/**
+ * Работает ли оператор в указанный момент — то же самое, что
+ * isOperatorWorkingAt в src/lib/leadFunnel.js, портировано вручную (общего
+ * модуля между React и Apps Script рантаймами нет).
+ */
+function isOperatorWorkingAt_(workSchedule, date) {
+  if (!workSchedule) return true;
+  const today = workSchedule[date.getDay()];
+  if (today === undefined) return true;
+  if (today === null) return false;
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  const hhmm = hh + ':' + mm;
+  return hhmm >= today.start && hhmm < today.end;
+}
+
+function nextLeastLoadedOperator_(branchId, createdAt) {
   const settings = fromFsDoc_(fsGetOptional_(`/settings/${branchId}`) || { fields: {} });
   let ids = settings.activeLeadOperators;
   if (!ids || !ids.length) {
@@ -333,9 +349,13 @@ function nextLeastLoadedOperator_(branchId) {
   }
   if (!ids.length) return null;
 
+  const schedules = settings.operatorSchedules || {};
+  const onShiftIds = ids.filter((id) => isOperatorWorkingAt_(schedules[id], createdAt));
+  const candidateIds = onShiftIds.length > 0 ? onShiftIds : ids;
+
   let best = null;
   let bestCount = Infinity;
-  ids.forEach((id) => {
+  candidateIds.forEach((id) => {
     const leads = runQuery_(
       'students',
       [
@@ -391,7 +411,7 @@ function createLead_(body) {
     return { id: dup.id, merged: true };
   }
 
-  const assignedOperator = nextLeastLoadedOperator_(branchId);
+  const assignedOperator = nextLeastLoadedOperator_(branchId, effectiveCreatedAt);
   const doc = {
     fullName,
     phone,
