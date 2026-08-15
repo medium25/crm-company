@@ -232,3 +232,34 @@ export async function assignLeastLoadedOperator(db, branchId, operatorIds) {
   }
   return operatorIds[bestIndex];
 }
+
+/**
+ * Работает ли оператор в указанный момент — расписание из
+ * settings/{branchId}.operatorSchedules[operatorId] (Настройки →
+ * Распределение лидов → «Расписание»). `null` в дне — явный выходной,
+ * `undefined` (весь массив или запись оператора отсутствует) — тех.дефолт
+ * «работает всегда», чтобы ненастроенное расписание молча не выключало
+ * оператора из распределения.
+ * @param {Array<{start: string, end: string}|null>|undefined} workSchedule
+ * @param {Date} date
+ * @returns {boolean}
+ */
+export function isOperatorWorkingAt(workSchedule, date) {
+  if (!workSchedule) return true;
+  const today = workSchedule[date.getDay()];
+  if (today === undefined) return true;
+  if (today === null) return false;
+  const hhmm = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return hhmm >= today.start && hhmm < today.end;
+}
+
+/**
+ * Операторы из списка, у которых сейчас рабочее время — приоритетное
+ * подмножество для назначения лида (см. assignOperatorForLead).
+ * @param {Array<{id: string, workSchedule?: Array}>} operators
+ * @param {Date} date
+ * @returns {Array<string>} id операторов
+ */
+export function selectOnShiftOperatorIds(operators, date) {
+  return operators.filter((op) => isOperatorWorkingAt(op.workSchedule, date)).map((op) => op.id);
+}
