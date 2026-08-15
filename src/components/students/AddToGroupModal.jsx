@@ -9,6 +9,7 @@ import { useToast } from '../ui/Toast.jsx';
 import { recomputeStudentAggregates } from '../../lib/students.js';
 import { chargePartialMonth } from '../../lib/billing.js';
 import { logActivity } from '../../lib/activityLog.js';
+import { NON_TERMINAL_STAGES } from '../../lib/leadFunnel.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Select.jsx';
@@ -104,6 +105,19 @@ export function AddToGroupModal({ open, student, onClose }) {
 
       await updateDoc(doc(db, 'groups', group.id), { studentsCount: increment(1) });
       await recomputeStudentAggregates(db, student.id);
+
+      // Лид, добавленный в группу напрямую (минуя «Пришёл» → оплату на
+      // доске «Заявки»), иначе навсегда зависает карточкой в своей стадии
+      // воронки — funnelStage тут никогда бы не сдвинулся сам. Закрываем
+      // воронку сразу же, раз студент фактически уже не лид.
+      if (NON_TERMINAL_STAGES.includes(student.funnelStage)) {
+        await updateDoc(doc(db, 'students', student.id), {
+          funnelStage: 'won',
+          stageHistory: [...(student.stageHistory ?? []), { stage: 'won', enteredAt: new Date() }],
+          updatedAt: now,
+          updatedBy: user.uid,
+        });
+      }
 
       await logActivity(
         db,
