@@ -121,13 +121,14 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
         )}
         <p className="text-[15px] text-muted">Стоимость для студента: {formatMoney(enrollment.price)}</p>
         {transferNote && (
-          <div className="mt-1 flex items-center gap-2">
-            <p className="min-w-0 flex-1 truncate text-[13px] text-muted">{transferNote}</p>
+          <div className="mt-2 flex items-center gap-2 rounded-field border border-navy/20 bg-navy/5 px-3 py-2">
+            <ArrowRightLeft className="h-4 w-4 shrink-0 text-navy" />
+            <p className="min-w-0 flex-1 truncate text-[13px] font-bold text-navy">{transferNote}</p>
             <button
               type="button"
               onClick={dismissTransferNote}
               aria-label="Скрыть уведомление"
-              className="shrink-0 text-muted hover:text-text"
+              className="shrink-0 text-navy hover:opacity-70"
             >
               <X className="h-3.5 w-3.5" />
             </button>

@@ -80,6 +80,7 @@ export function StudentDetailPage() {
   const { data: monthlyBalances } = useCollection(monthlyBalancesQuery);
 
   const [tab, setTab] = useState('groups');
+  const [showLeftGroups, setShowLeftGroups] = useState(false);
   const [editing, setEditing] = useState(false);
   const [addToGroupOpen, setAddToGroupOpen] = useState(false);
   const [freezeTarget, setFreezeTarget] = useState(null);
@@ -321,19 +322,30 @@ export function StudentDetailPage() {
                     <EmptyState icon={CircleUserRound} title="Пока нет записей в группы" actionLabel="Добавить в группу" onAction={() => setAddToGroupOpen(true)} />
                   ) : (
                     <div className="flex flex-col gap-4">
-                      {enrollments.map((e) => (
-                        <EnrollmentCard
-                          key={e.id}
-                          enrollment={e}
-                          studentBalance={student.balance}
-                          studentFreezeCount={student.freezeCount}
-                          onFreeze={setFreezeTarget}
-                          onLeave={setLeaveTarget}
-                          onActivate={setActivateTarget}
-                          onUnfreeze={setUnfreezeTarget}
-                          onTransfer={setTransferTarget}
-                        />
-                      ))}
+                      {enrollments
+                        .filter((e) => showLeftGroups || e.status !== 'left')
+                        .map((e) => (
+                          <EnrollmentCard
+                            key={e.id}
+                            enrollment={e}
+                            studentBalance={student.balance}
+                            studentFreezeCount={student.freezeCount}
+                            onFreeze={setFreezeTarget}
+                            onLeave={setLeaveTarget}
+                            onActivate={setActivateTarget}
+                            onUnfreeze={setUnfreezeTarget}
+                            onTransfer={setTransferTarget}
+                          />
+                        ))}
+                      {enrollments.some((e) => e.status === 'left') && (
+                        <button
+                          type="button"
+                          onClick={() => setShowLeftGroups((v) => !v)}
+                          className="self-start text-[13px] text-link hover:underline"
+                        >
+                          {showLeftGroups ? 'Скрыть покинутые группы' : 'Показать покинутые группы'}
+                        </button>
+                      )}
                     </div>
                   )}
 
