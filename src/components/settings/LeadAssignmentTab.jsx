@@ -11,6 +11,8 @@ import { Table } from '../ui/Table.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { SkeletonRow } from '../ui/Skeleton.jsx';
+import { DropdownMenu } from '../ui/DropdownMenu.jsx';
+import { OperatorScheduleModal } from './OperatorScheduleModal.jsx';
 
 /**
  * Кто получает новых лидов и с каким приоритетом — настройка вместо
@@ -44,6 +46,7 @@ export function LeadAssignmentTab() {
 
   const [counts, setCounts] = useState({});
   const [savingId, setSavingId] = useState(null);
+  const [scheduleTarget, setScheduleTarget] = useState(null);
 
   useEffect(() => {
     if (!db || staffList.length === 0) return;
@@ -65,8 +68,8 @@ export function LeadAssignmentTab() {
   if (staffLoading || settingsLoading) {
     return (
       <div className="flex flex-col gap-2">
-        <SkeletonRow columns={3} />
-        <SkeletonRow columns={3} />
+        <SkeletonRow columns={4} />
+        <SkeletonRow columns={4} />
       </div>
     );
   }
@@ -117,15 +120,29 @@ export function LeadAssignmentTab() {
         </button>
       ),
     },
+    {
+      key: '__actions',
+      label: '',
+      width: '48px',
+      render: (m) => (
+        <DropdownMenu items={[{ label: 'Расписание', onClick: () => setScheduleTarget(m) }]} />
+      ),
+    },
   ];
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-4xl">
       <p className="mb-4 text-[15px] text-muted">
-        Новый лид автоматически достаётся активному оператору с наименьшей текущей нагрузкой (сумма карточек в
-        стадиях «Новый лид» и «Дозвон»). Отключи оператора здесь, чтобы он временно не получал новых лидов.
+        Новый лид в первую очередь достаётся активному оператору, у которого сейчас рабочее время по расписанию, и
+        только среди них — наименее загруженному. Если по расписанию никто не работает — прежняя логика: наименее
+        загруженный среди всех активных.
       </p>
       <Table columns={columns} rows={staffList} />
+      <OperatorScheduleModal
+        operator={scheduleTarget}
+        schedule={settingsDoc?.operatorSchedules?.[scheduleTarget?.id]}
+        onClose={() => setScheduleTarget(null)}
+      />
     </div>
   );
 }
