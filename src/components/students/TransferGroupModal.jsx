@@ -7,14 +7,13 @@ import { useCollection } from '../../hooks/useCollection.js';
 import { useDoc } from '../../hooks/useDoc.js';
 import { useToast } from '../ui/Toast.jsx';
 import { recomputeStudentAggregates } from '../../lib/students.js';
-import { chargeAmountForLessons, defaultPaymentSplitAmount } from '../../lib/billing.js';
+import { chargeAmountForLessons } from '../../lib/billing.js';
 import { logActivity } from '../../lib/activityLog.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Select.jsx';
 import { Input } from '../ui/Input.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
-import { formatMoney, formatMethod } from '../../lib/format.js';
 
 /**
  * Перевод студента из текущей группы в другую — закрывает старый enrollment
@@ -23,10 +22,11 @@ import { formatMoney, formatMethod } from '../../lib/format.js';
  * настоящим уходом) и сразу создаёт новый в целевой группе с тем же
  * статусом. `activatedAt` переносится как есть.
  *
- * Если месяц уже оплачен/списан в старой группе — списание дробится между
- * старой и новой записью по вручную введённому числу «уроков уже прошло»;
- * оплата этого месяца дробится опционально, по выбору пользователя на
- * каждую транзакцию — см. `docs/superpowers/specs/2026-08-15-mid-month-group-transfer-split-design.md`.
+ * Если месяц уже списан в старой группе — списание дробится между старой и
+ * новой записью по вручную введённому числу «уроков уже прошло». Оплаты
+ * этого месяца перевод не трогает — деньги остаются на той транзакции, на
+ * которую были изначально записаны, см.
+ * `docs/superpowers/specs/2026-08-15-mid-month-group-transfer-split-design.md`.
  * @param {Object} props
  * @param {Object|null} props.enrollment запись, которую переводим, или null (закрыто)
  * @param {{id: string, fullName: string}} props.student
@@ -50,7 +50,6 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
   const [price, setPrice] = useState('');
   const [transferredAt, setTransferredAt] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [alreadyHad, setAlreadyHad] = useState('');
-  const [paymentSplits, setPaymentSplits] = useState({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -59,7 +58,6 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
       setPrice('');
       setTransferredAt(format(new Date(), 'yyyy-MM-dd'));
       setAlreadyHad('');
-      setPaymentSplits({});
     }
   }, [enrollment]);
 
@@ -78,30 +76,6 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
   const totalOld = oldCharge?.lessonsCount ?? oldGroup?.lessonsPerMonth ?? 0;
   const alreadyHadNum = Math.min(Math.max(Number(alreadyHad) || 0, 0), totalOld);
   const remaining = Math.max(totalOld - alreadyHadNum, 0);
-
-  const paymentsQuery = useMemo(
-    () =>
-      db && enrollment && month
-        ? query(collection(db, 'transactions'), where('studentId', '==', enrollment.studentId), where('month', '==', month))
-        : null,
-    [enrollment, month],
-  );
-  const { data: monthTxs } = useCollection(paymentsQuery);
-  const payments = useMemo(() => monthTxs.filter((t) => t.type === 'payment'), [monthTxs]);
-
-  const getSplit = (paymentId) => paymentSplits[paymentId] ?? { checked: false, amount: '' };
-
-  const toggleSplit = (payment) => {
-    setPaymentSplits((prev) => {
-      const current = prev[payment.id] ?? { checked: false, amount: '' };
-      const amount = current.amount || String(defaultPaymentSplitAmount(payment.amount, remaining, totalOld));
-      return { ...prev, [payment.id]: { checked: !current.checked, amount } };
-    });
-  };
-
-  const setSplitAmount = (paymentId, amount) => {
-    setPaymentSplits((prev) => ({ ...prev, [paymentId]: { ...(prev[paymentId] ?? { checked: false }), amount } }));
-  };
 
   const handleGroupChange = (id) => {
     setGroupId(id);
@@ -253,50 +227,6 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
         }
       }
 
-      // --- Дробление отмеченных оплат этого месяца ---
-      for (const payment of payments) {
-        const split = paymentSplits[payment.id];
-        if (!split?.checked) continue;
-        const moveAmount = Math.min(Math.max(Number(split.amount) || 0, 0), payment.amount);
-        if (moveAmount <= 0) continue;
-
-        batch.update(doc(db, 'transactions', payment.id), {
-          amount: payment.amount - moveAmount,
-          updatedAt: now,
-          updatedBy: user.uid,
-        });
-
-        const newPaymentRef = doc(collection(db, 'transactions'));
-        batch.set(newPaymentRef, {
-          studentId: payment.studentId,
-          studentName: payment.studentName,
-          branchId: payment.branchId,
-          enrollmentId: newEnrollmentRef.id,
-          groupId: targetGroup.id,
-          groupCode: targetGroup.code,
-          teacherId: targetGroup.teacherId,
-          teacherName: targetGroup.teacherName,
-          type: 'payment',
-          amount: moveAmount,
-          affectsBalance: true,
-          method: payment.method,
-          date: payment.date,
-          month: payment.month,
-          comment: `Перенос из оплаты ${payment.id} при переводе в ${targetGroup.code}`,
-          periodFrom: null,
-          periodTo: null,
-          lessonsCount: null,
-          createdBy: user.uid,
-          createdByName: staff?.fullName ?? '',
-          createdAt: now,
-        });
-        batch.set(
-          doc(db, 'monthlyRevenue', `${payment.branchId}_${payment.month}`),
-          { paymentsCount: increment(1), updatedAt: now },
-          { merge: true },
-        );
-      }
-
       await batch.commit();
       await recomputeStudentAggregates(db, enrollment.studentId);
 
@@ -373,34 +303,6 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
               Спишется {alreadyHadNum} ур. со старой группы, {remaining} ур. с новой (из {totalOld}).
             </p>
           </>
-        )}
-
-        {payments.length > 0 && (
-          <div className="flex flex-col gap-2 rounded-2xl border border-border p-4">
-            <p className="text-[13px] font-bold text-muted">Оплаты этого месяца — разделить между группами</p>
-            {payments.map((payment) => {
-              const split = getSplit(payment.id);
-              return (
-                <div key={payment.id} className="flex items-center gap-3">
-                  <label className="flex flex-1 items-center gap-2 text-[15px] text-text">
-                    <input type="checkbox" checked={split.checked} onChange={() => toggleSplit(payment)} />
-                    {formatMoney(payment.amount)} · {formatMethod(payment.method)} ·{' '}
-                    {payment.date ? format(payment.date.toDate(), 'dd.MM.yyyy') : ''}
-                  </label>
-                  <div className="w-32">
-                    <Input
-                      type="number"
-                      min="0"
-                      max={payment.amount}
-                      disabled={!split.checked}
-                      value={split.amount}
-                      onChange={(e) => setSplitAmount(payment.id, e.target.value)}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         )}
       </form>
     </Modal>
