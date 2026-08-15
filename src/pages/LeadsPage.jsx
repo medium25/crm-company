@@ -13,6 +13,7 @@ import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
+import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { CallLogModal } from '../components/students/CallLogModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
@@ -49,6 +50,7 @@ export function LeadsPage() {
         ? query(
             collection(db, 'students'),
             where('branchId', '==', activeBranchId),
+            where('isArchived', '==', false),
             where('funnelStage', 'in', COLUMNS.map((c) => c.key)),
             orderBy('createdAt', 'desc'),
           )
@@ -68,8 +70,8 @@ export function LeadsPage() {
   const editStageColumn = (stageKey, patch) => {
     if (!branchSettingsRef) return;
     // set+merge, не update — settings/{branchId} может ещё не существовать
-    // (создаётся лениво, см. assignRoundRobinOperator), а merge на
-    // вложенный объект сохраняет overrides остальных стадий как есть.
+    // (создаётся лениво при первом сохранении любой из его настроек), а
+    // merge на вложенный объект сохраняет overrides остальных стадий как есть.
     setDoc(branchSettingsRef, { leadStageOverrides: { [stageKey]: patch } }, { merge: true }).catch(() =>
       showToast('Не удалось сохранить стадию.', { type: 'error' }),
     );
@@ -102,6 +104,7 @@ export function LeadsPage() {
 
   const [formLead, setFormLead] = useState(null);
   const [declineTarget, setDeclineTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [callTarget, setCallTarget] = useState(null);
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
   const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
@@ -257,6 +260,7 @@ export function LeadsPage() {
     onCall: (lead) => setCallTarget(lead),
     onEdit: (lead) => setFormLead(lead),
     onDecline: (lead) => setDeclineTarget(lead),
+    onDelete: (lead) => setDeleteTarget(lead),
     onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
     onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
     onMarkAttended: (lead, engagementScore) => {
@@ -318,6 +322,7 @@ export function LeadsPage() {
 
       <StudentFormModal student={formLead} onClose={() => setFormLead(null)} onCreated={handleCreated} />
       <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
+      <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
       <CallLogModal open={Boolean(callTarget)} studentId={callTarget?.id} onClose={() => setCallTarget(null)} />
       <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />

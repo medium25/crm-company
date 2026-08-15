@@ -84,6 +84,16 @@ export function formatDateTime(ts) {
 }
 
 /**
+ * @param {import('firebase/firestore').Timestamp} ts
+ * @returns {string} "24.07.2026 14:44" — без секунд, для компактных мест
+ * (карточка лида на доске и т.п.), где точность до секунды не нужна.
+ */
+export function formatDateTimeShort(ts) {
+  if (!ts) return '';
+  return formatDateFns(ts.toDate(), 'dd.MM.yyyy HH:mm', { locale: ru });
+}
+
+/**
  * @param {string} month "2026-07"
  * @returns {string} "июль 2026"
  */
