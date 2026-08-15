@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../ui/Toast.jsx';
@@ -21,6 +21,10 @@ export function TransferAllLeadsModal({ operator, operators, onClose }) {
   const [targetId, setTargetId] = useState('');
   const [transferring, setTransferring] = useState(false);
 
+  useEffect(() => {
+    if (operator) setTargetId('');
+  }, [operator]);
+
   const targetOptions = operators.filter((op) => op.id !== operator?.id);
 
   const handleTransfer = async () => {
@@ -40,7 +44,6 @@ export function TransferAllLeadsModal({ operator, operators, onClose }) {
       showToast('Не удалось перевести лиды.', { type: 'error' });
     } finally {
       setTransferring(false);
-      setTargetId('');
     }
   };
 
