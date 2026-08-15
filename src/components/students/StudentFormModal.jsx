@@ -8,7 +8,7 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
-import { getActiveLeadOperators, assignLeastLoadedOperator } from '../../lib/leadFunnel.js';
+import { getActiveLeadOperators, getOperatorSchedules, assignOperatorForLead } from '../../lib/leadFunnel.js';
 
 const SOURCE_OPTIONS = [
   { value: '', label: 'Не указан' },
@@ -73,8 +73,12 @@ export function StudentFormModal({ student, onClose, onCreated }) {
         showToast('Студент обновлён.');
         onClose();
       } else {
-        const operatorIds = await getActiveLeadOperators(db, activeBranchId);
-        const assignedOperator = await assignLeastLoadedOperator(db, activeBranchId, operatorIds);
+        const [operatorIds, operatorSchedules] = await Promise.all([
+          getActiveLeadOperators(db, activeBranchId),
+          getOperatorSchedules(db, activeBranchId),
+        ]);
+        const operators = operatorIds.map((id) => ({ id, workSchedule: operatorSchedules[id] }));
+        const assignedOperator = await assignOperatorForLead(db, activeBranchId, operators, new Date());
         const created = await addDoc(collection(db, 'students'), {
           ...payload,
           branchId: activeBranchId,
