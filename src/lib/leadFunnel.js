@@ -1,5 +1,5 @@
 // src/lib/leadFunnel.js
-import { doc, updateDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getCountFromServer, serverTimestamp } from 'firebase/firestore';
 import { differenceInCalendarDays } from 'date-fns';
 
 /** Причины отказа — фиксированный список, свободный текст не допускается (см. спек §7). */
@@ -170,25 +170,65 @@ export function stageDeadline(lead) {
 }
 
 /**
- * Round-robin назначение оператора при создании лида. Список операторов
- * читается снаружи транзакции (обычный getDocs — сам список меняется
- * редко, 2-3 человека, гонка на устаревший список не критична), но счётчик
- * очереди — `settings/{branchId}.lastRoundRobinIndex` — читается и
- * пишется внутри `runTransaction`, чтобы два лида, созданных почти
- * одновременно, не получили одного и того же следующего оператора.
+ * Человекочитаемая причина, почему карточка помечена просроченной (бейдж
+ * с «!» в углу LeadCard) — что именно не сделали вовремя, по стадии.
+ * Дату/время дедлайна вызывающая сторона добавляет сама (formatDateTimeShort
+ * от stageDeadline(lead)).
+ * @param {Object} lead
+ * @returns {string}
+ */
+export function overdueReasonLabel(lead) {
+  const stage = lead.funnelStage ?? 'new';
+  if (stage === 'new') return 'Лид не обработан — истёк срок на первый звонок';
+  if (stage === 'calling') return 'Просрочен повторный звонок';
+  if (stage === 'trial_scheduled') return 'Не подтверждён/не отмечен пробный урок';
+  if (stage === 'closing') return 'Просрочено плановое касание в дожиме';
+  return 'Просрочено плановое действие по лиду';
+}
+
+/**
+ * Список операторов для распределения лидов — `settings/{branchId}.activeLeadOperators`
+ * (настраивается в Настройки → Распределение лидов). Пока никто не
+ * настроил — пуст, вызывающая сторона решает, что делать (см.
+ * assignLeastLoadedOperator).
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} branchId
- * @param {Array<string>} operatorIds уже отсортированный список uid
+ * @returns {Promise<Array<string>>}
+ */
+export async function getActiveLeadOperators(db, branchId) {
+  const snap = await getDoc(doc(db, 'settings', branchId));
+  return snap.data()?.activeLeadOperators ?? [];
+}
+
+/**
+ * Назначает лида оператору с наименьшей текущей нагрузкой — суммой карточек
+ * в стадиях 'new'+'calling' среди активных операторов (спек: заменяет
+ * round-robin, «кому распределять» настраивается отдельно, «кому
+ * наименьшей» решает нагрузка на момент создания). Не транзакция — гонка
+ * при одновременном создании двух лидов теоретически возможна (оба могут
+ * достаться одному и тому же наименее загруженному), не критично для
+ * объёма одной школы.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @param {Array<string>} operatorIds из getActiveLeadOperators
  * @returns {Promise<string|null>} uid назначенного оператора, null если операторов нет
  */
-export async function assignRoundRobinOperator(db, branchId, operatorIds) {
+export async function assignLeastLoadedOperator(db, branchId, operatorIds) {
   if (operatorIds.length === 0) return null;
-  const settingsRef = doc(db, 'settings', branchId);
-  return runTransaction(db, async (tx) => {
-    const snap = await tx.get(settingsRef);
-    const index = snap.data()?.lastRoundRobinIndex ?? 0;
-    const operator = operatorIds[index % operatorIds.length];
-    tx.set(settingsRef, { lastRoundRobinIndex: index + 1 }, { merge: true });
-    return operator;
-  });
+  const counts = await Promise.all(
+    operatorIds.map((id) =>
+      getCountFromServer(
+        query(
+          collection(db, 'students'),
+          where('assignedOperator', '==', id),
+          where('funnelStage', 'in', ['new', 'calling']),
+        ),
+      ).then((snap) => snap.data().count),
+    ),
+  );
+  let bestIndex = 0;
+  for (let i = 1; i < operatorIds.length; i++) {
+    if (counts[i] < counts[bestIndex]) bestIndex = i;
+  }
+  return operatorIds[bestIndex];
 }

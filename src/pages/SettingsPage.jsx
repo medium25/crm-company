@@ -3,6 +3,7 @@ import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Tabs } from '../components/ui/Tabs.jsx';
 import { BranchSettingsTab } from '../components/settings/BranchSettingsTab.jsx';
 import { StaffSettingsTab } from '../components/settings/StaffSettingsTab.jsx';
+import { LeadAssignmentTab } from '../components/settings/LeadAssignmentTab.jsx';
 import { DirectoriesTab } from '../components/settings/DirectoriesTab.jsx';
 import { SmsTemplatesTab } from '../components/settings/SmsTemplatesTab.jsx';
 import { BillingHistoryTab } from '../components/settings/BillingHistoryTab.jsx';
@@ -10,6 +11,7 @@ import { BillingHistoryTab } from '../components/settings/BillingHistoryTab.jsx'
 const TABS = [
   { key: 'branch', label: 'Филиал' },
   { key: 'staff', label: 'Сотрудники' },
+  { key: 'leadAssignment', label: 'Распределение лидов' },
   { key: 'directories', label: 'Справочники' },
   { key: 'sms', label: 'Шаблоны SMS' },
   { key: 'billing', label: 'Биллинг' },
@@ -25,6 +27,7 @@ export function SettingsPage() {
       <div className="mt-6">
         {tab === 'branch' && <BranchSettingsTab />}
         {tab === 'staff' && <StaffSettingsTab />}
+        {tab === 'leadAssignment' && <LeadAssignmentTab />}
         {tab === 'directories' && <DirectoriesTab />}
         {tab === 'sms' && <SmsTemplatesTab />}
         {tab === 'billing' && <BillingHistoryTab />}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -8,7 +8,7 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
-import { assignRoundRobinOperator } from '../../lib/leadFunnel.js';
+import { getActiveLeadOperators, assignLeastLoadedOperator } from '../../lib/leadFunnel.js';
 
 const SOURCE_OPTIONS = [
   { value: '', label: 'Не указан' },
@@ -73,13 +73,8 @@ export function StudentFormModal({ student, onClose, onCreated }) {
         showToast('Студент обновлён.');
         onClose();
       } else {
-        const operatorsSnap = await getDocs(
-          query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId), where('role', 'in', ['ceo', 'manager', 'admin'])),
-        );
-        const operatorIds = operatorsSnap.docs
-          .sort((a, b) => (a.data().fullName ?? '').localeCompare(b.data().fullName ?? ''))
-          .map((d) => d.id);
-        const assignedOperator = await assignRoundRobinOperator(db, activeBranchId, operatorIds);
+        const operatorIds = await getActiveLeadOperators(db, activeBranchId);
+        const assignedOperator = await assignLeastLoadedOperator(db, activeBranchId, operatorIds);
         const created = await addDoc(collection(db, 'students'), {
           ...payload,
           branchId: activeBranchId,
