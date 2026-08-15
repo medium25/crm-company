@@ -102,6 +102,9 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
           <p className="text-[15px] text-muted">Дата активации: {formatDate(enrollment.activatedAt)}</p>
         )}
         <p className="text-[15px] text-muted">Стоимость для студента: {formatMoney(enrollment.price)}</p>
+        {enrollment.transferredFromGroupCode && (
+          <p className="text-[15px] text-muted">Переведён из группы {enrollment.transferredFromGroupCode}</p>
+        )}
       </div>
     </div>
   );

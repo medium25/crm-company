@@ -129,6 +129,7 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
         lastChargedMonth: enrollment.lastChargedMonth ?? null,
         isArchived: false,
         transferredFromGroupId: enrollment.groupId,
+        transferredFromGroupCode: enrollment.groupCode,
         createdAt: now,
         createdBy: user.uid,
         updatedAt: now,
