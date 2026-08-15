@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc } from 'firebase/firestore';
-import { Pause, Ghost, CheckCircle, ArrowRightLeft } from 'lucide-react';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { Pause, Ghost, CheckCircle, ArrowRightLeft, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useDoc } from '../../hooks/useDoc.js';
 import { MIN_FREEZE_BALANCE, MAX_FREEZES_PER_STUDENT, canFreezeStudent } from '../../lib/billing.js';
@@ -32,6 +32,24 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
   const freezeDisabledTitle = freezeLimitReached
     ? `Лимит заморозок за весь срок обучения исчерпан (${MAX_FREEZES_PER_STUDENT} из ${MAX_FREEZES_PER_STUDENT})`
     : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`;
+
+  const dismissTransferNote = () => {
+    updateDoc(doc(db, 'enrollments', enrollment.id), { transferNoteDismissed: true, updatedAt: serverTimestamp() });
+  };
+
+  const transferScheduleLabel = enrollment.transferredFromSchedule
+    ? ` (${formatScheduleType(enrollment.transferredFromSchedule.type)} · ${enrollment.transferredFromSchedule.time})`
+    : '';
+  const transferDetails = [
+    enrollment.transferredLessonsCount != null ? `${enrollment.transferredLessonsCount} ур.` : null,
+    enrollment.transferredAt ? formatDate(enrollment.transferredAt) : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const transferNote =
+    enrollment.transferredFromGroupCode && !enrollment.transferNoteDismissed
+      ? `Переведён из ${enrollment.transferredFromGroupCode}${transferScheduleLabel}${transferDetails ? `, ${transferDetails}` : ''}`
+      : null;
 
   return (
     <div className="rounded-card border border-border bg-surface p-5">
@@ -102,6 +120,19 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
           <p className="text-[15px] text-muted">Дата активации: {formatDate(enrollment.activatedAt)}</p>
         )}
         <p className="text-[15px] text-muted">Стоимость для студента: {formatMoney(enrollment.price)}</p>
+        {transferNote && (
+          <div className="mt-1 flex items-center gap-2">
+            <p className="min-w-0 flex-1 truncate text-[13px] text-muted">{transferNote}</p>
+            <button
+              type="button"
+              onClick={dismissTransferNote}
+              aria-label="Скрыть уведомление"
+              className="shrink-0 text-muted hover:text-text"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
