@@ -263,3 +263,32 @@ export function isOperatorWorkingAt(workSchedule, date) {
 export function selectOnShiftOperatorIds(operators, date) {
   return operators.filter((op) => isOperatorWorkingAt(op.workSchedule, date)).map((op) => op.id);
 }
+
+/**
+ * Расписания операторов — settings/{branchId}.operatorSchedules (см. Global
+ * Constraints: живёт на settings, не на staff/{id}, из-за ограничения
+ * firestore.rules на staff.update для admin-роли).
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @returns {Promise<Record<string, Array<{start: string, end: string}|null>>>}
+ */
+export async function getOperatorSchedules(db, branchId) {
+  const snap = await getDoc(doc(db, 'settings', branchId));
+  return snap.data()?.operatorSchedules ?? {};
+}
+
+/**
+ * Назначение лида с учётом расписания: сначала — наименее загруженный среди
+ * операторов, у которых сейчас рабочее время; если таких нет — прежняя
+ * логика дефицита среди ВСЕХ переданных операторов.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @param {Array<{id: string, workSchedule?: Array}>} operators активные операторы с их расписанием
+ * @param {Date} createdAt момент создания лида (может быть в прошлом — лид из Google Sheets)
+ * @returns {Promise<string|null>}
+ */
+export async function assignOperatorForLead(db, branchId, operators, createdAt) {
+  const onShiftIds = selectOnShiftOperatorIds(operators, createdAt);
+  const candidateIds = onShiftIds.length > 0 ? onShiftIds : operators.map((op) => op.id);
+  return assignLeastLoadedOperator(db, branchId, candidateIds);
+}
