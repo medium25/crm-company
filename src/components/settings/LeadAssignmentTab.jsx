@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { collection, doc, query, where, orderBy, setDoc, serverTimestamp, getCountFromServer } from 'firebase/firestore';
-import { Users } from 'lucide-react';
+import { ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -13,6 +13,7 @@ import { EmptyState } from '../ui/EmptyState.jsx';
 import { SkeletonRow } from '../ui/Skeleton.jsx';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { OperatorScheduleModal } from './OperatorScheduleModal.jsx';
+import { OperatorLeadsPanel } from './OperatorLeadsPanel.jsx';
 
 /**
  * Кто получает новых лидов и с каким приоритетом — настройка вместо
@@ -47,6 +48,7 @@ export function LeadAssignmentTab() {
   const [counts, setCounts] = useState({});
   const [savingId, setSavingId] = useState(null);
   const [scheduleTarget, setScheduleTarget] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
     if (!db || staffList.length === 0) return;
@@ -68,8 +70,8 @@ export function LeadAssignmentTab() {
   if (staffLoading || settingsLoading) {
     return (
       <div className="flex flex-col gap-2">
-        <SkeletonRow columns={4} />
-        <SkeletonRow columns={4} />
+        <SkeletonRow columns={5} />
+        <SkeletonRow columns={5} />
       </div>
     );
   }
@@ -121,6 +123,21 @@ export function LeadAssignmentTab() {
       ),
     },
     {
+      key: '__expand',
+      label: '',
+      width: '40px',
+      render: (m) => (
+        <button
+          type="button"
+          onClick={() => setExpandedId((id) => (id === m.id ? null : m.id))}
+          aria-label={expandedId === m.id ? 'Свернуть лиды оператора' : 'Показать лиды оператора'}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+        >
+          {expandedId === m.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+      ),
+    },
+    {
       key: '__actions',
       label: '',
       width: '48px',
@@ -138,6 +155,14 @@ export function LeadAssignmentTab() {
         загруженный среди всех активных.
       </p>
       <Table columns={columns} rows={staffList} />
+      {expandedId && (
+        <OperatorLeadsPanel
+          operator={staffList.find((m) => m.id === expandedId)}
+          operators={staffList.filter((m) => isActive(m.id))}
+          stageOverrides={settingsDoc?.leadStageOverrides}
+          onClose={() => setExpandedId(null)}
+        />
+      )}
       <OperatorScheduleModal
         operator={scheduleTarget}
         schedule={settingsDoc?.operatorSchedules?.[scheduleTarget?.id]}
