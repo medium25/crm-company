@@ -52,8 +52,16 @@ export function pricePerLesson(enrollment, group) {
  * @param {string} [tx.id] explicit ID (списания) — иначе авто
  * @returns {Promise<string>} ID созданной транзакции
  */
+/**
+ * @param {Object} tx
+ * @param {boolean} [tx.affectsBalance] false — не трогает student.balance/
+ *   lastPaymentAt/monthlyBalances (напр. оплата учебных материалов —
+ *   разовый платёж, не долг за курс; recalcBalance тоже это исключает,
+ *   см. ниже). Всё равно пишется в transactions и monthlyRevenue (реальная
+ *   выручка), просто не влияет на баланс студента.
+ */
 export async function writeTransaction(db, tx) {
-  const { id, studentId, amount, month, type, branchId, ...rest } = tx;
+  const { id, studentId, amount, month, type, branchId, affectsBalance = true, ...rest } = tx;
   const batch = writeBatch(db);
   const txRef = id ? doc(db, 'transactions', id) : doc(collection(db, 'transactions'));
 
@@ -63,34 +71,39 @@ export async function writeTransaction(db, tx) {
     month,
     type,
     branchId,
+    affectsBalance,
     ...rest,
     createdAt: serverTimestamp(),
   });
 
-  const studentUpdate = {
-    balance: increment(amount),
-    balanceUpdatedAt: serverTimestamp(),
-  };
-  if (type === 'payment') {
-    studentUpdate.lastPaymentAt = serverTimestamp();
-  }
-  batch.update(doc(db, 'students', studentId), studentUpdate);
-
-  batch.set(
-    doc(db, 'monthlyBalances', `${studentId}_${month}`),
-    {
-      studentId,
-      month,
-      charges: increment(amount < 0 ? amount : 0),
-      payments: increment(amount > 0 ? amount : 0),
+  if (affectsBalance) {
+    const studentUpdate = {
       balance: increment(amount),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+      balanceUpdatedAt: serverTimestamp(),
+    };
+    if (type === 'payment') {
+      studentUpdate.lastPaymentAt = serverTimestamp();
+    }
+    batch.update(doc(db, 'students', studentId), studentUpdate);
+
+    batch.set(
+      doc(db, 'monthlyBalances', `${studentId}_${month}`),
+      {
+        studentId,
+        month,
+        charges: increment(amount < 0 ? amount : 0),
+        payments: increment(amount > 0 ? amount : 0),
+        balance: increment(amount),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
 
   // График выручки дашборда читает предпосчитанный агрегат, а не всю
   // коллекцию transactions — только реальные оплаты, не списания/сторно.
+  // Материалы (affectsBalance:false) сюда всё равно попадают — это
+  // реальная полученная выручка, просто не долг за курс.
   if (type === 'payment' && branchId) {
     batch.set(
       doc(db, 'monthlyRevenue', `${branchId}_${month}`),
@@ -293,6 +306,43 @@ export async function recordPayment(db, { student, branchId, amount, method, dat
 }
 
 /**
+ * Оплата учебных материалов (книги и т.п.) — разовый платёж, не долг за
+ * курс: не трогает student.balance/lastPaymentAt/firstPaymentAt, не двигает
+ * воронку лида. Попадает в transactions (affectsBalance:false) и в общую
+ * выручку (monthlyRevenue/список платежей в «Финансы») — реальные деньги,
+ * просто не про обучение. См. lib/billing.js writeTransaction.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {{student: Object, branchId: string, amount: number, method: string, date: Date, comment?: string}} ctx
+ * @param {{uid: string, fullName: string}} user
+ * @returns {Promise<string>}
+ */
+export async function recordMaterialPayment(db, { student, branchId, amount, method, date, comment }, user) {
+  return writeTransaction(db, {
+    branchId,
+    studentId: student.id,
+    studentName: student.fullName,
+    enrollmentId: null,
+    groupId: null,
+    groupCode: null,
+    teacherId: null,
+    teacherName: null,
+    type: 'payment',
+    category: 'materials',
+    affectsBalance: false,
+    amount: Math.abs(amount),
+    method,
+    date: Timestamp.fromDate(date),
+    month: format(date, 'yyyy-MM'),
+    comment: comment ?? '',
+    periodFrom: null,
+    periodTo: null,
+    lessonsCount: null,
+    createdBy: user.uid,
+    createdByName: user.fullName,
+  });
+}
+
+/**
  * Ручное списание — только `owner`/`accountant`.
  * @param {import('firebase/firestore').Firestore} db
  * @param {{student: Object, branchId: string, amount: number, comment: string, date: Date}} ctx
@@ -414,12 +464,12 @@ export async function updateTransaction(db, original, { amount, comment, date },
  * @returns {Promise<void>}
  */
 export async function deleteTransaction(db, original) {
-  const { id, studentId, amount, month, type, branchId } = original;
+  const { id, studentId, amount, month, type, branchId, affectsBalance = true } = original;
   const batch = writeBatch(db);
 
   batch.delete(doc(db, 'transactions', id));
 
-  if (studentId) {
+  if (studentId && affectsBalance) {
     batch.update(doc(db, 'students', studentId), {
       balance: increment(-amount),
       balanceUpdatedAt: serverTimestamp(),
@@ -461,7 +511,11 @@ export async function deleteTransaction(db, original) {
  */
 export async function recalcBalance(db, studentId) {
   const snap = await getDocs(query(collection(db, 'transactions'), where('studentId', '==', studentId)));
-  const total = snap.docs.reduce((sum, d) => sum + d.data().amount, 0);
+  // affectsBalance отсутствует на старых транзакциях (до введения оплаты
+  // материалов) — трактуем как true, исключаем только явное false.
+  const total = snap.docs
+    .filter((d) => d.data().affectsBalance !== false)
+    .reduce((sum, d) => sum + d.data().amount, 0);
   await updateDoc(doc(db, 'students', studentId), { balance: total, balanceUpdatedAt: serverTimestamp() });
   return total;
 }

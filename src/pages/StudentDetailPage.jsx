@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collection, doc, query, where, orderBy, updateDoc, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
-import { ArrowLeft, Pencil, Mail, Archive, History, Flag, FolderPlus, Wallet, CircleUserRound, RefreshCw, Trash2, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Pencil, Mail, Archive, History, Flag, FolderPlus, Wallet, CircleUserRound, RefreshCw, Trash2, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useRole } from '../hooks/useRole.js';
@@ -27,6 +27,7 @@ import { TransferGroupModal } from '../components/students/TransferGroupModal.js
 import { UnfreezeEnrollmentModal } from '../components/students/UnfreezeEnrollmentModal.jsx';
 import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
 import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
+import { MaterialPaymentModal } from '../components/students/MaterialPaymentModal.jsx';
 import { ManualChargeModal } from '../components/students/ManualChargeModal.jsx';
 import { EditChargeModal } from '../components/students/EditChargeModal.jsx';
 import { CommentsTab } from '../components/shared/CommentsTab.jsx';
@@ -90,6 +91,7 @@ export function StudentDetailPage() {
   const [archiving, setArchiving] = useState(false);
   const [note, setNote] = useState('');
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [materialPaymentOpen, setMaterialPaymentOpen] = useState(false);
   const [manualChargeOpen, setManualChargeOpen] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -249,11 +251,16 @@ export function StudentDetailPage() {
             <Badge variant="group-code">{branchName}</Badge>
           </div>
 
-          <div className="flex w-fit items-stretch overflow-hidden rounded-full border border-navy">
+          {/* overflow-hidden тут раньше клипал выпадающее меню DropdownMenu
+              (оно absolute-позиционировано внутри этого же контейнера) — меню
+              открывалось логически, но было визуально обрезано скруглённой
+              «таблеткой». Форма пилюли теперь — rounded-l-full/rounded-r-full
+              на самих кнопках, без overflow-hidden на обёртке. */}
+          <div className="flex w-fit items-stretch rounded-full border border-navy">
             <button
               type="button"
               onClick={() => setAddToGroupOpen(true)}
-              className="flex items-center gap-2 px-4 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+              className="flex items-center gap-2 rounded-l-full px-4 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
             >
               <FolderPlus className="h-4 w-4" /> Добавить в группу
             </button>
@@ -265,17 +272,17 @@ export function StudentDetailPage() {
               ]}
             />
           </div>
-          <div className="flex w-fit items-stretch overflow-hidden rounded-full border border-navy">
+          <div className="flex w-fit items-stretch rounded-full border border-navy">
             <button
               type="button"
               onClick={() => setPaymentOpen(true)}
-              className="flex items-center gap-2 px-4 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+              className="flex items-center gap-2 rounded-l-full px-4 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
             >
               <Wallet className="h-4 w-4" /> Добавить оплату
             </button>
             <DropdownMenu
               variant="chevron"
-              items={[{ label: 'Оплата', onClick: () => setPaymentOpen(true) }]}
+              items={[{ label: 'Оплата учебных материалов', onClick: () => setMaterialPaymentOpen(true) }]}
             />
           </div>
           {isAdmin && (
@@ -475,6 +482,7 @@ export function StudentDetailPage() {
         onClose={() => setActivateTarget(null)}
       />
       <AddPaymentModal open={paymentOpen} student={student} enrollments={enrollments} onClose={() => setPaymentOpen(false)} />
+      <MaterialPaymentModal open={materialPaymentOpen} student={student} onClose={() => setMaterialPaymentOpen(false)} />
       {isAdmin && (
         <>
           <ManualChargeModal open={manualChargeOpen} student={student} onClose={() => setManualChargeOpen(false)} />

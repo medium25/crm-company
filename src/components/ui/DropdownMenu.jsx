@@ -44,7 +44,7 @@ export function DropdownMenu({ items, variant = 'icon', icon: Icon, ariaLabel })
         onClick={() => setOpen((v) => !v)}
         className={
           variant === 'chevron'
-            ? 'flex h-11 w-9 items-center justify-center border-l border-navy text-navy hover:bg-orange-soft/40'
+            ? 'flex h-11 w-9 items-center justify-center rounded-r-full border-l border-navy text-navy hover:bg-orange-soft/40'
             : 'flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt'
         }
         aria-label={ariaLabel ?? 'Действия'}
