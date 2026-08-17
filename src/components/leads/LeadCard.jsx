@@ -435,21 +435,22 @@ export function LeadCard({
         </p>
       )}
 
-      <div className="flex items-center justify-end border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
+        {operatorLabel ? (
+          <span
+            className="truncate rounded-badge px-1.5 py-0.5 text-[9px] font-bold text-white"
+            style={{ backgroundColor: operatorColor || '#8B94A3' }}
+          >
+            {operatorLabel}
+          </span>
+        ) : (
+          <span />
+        )}
         <div className="flex shrink-0 items-center gap-0.5">
           {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
           <DropdownMenu items={menuItems} />
         </div>
       </div>
-
-      {operatorLabel && (
-        <span
-          className="self-end truncate rounded-badge px-1.5 py-0.5 text-[9px] font-bold text-white"
-          style={{ backgroundColor: operatorColor || '#8B94A3' }}
-        >
-          {operatorLabel}
-        </span>
-      )}
     </div>
   );
 }
