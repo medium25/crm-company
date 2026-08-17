@@ -151,13 +151,13 @@ function EditableStageTitle({ column, onEdit }) {
 /**
  * Свёрнутая/развёрнутая папка карточек внутри колонки — только для
  * «Пробный назначен» (см. groupLeadsByTrialDay ниже), где карточек может
- * скопиться много и полезно свернуть то, что не сегодня/завтра. Пустая
- * группа не рендерится вовсе.
+ * скопиться много и полезно свернуть то, что не сегодня/завтра. Рендерится
+ * всегда, даже пустой — «Завтра» без карточек всё равно должна быть видна,
+ * а не пропадать из списка.
  * @param {{title: string, leads: Array<Object>, operatorByUid: Map, cardActions: Object}} props
  */
 function LeadGroup({ title, leads, operatorByUid, cardActions }) {
   const [open, setOpen] = useState(true);
-  if (leads.length === 0) return null;
 
   return (
     <div className="rounded-field border border-border bg-surface">
@@ -174,10 +174,14 @@ function LeadGroup({ title, leads, operatorByUid, cardActions }) {
       </button>
       {open && (
         <div className="space-y-2 border-t border-border p-2">
-          {leads.map((lead) => {
-            const op = operatorByUid.get(lead.assignedOperator);
-            return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
-          })}
+          {leads.length === 0 ? (
+            <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
+          ) : (
+            leads.map((lead) => {
+              const op = operatorByUid.get(lead.assignedOperator);
+              return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
+            })
+          )}
         </div>
       )}
     </div>
