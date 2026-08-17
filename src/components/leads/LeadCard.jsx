@@ -1,11 +1,87 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle, PhoneOff, Info } from 'lucide-react';
+import { collection, addDoc, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
+import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle, PhoneOff, Info, MessageSquare } from 'lucide-react';
+import { db } from '../../firebase.js';
+import { useAuth } from '../../hooks/useAuth.js';
+import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, stageDeadline, overdueReasonLabel, callScheduleHint, isTrialDay, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDate, formatDateTime, formatDateTimeShort } from '../../lib/format.js';
+
+/**
+ * Компактная лента комментариев лида, разворачивается прямо в карточке.
+ * Та же коллекция `comments` (entityType/entityId), что и CommentsTab у
+ * студента/группы, но своя вёрстка — под тесную карточку в канбане, ввод
+ * одной строкой («командная строка»), без textarea и большой кнопки.
+ */
+function LeadCommentsPanel({ leadId }) {
+  const { user, staff } = useAuth();
+  const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const commentsQuery = useMemo(
+    () =>
+      db
+        ? query(collection(db, 'comments'), where('entityType', '==', 'lead'), where('entityId', '==', leadId), orderBy('createdAt', 'desc'))
+        : null,
+    [leadId],
+  );
+  const { data: comments, loading } = useCollection(commentsQuery);
+
+  const submit = async () => {
+    const value = text.trim();
+    if (!value || saving) return;
+    setSaving(true);
+    try {
+      await addDoc(collection(db, 'comments'), {
+        entityType: 'lead',
+        entityId: leadId,
+        text: value,
+        authorId: user.uid,
+        authorName: staff?.fullName ?? '',
+        createdAt: serverTimestamp(),
+      });
+      setText('');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-1.5 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-40 space-y-1.5 overflow-y-auto">
+        {loading && <p className="text-[12px] text-muted">Загрузка…</p>}
+        {!loading && comments.length === 0 && <p className="text-[12px] text-muted">Пока нет комментариев</p>}
+        {comments.map((c) => (
+          <div key={c.id} className="text-[12px]">
+            <span className="font-bold text-text">{c.authorName}</span>{' '}
+            <span className="text-muted">{formatDateTime(c.createdAt)}</span>
+            <p className="whitespace-pre-wrap text-text">{c.text}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex items-center gap-1 rounded-field border border-border-strong bg-surface-alt px-2 py-1">
+        <span className="shrink-0 font-mono text-[13px] text-muted">&gt;</span>
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            e.stopPropagation();
+            submit();
+          }}
+          placeholder="Написать комментарий…"
+          disabled={saving}
+          className="min-w-0 flex-1 bg-transparent font-mono text-[13px] text-text placeholder:text-muted focus:outline-none"
+        />
+      </div>
+    </div>
+  );
+}
 
 const ENGAGEMENT_OPTIONS = [
   { value: 'low', label: 'Низкая' },
@@ -312,6 +388,7 @@ export function LeadCard({
   const isTerminal = stage === 'won' || stage === 'lost';
   const attempts = lead.callAttempts ?? [];
   const operatorLabel = (operatorName ?? '').split(' ')[0];
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   const createdAt = lead.createdAt?.toDate?.();
   const trialDateJs = lead.trialDate?.toDate?.();
@@ -447,10 +524,20 @@ export function LeadCard({
           <span />
         )}
         <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setCommentsOpen((v) => !v)}
+            aria-label="Комментарии"
+            className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${commentsOpen ? 'text-navy' : 'text-muted'}`}
+          >
+            <MessageSquare className="h-4 w-4" />
+          </button>
           {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
           <DropdownMenu items={menuItems} />
         </div>
       </div>
+
+      {commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
     </div>
   );
 }
