@@ -34,6 +34,11 @@ export function LeadsPage() {
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const { user, staff } = useAuth();
+  // Ceo/manager видят все заявки филиала по умолчанию, с кнопкой
+  // переключения на «только мои»; остальные роли (admin/teacher) всегда
+  // видят только назначенные лично им — без кнопки, переключать нечего.
+  const canSeeAllLeads = staff?.role === 'ceo' || staff?.role === 'manager';
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
 
   // Форс-перерисовка раз в минуту — иначе просроченный SLA-бейдж не
   // появится сам по себе (Firestore не «уведомляет» о течении времени).
@@ -82,12 +87,14 @@ export function LeadsPage() {
   // рендерится в этом списке.
   const leads = useMemo(() => {
     const cutoff = Date.now() - WON_LOST_VISIBLE_DAYS * 86_400_000;
+    const scopedToSelf = !canSeeAllLeads || showOnlyMine;
     return allLeads.filter((l) => {
+      if (scopedToSelf && l.assignedOperator !== user.uid) return false;
       if (!TERMINAL_STAGES.includes(columnKeyOf(l))) return true;
       const at = (l.paidAt ?? l.lostAt ?? l.updatedAt)?.toDate?.();
       return at ? at.getTime() >= cutoff : true;
     });
-  }, [allLeads]);
+  }, [allLeads, canSeeAllLeads, showOnlyMine, user.uid]);
 
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
@@ -301,9 +308,30 @@ export function LeadsPage() {
       <PageHeader
         title="Заявки"
         actions={
-          <Button onClick={openAddForm}>
-            <Plus className="h-4 w-4" /> Добавить лида
-          </Button>
+          <div className="flex items-center gap-3">
+            {canSeeAllLeads && (
+              <div className="flex gap-1 rounded-full bg-surface-alt p-1">
+                {[
+                  { value: false, label: 'Все' },
+                  { value: true, label: 'Только мои' },
+                ].map((t) => (
+                  <button
+                    key={String(t.value)}
+                    type="button"
+                    onClick={() => setShowOnlyMine(t.value)}
+                    className={`rounded-full px-3 py-1.5 text-[13px] ${
+                      showOnlyMine === t.value ? 'bg-navy text-white' : 'text-muted'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button onClick={openAddForm}>
+              <Plus className="h-4 w-4" /> Добавить лида
+            </Button>
+          </div>
         }
       />
       <div className="flex gap-4 overflow-x-auto pb-2">
