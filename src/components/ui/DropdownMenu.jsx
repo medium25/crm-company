@@ -25,8 +25,11 @@ const MARGIN = 8;
  * @param {'icon'|'chevron'} [props.variant]
  * @param {import('react').ComponentType} [props.icon] переопределяет иконку триггера (по умолчанию MoreVertical/ChevronDown по variant)
  * @param {string} [props.ariaLabel] переопределяет aria-label триггера (по умолчанию «Действия»)
+ * @param {(opts: {ref: import('react').Ref, toggle: () => void}) => import('react').ReactNode} [props.trigger]
+ *   полностью свой триггер вместо кнопки-иконки по умолчанию — тот же портал/позиционирование/
+ *   закрытие по клику вне, но снаружи выглядит как угодно (напр. точка попытки дозвона).
  */
-export function DropdownMenu({ items, variant = 'icon', icon: Icon, ariaLabel }) {
+export function DropdownMenu({ items, variant = 'icon', icon: Icon, ariaLabel, trigger }) {
   const [open, setOpen] = useState(false);
   const [style, setStyle] = useState(null);
   const triggerRef = useRef(null);
@@ -77,19 +80,23 @@ export function DropdownMenu({ items, variant = 'icon', icon: Icon, ariaLabel })
   return (
     <>
       <div onClick={(e) => e.stopPropagation()}>
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className={
-            variant === 'chevron'
-              ? 'flex h-11 w-9 items-center justify-center rounded-r-full border-l border-navy text-navy hover:bg-orange-soft/40'
-              : 'flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt'
-          }
-          aria-label={ariaLabel ?? 'Действия'}
-        >
-          <TriggerIcon className="h-4 w-4" />
-        </button>
+        {trigger ? (
+          trigger({ ref: triggerRef, toggle: () => setOpen((v) => !v) })
+        ) : (
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className={
+              variant === 'chevron'
+                ? 'flex h-11 w-9 items-center justify-center rounded-r-full border-l border-navy text-navy hover:bg-orange-soft/40'
+                : 'flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt'
+            }
+            aria-label={ariaLabel ?? 'Действия'}
+          >
+            <TriggerIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
       {open &&
         createPortal(

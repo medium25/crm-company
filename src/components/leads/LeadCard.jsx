@@ -109,26 +109,29 @@ function trialScheduleLabel(lead) {
 const MAX_ATTEMPTS = 5;
 const UNREACHABLE_MAX_ATTEMPTS = 3;
 
-/** Ряд из 5 точек — попытки дозвона, см. 2026-08-12-lead-card-call-attempts-design.md. */
+/** Триггер-точка попытки — общий для CallAttemptDots и TrialUnreachableBlock. */
+function AttemptDot({ ref, toggle, ariaLabel }) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={toggle}
+      aria-label={ariaLabel}
+      className="flex h-4 w-4 items-center justify-center text-border hover:text-navy"
+    >
+      <Circle className="h-4 w-4" />
+    </button>
+  );
+}
+
+/**
+ * Ряд из 5 точек — попытки дозвона, см. 2026-08-12-lead-card-call-attempts-design.md.
+ * Меню выбора результата — через DropdownMenu (портал, `position: fixed`) —
+ * точка попытки лежит у левого края узкой карточки в канбане, обычный
+ * absolute-попап вылезал за край карточки и обрезался/наезжал на соседнюю
+ * колонку.
+ */
 function CallAttemptDots({ attempts, onMark }) {
-  const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    const onKeyDown = (e) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onClickOutside);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onClickOutside);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
   const isCold = attempts.length === MAX_ATTEMPTS && attempts.every((a) => a.result === 'fail');
   const hint = callScheduleHint(attempts);
 
@@ -143,45 +146,16 @@ function CallAttemptDots({ attempts, onMark }) {
           }
           if (i === attempts.length) {
             return (
-              <div key={i} ref={ref} className="relative">
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => setOpen((v) => !v)}
-                  aria-label={`Попытка ${i + 1}: отметить результат звонка`}
-                  className="flex h-4 w-4 items-center justify-center text-border hover:text-navy disabled:opacity-50"
-                >
-                  <Circle className="h-4 w-4" />
-                </button>
-                {open && (
-                  <div className="absolute left-1/2 top-6 z-10 w-40 -translate-x-1/2 rounded-field border border-border bg-surface py-1 shadow-hover">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setOpen(false);
-                        setPending(true);
-                        await onMark('success');
-                        setPending(false);
-                      }}
-                      className="block w-full px-3 py-1.5 text-left text-[13px] text-text hover:bg-surface-alt"
-                    >
-                      ✓ Успешно
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setOpen(false);
-                        setPending(true);
-                        await onMark('fail');
-                        setPending(false);
-                      }}
-                      className="block w-full px-3 py-1.5 text-left text-[13px] text-danger hover:bg-surface-alt"
-                    >
-                      ✕ Не успешно
-                    </button>
-                  </div>
+              <DropdownMenu
+                key={i}
+                items={[
+                  { label: '✓ Успешно', onClick: () => onMark('success') },
+                  { label: '✕ Не успешно', danger: true, onClick: () => onMark('fail') },
+                ]}
+                trigger={({ ref, toggle }) => (
+                  <AttemptDot ref={ref} toggle={toggle} ariaLabel={`Попытка ${i + 1}: отметить результат звонка`} />
                 )}
-              </div>
+              />
             );
           }
           return <Circle key={i} className="h-4 w-4 text-border" />;
@@ -294,18 +268,6 @@ function LeadInfoPopover({ question, answer }) {
 function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
   const attempts = lead.unreachableAttempts ?? [];
   const [active, setActive] = useState(attempts.length > 0);
-  const [openIndex, setOpenIndex] = useState(null);
-  const [pending, setPending] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (openIndex === null) return;
-    const onClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpenIndex(null);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [openIndex]);
 
   if (!active) {
     return (
@@ -323,10 +285,7 @@ function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
   const failStreak = attempts.filter((a) => a.result === 'fail').length;
 
   const pick = async (result) => {
-    setOpenIndex(null);
-    setPending(true);
     await onMark(result);
-    setPending(false);
     if (result === 'reschedule') onReschedule();
   };
 
@@ -340,37 +299,14 @@ function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
         }
         if (i !== attempts.length) return <Circle key={i} className="h-4 w-4 text-border" />;
         return (
-          <div key={i} ref={ref} className="relative">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => setOpenIndex(i)}
-              aria-label={`Попытка ${i + 1}: связаться`}
-              className="flex h-4 w-4 items-center justify-center text-border hover:text-navy disabled:opacity-50"
-            >
-              <Circle className="h-4 w-4" />
-            </button>
-            {openIndex === i && (
-              <div className="absolute left-1/2 top-6 z-10 w-40 -translate-x-1/2 rounded-field border border-border bg-surface py-1 shadow-hover">
-                {!rescheduleUsed && (
-                  <button
-                    type="button"
-                    onClick={() => pick('reschedule')}
-                    className="block w-full px-3 py-1.5 text-left text-[13px] text-text hover:bg-surface-alt"
-                  >
-                    Перенос
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => pick('fail')}
-                  className="block w-full px-3 py-1.5 text-left text-[13px] text-danger hover:bg-surface-alt"
-                >
-                  Неуспешно
-                </button>
-              </div>
-            )}
-          </div>
+          <DropdownMenu
+            key={i}
+            items={[
+              ...(rescheduleUsed ? [] : [{ label: 'Перенос', onClick: () => pick('reschedule') }]),
+              { label: 'Неуспешно', danger: true, onClick: () => pick('fail') },
+            ]}
+            trigger={({ ref, toggle }) => <AttemptDot ref={ref} toggle={toggle} ariaLabel={`Попытка ${i + 1}: связаться`} />}
+          />
         );
       })}
       {failStreak >= UNREACHABLE_MAX_ATTEMPTS && (
@@ -531,7 +467,7 @@ export function LeadCard({
               checked={Boolean(lead.callReminderDone)}
               onChange={(e) => onToggleCallReminder(lead, e.target.checked)}
             />
-            Напомнить через звонок
+            {lead.callReminderDone ? 'Напомнили через звонок' : 'Напомнить через звонок'}
           </label>
         </div>
       )}
