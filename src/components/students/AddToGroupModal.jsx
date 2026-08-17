@@ -109,11 +109,17 @@ export function AddToGroupModal({ open, student, onClose }) {
       // Лид, добавленный в группу напрямую (минуя «Пришёл» → оплату на
       // доске «Заявки»), иначе навсегда зависает карточкой в своей стадии
       // воронки — funnelStage тут никогда бы не сдвинулся сам. Закрываем
-      // воронку сразу же, раз студент фактически уже не лид.
+      // воронку сразу же, раз студент фактически уже не лид — но «Оплачено»
+      // ставим, только если оплата и правда была (firstPaymentAt), иначе
+      // это враньё на доске. Без оплаты — «Дожим»: студент уже учится,
+      // но платёж всё ещё нужно выбить.
       if (NON_TERMINAL_STAGES.includes(student.funnelStage)) {
+        const hasPaid = Boolean(student.firstPaymentAt);
+        const nextStage = hasPaid ? 'won' : 'closing';
         await updateDoc(doc(db, 'students', student.id), {
-          funnelStage: 'won',
-          stageHistory: [...(student.stageHistory ?? []), { stage: 'won', enteredAt: new Date() }],
+          funnelStage: nextStage,
+          stageHistory: [...(student.stageHistory ?? []), { stage: nextStage, enteredAt: new Date() }],
+          ...(hasPaid ? { paidAt: student.paidAt ?? student.firstPaymentAt } : {}),
           updatedAt: now,
           updatedBy: user.uid,
         });
