@@ -45,13 +45,19 @@ export function formatMoneySigned(amount) {
 }
 
 /**
- * @param {string} phone цифры без плюса, напр. "998940189956"
+ * В Узбекистане номер можно указать с кодом страны (12 цифр, "998" + 9
+ * цифр) или без него (9 цифр локального номера). Локальный номер может
+ * САМ начинаться на "99" (оператор Uzmobile/UMS) — тогда 9-значная строка
+ * тоже стартует с "998", как и настоящий код страны. Отличаем их по длине:
+ * длина 12 — код страны, срезаем; длина 9 (в т.ч. с "99..." внутри) —
+ * это уже полный локальный номер, не трогаем.
+ * @param {string} phone цифры без плюса, напр. "998940189956" или "998292289"
  * @returns {string} "94 018 99 56"
  */
 export function formatPhone(phone) {
   if (!phone) return '';
   const digits = phone.replace(/\D/g, '');
-  const local = digits.startsWith('998') ? digits.slice(3) : digits.slice(-9);
+  const local = digits.length === 12 && digits.startsWith('998') ? digits.slice(3) : digits.slice(-9);
   const m = local.match(/^(\d{2})(\d{3})(\d{2})(\d{2})$/);
   return m ? `${m[1]} ${m[2]} ${m[3]} ${m[4]}` : local;
 }
