@@ -382,6 +382,8 @@ export function LeadCard({
         </div>
       </div>
 
+      <span className="text-[12px] text-muted">{formatDateTimeShort(lead.createdAt)}</span>
+
       {(stage === 'new' || stage === 'calling') && (
         <div onClick={(e) => e.stopPropagation()}>
           <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} />
@@ -433,8 +435,7 @@ export function LeadCard({
         </p>
       )}
 
-      <div className="flex items-center justify-between border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
-        <span className="text-[12px] text-muted">{formatDateTimeShort(lead.createdAt)}</span>
+      <div className="flex items-center justify-end border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
         <div className="flex shrink-0 items-center gap-0.5">
           {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
           <DropdownMenu items={menuItems} />
