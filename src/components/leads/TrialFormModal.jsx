@@ -16,7 +16,7 @@ import {
   format,
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -40,13 +40,17 @@ const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 function TrialCalendar({ value, onChange }) {
   const selected = useMemo(() => parseISO(value), [value]);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(selected));
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     setViewMonth(startOfMonth(selected));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  const pick = (d) => onChange(format(d, 'yyyy-MM-dd'));
+  const pick = (d) => {
+    onChange(format(d, 'yyyy-MM-dd'));
+    setOpen(false);
+  };
 
   const today = useMemo(() => new Date(), []);
   const quickDays = [
@@ -86,50 +90,62 @@ function TrialCalendar({ value, onChange }) {
         ))}
       </div>
 
-      <div className="rounded-field border border-border-strong p-2.5">
-        <div className="mb-2 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setViewMonth((m) => subMonths(m, 1))}
-            aria-label="Предыдущий месяц"
-            className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-[13px] font-bold capitalize text-text">{format(viewMonth, 'LLLL yyyy', { locale: ru })}</span>
-          <button
-            type="button"
-            onClick={() => setViewMonth((m) => addMonths(m, 1))}
-            aria-label="Следующий месяц"
-            className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-11 items-center gap-2 rounded-field border border-border-strong px-3 text-[15px] text-text hover:bg-surface-alt"
+      >
+        <Calendar className="h-4 w-4 shrink-0 text-muted" />
+        <span className="flex-1 text-left capitalize">{format(selected, 'd MMMM yyyy, EEEE', { locale: ru })}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="rounded-field border border-border-strong p-2.5">
+          <div className="mb-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setViewMonth((m) => subMonths(m, 1))}
+              aria-label="Предыдущий месяц"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-[13px] font-bold capitalize text-text">{format(viewMonth, 'LLLL yyyy', { locale: ru })}</span>
+            <button
+              type="button"
+              onClick={() => setViewMonth((m) => addMonths(m, 1))}
+              aria-label="Следующий месяц"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-0.5 pb-1 text-center text-[11px] text-muted">
+            {WEEKDAY_LABELS.map((d) => (
+              <span key={d}>{d}</span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-0.5">
+            {days.map((d) => {
+              const inMonth = isSameMonth(d, viewMonth);
+              const selectedDay = isSameDay(d, selected);
+              return (
+                <button
+                  key={d.toISOString()}
+                  type="button"
+                  onClick={() => pick(d)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] ${
+                    selectedDay ? 'bg-navy font-bold text-white' : inMonth ? 'text-text hover:bg-surface-alt' : 'text-border hover:bg-surface-alt'
+                  } ${isToday(d) && !selectedDay ? 'ring-1 ring-navy/40' : ''}`}
+                >
+                  {format(d, 'd')}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="grid grid-cols-7 gap-0.5 pb-1 text-center text-[11px] text-muted">
-          {WEEKDAY_LABELS.map((d) => (
-            <span key={d}>{d}</span>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-0.5">
-          {days.map((d) => {
-            const inMonth = isSameMonth(d, viewMonth);
-            const selectedDay = isSameDay(d, selected);
-            return (
-              <button
-                key={d.toISOString()}
-                type="button"
-                onClick={() => pick(d)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] ${
-                  selectedDay ? 'bg-navy font-bold text-white' : inMonth ? 'text-text hover:bg-surface-alt' : 'text-border hover:bg-surface-alt'
-                } ${isToday(d) && !selectedDay ? 'ring-1 ring-navy/40' : ''}`}
-              >
-                {format(d, 'd')}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
