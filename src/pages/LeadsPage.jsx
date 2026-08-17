@@ -301,26 +301,27 @@ export function LeadsPage() {
   };
 
   return (
-    <>
+    <div>
       {canSeeAllLeads && (
-        <div className="mb-2 flex justify-end">
-          <div className="flex gap-1 rounded-full bg-surface-alt p-1">
-            {[
-              { value: false, label: 'Все' },
-              { value: true, label: 'Только мои' },
-            ].map((t) => (
-              <button
-                key={String(t.value)}
-                type="button"
-                onClick={() => setShowOnlyMine(t.value)}
-                className={`rounded-full px-3 py-1.5 text-[13px] ${
-                  showOnlyMine === t.value ? 'bg-navy text-white' : 'text-muted'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+        // fixed в угол экрана — не участвует в потоке страницы (колонки
+        // начинаются сразу сверху) и не переезжает поверх шапок колонок
+        // при горизонтальном скролле доски, в отличие от absolute сверху.
+        <div className="fixed bottom-4 right-4 z-10 flex gap-1 rounded-full bg-surface-alt p-1 shadow-hover">
+          {[
+            { value: false, label: 'Все' },
+            { value: true, label: 'Только мои' },
+          ].map((t) => (
+            <button
+              key={String(t.value)}
+              type="button"
+              onClick={() => setShowOnlyMine(t.value)}
+              className={`rounded-full px-3 py-1.5 text-[13px] ${
+                showOnlyMine === t.value ? 'bg-navy text-white' : 'text-muted'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       )}
       <div className="flex gap-4 overflow-x-auto pb-2">
@@ -347,6 +348,6 @@ export function LeadsPage() {
       <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
       <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
-    </>
+    </div>
   );
 }
