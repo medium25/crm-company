@@ -192,7 +192,10 @@ export function LeadsPage() {
       showToast('Нельзя вернуть лида на предыдущую стадию.', { type: 'error' });
       return;
     }
-    if (stageKey === 'lost') return; // этот переход — только через DeclineLeadModal (нужна причина), не drag
+    if (stageKey === 'lost') {
+      setDeclineTarget(lead); // нужна причина из фиксированного списка — открываем ту же форму, что и «⋮»
+      return;
+    }
     if (stageKey === 'trial_scheduled') {
       setTrialTarget({ lead, mode: 'schedule' }); // нужна дата/время/учитель — открываем ту же форму, что и «⋮»
       return;
