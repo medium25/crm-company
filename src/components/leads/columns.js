@@ -146,9 +146,10 @@ export function columnKeyOf(lead) {
 }
 
 /**
- * Разрешён ли переход `from → to`: только вперёд по FORWARD_ORDER (можно
- * пропускать стадии), либо в 'lost' из любой нетерминальной стадии.
- * 'won'/'lost' — терминальные, из них переходов нет вовсе.
+ * Разрешён ли переход `from → to`: строго на следующую стадию по
+ * FORWARD_ORDER (пропускать нельзя — каждая стадия обязательна: дозвон,
+ * назначение пробного, сам пробный, дожим), либо в 'lost' из любой
+ * нетерминальной стадии. 'won'/'lost' — терминальные, из них переходов нет.
  * @param {string} from
  * @param {string} to
  * @returns {boolean}
@@ -158,5 +159,5 @@ export function isForwardAllowed(from, to) {
   if (to === 'lost') return true;
   const fromIndex = FORWARD_ORDER.indexOf(from);
   const toIndex = FORWARD_ORDER.indexOf(to);
-  return toIndex > fromIndex;
+  return toIndex === fromIndex + 1;
 }
