@@ -191,17 +191,17 @@ function OverdueBadge({ reason, deadline }) {
   }, [open]);
 
   return (
-    <div ref={ref} onClick={(e) => e.stopPropagation()}>
+    <div ref={ref} className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Причина просрочки"
-        className="absolute -right-1.5 -top-2 rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger"
+        className="rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger"
       >
         Просрочено
       </button>
       {open && (
-        <div className="absolute inset-x-2.5 top-7 z-20 rounded-field border border-border bg-surface p-3 shadow-hover">
+        <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-field border border-border bg-surface p-3 shadow-hover">
           <p className="text-[13px] font-bold leading-snug text-text">{reason}</p>
           {deadline && <p className="mt-1 text-[11px] leading-snug text-muted">Срок был до {deadline}</p>}
         </div>
@@ -428,14 +428,16 @@ export function LeadCard({
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
       } ${overdue ? 'border-danger ring-1 ring-danger/40' : ''} ${priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''}`}
     >
-      {overdue && (
-        <OverdueBadge
-          reason={overdueReasonLabel(lead)}
-          deadline={deadline ? format(deadline, 'dd.MM.yyyy HH:mm', { locale: ru }) : null}
-        />
-      )}
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
+          {overdue && (
+            <OverdueBadge
+              reason={overdueReasonLabel(lead)}
+              deadline={deadline ? format(deadline, 'dd.MM.yyyy HH:mm', { locale: ru }) : null}
+            />
+          )}
+        </div>
         <div className="flex shrink-0 items-center gap-1">
           {trialConfirmAtRisk && <PhoneOff className="h-3.5 w-3.5 text-orange" aria-label="Не берёт трубку — подтверждение пробного" />}
           {lead.russianLevel && (
