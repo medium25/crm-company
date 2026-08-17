@@ -10,6 +10,8 @@ import { Skeleton } from '../ui/Skeleton.jsx';
 import { TagListEditor } from './TagListEditor.jsx';
 import { PAYMENT_METHOD_OPTIONS as PAYMENT_METHODS } from '../../lib/format.js';
 
+const DEFAULT_TRIAL_TIME_SLOTS = ['09:00', '10:30', '14:00', '15:30', '17:00', '18:30', '20:00'];
+
 /**
  * Настройки → Справочники: методы оплаты, источники лидов, причины ухода,
  * праздники — все живут в одном документе `settings/{branchId}` (раздел 02).
@@ -26,6 +28,7 @@ export function DirectoriesTab() {
   const [leadSources, setLeadSources] = useState([]);
   const [leaveReasons, setLeaveReasons] = useState([]);
   const [holidays, setHolidays] = useState([]);
+  const [trialTimeSlots, setTrialTimeSlots] = useState([]);
 
   useEffect(() => {
     if (!settings) return;
@@ -33,6 +36,7 @@ export function DirectoriesTab() {
     setLeadSources(settings.leadSources ?? []);
     setLeaveReasons(settings.leaveReasons ?? []);
     setHolidays(settings.holidays ?? []);
+    setTrialTimeSlots(settings.trialTimeSlots ?? DEFAULT_TRIAL_TIME_SLOTS);
   }, [settings]);
 
   const save = async (patch) => {
@@ -86,6 +90,18 @@ export function DirectoriesTab() {
             save({ leaveReasons: next });
           }}
           placeholder="Переезд, цена…"
+        />
+      </Card>
+
+      <Card>
+        <h3 className="mb-3 text-[15px] font-bold text-text">Время пробных уроков</h3>
+        <TagListEditor
+          items={trialTimeSlots}
+          onChange={(next) => {
+            setTrialTimeSlots(next);
+            save({ trialTimeSlots: next });
+          }}
+          placeholder="09:00"
         />
       </Card>
 

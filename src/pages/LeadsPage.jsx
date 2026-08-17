@@ -115,6 +115,9 @@ export function LeadsPage() {
     const map = {};
     for (const c of COLUMNS) map[c.key] = [];
     for (const lead of leads) map[columnKeyOf(lead)].push(lead);
+    // «Пробный назначен» — ближайший пробный первым, а не по дате создания
+    // лида (порядок остальных колонок), чтобы срочное было видно сразу.
+    map.trial_scheduled.sort((a, b) => (a.trialDate?.seconds ?? Infinity) - (b.trialDate?.seconds ?? Infinity));
     return map;
   }, [leads]);
 
@@ -250,12 +253,12 @@ export function LeadsPage() {
     });
   };
 
-  // Без DeadlineModal — дата подтверждения фиксирована (trialDate минус
-  // 24ч, см. TrialFormModal), у оператора нет нового выбора при каждой
-  // отметке, попыток сколько угодно (спек «Звонок-подтверждение»).
-  const markTrialConfirm = (lead, result) => {
-    const attempts = [...(lead.trialConfirmAttempts ?? []), { result, at: new Date() }];
-    patch(lead, { trialConfirmAttempts: attempts });
+  // «Не выходит на связь» — до 3 попыток, каждая либо переносит (открывает
+  // TrialFormModal отдельно, см. onReschedule в TrialUnreachableBlock),
+  // либо просто фиксируется как неуспешная.
+  const markUnreachable = (lead, result) => {
+    const attempts = [...(lead.unreachableAttempts ?? []), { result, at: new Date() }];
+    patch(lead, { unreachableAttempts: attempts });
   };
 
   const openAddForm = () => setFormLead({});
@@ -297,7 +300,8 @@ export function LeadsPage() {
     onMarkTouch: markTouch,
     onMove: moveLead,
     onMarkAttempt: markAttempt,
-    onMarkTrialConfirm: markTrialConfirm,
+    onMarkUnreachable: markUnreachable,
+    onToggleCallReminder: (lead, checked) => patch(lead, { callReminderDone: checked }),
   };
 
   return (
@@ -346,7 +350,7 @@ export function LeadsPage() {
       <StudentFormModal student={formLead} onClose={() => setFormLead(null)} onCreated={handleCreated} />
       <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
       <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
-      <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
+      <TrialFormModal target={trialTarget} timeSlots={branchSettings?.trialTimeSlots} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
     </div>
   );

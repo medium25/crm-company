@@ -157,13 +157,12 @@ export function stageDeadline(lead) {
   if (stage === 'new') return lead.createdAt?.toDate ? slaDeadline(lead.createdAt.toDate()) : null;
   if (stage === 'calling') return lead.nextCallDueAt?.toDate?.() ?? null;
   if (stage === 'trial_scheduled') {
+    // До дня пробного никакого дедлайна нет — «Не выходит на связь» теперь
+    // ручной, не обязательный шаг со своим SLA. В день пробного — красный,
+    // пока не отмечена галочка «Напомнить через звонок».
     const trialDate = lead.trialDate?.toDate?.();
-    if (!trialDate) return null;
-    if (isTrialDay(trialDate)) return trialDate;
-    const attempts = lead.trialConfirmAttempts ?? [];
-    const lastAttempt = attempts[attempts.length - 1];
-    if (lastAttempt?.result === 'success') return null;
-    return lead.trialConfirmDueAt?.toDate?.() ?? null;
+    if (!trialDate || !isTrialDay(trialDate)) return null;
+    return lead.callReminderDone ? null : trialDate;
   }
   if (stage === 'closing') return lead.nextTouchAt?.toDate?.() ?? null;
   return null;
@@ -181,7 +180,7 @@ export function overdueReasonLabel(lead) {
   const stage = lead.funnelStage ?? 'new';
   if (stage === 'new') return 'Лид не обработан — истёк срок на первый звонок';
   if (stage === 'calling') return 'Просрочен повторный звонок';
-  if (stage === 'trial_scheduled') return 'Не подтверждён/не отмечен пробный урок';
+  if (stage === 'trial_scheduled') return 'Не отмечено напоминание звонком перед пробным';
   if (stage === 'closing') return 'Просрочено плановое касание в дожиме';
   return 'Просрочено плановое действие по лиду';
 }
