@@ -14,7 +14,6 @@ import { Button } from '../components/ui/Button.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
 import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
-import { CallLogModal } from '../components/students/CallLogModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
@@ -105,7 +104,6 @@ export function LeadsPage() {
   const [formLead, setFormLead] = useState(null);
   const [declineTarget, setDeclineTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [callTarget, setCallTarget] = useState(null);
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
   const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
 
@@ -265,7 +263,6 @@ export function LeadsPage() {
 
   const cardActions = {
     onOpen: (lead) => navigate(`/students/${lead.id}`),
-    onCall: (lead) => setCallTarget(lead),
     onEdit: (lead) => setFormLead(lead),
     onDecline: (lead) => setDeclineTarget(lead),
     onDelete: (lead) => setDeleteTarget(lead),
@@ -331,7 +328,6 @@ export function LeadsPage() {
       <StudentFormModal student={formLead} onClose={() => setFormLead(null)} onCreated={handleCreated} />
       <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
       <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
-      <CallLogModal open={Boolean(callTarget)} studentId={callTarget?.id} onClose={() => setCallTarget(null)} />
       <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
     </>

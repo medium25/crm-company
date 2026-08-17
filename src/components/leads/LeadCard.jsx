@@ -280,7 +280,6 @@ function TrialConfirmBlock({ onMark }) {
  * @param {string} [props.operatorColor] hex-цвет назначенного оператора (`staff.color`)
  * @param {string} [props.operatorName] имя назначенного оператора
  * @param {(lead: Object) => void} props.onOpen
- * @param {(lead: Object) => void} props.onCall открывает полную форму записи звонка
  * @param {(lead: Object) => void} props.onEdit
  * @param {(lead: Object) => void} props.onDecline
  * @param {(lead: Object) => void} props.onDelete полное удаление, только для status=='lead'
@@ -297,7 +296,6 @@ export function LeadCard({
   operatorColor,
   operatorName,
   onOpen,
-  onCall,
   onEdit,
   onDecline,
   onDelete,
@@ -329,10 +327,7 @@ export function LeadCard({
   const priority = stage === 'new' && createdAt ? isPriorityLead(createdAt) : false;
 
   const menuItems = [
-    ...(stage === 'new' || stage === 'calling' ? [{ label: 'Записать на пробный', onClick: () => onScheduleTrial(lead) }] : []),
-    { label: 'Записать звонок', onClick: () => onCall(lead) },
     { label: 'Редактировать', onClick: () => onEdit(lead) },
-    ...(!isTerminal ? [{ label: 'Отказ', danger: true, onClick: () => onDecline(lead) }] : []),
     // Только для настоящих лидов (status=='lead') — правило Firestore всё
     // равно не даст удалить студента с историей, но незачем и предлагать.
     ...(lead.status === 'lead' ? [{ label: 'Удалить навсегда', danger: true, onClick: () => onDelete(lead) }] : []),
