@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle, PhoneOff, Info, MessageSquare, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, Clock } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -196,9 +196,9 @@ function OverdueBadge({ reason, deadline }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Причина просрочки"
-        className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-white shadow-sm"
+        className="absolute -right-1.5 -top-2 rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger"
       >
-        <AlertTriangle className="h-2.5 w-2.5" strokeWidth={3} />
+        Просрочено
       </button>
       {open && (
         <div className="absolute inset-x-2.5 top-7 z-20 rounded-field border border-border bg-surface p-3 shadow-hover">
