@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { Info, Plus } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { isToday, isTomorrow } from 'date-fns';
+import { ChevronDown, ChevronRight, Info, Plus } from 'lucide-react';
 import { LeadCard } from './LeadCard.jsx';
 import { STAGE_COLOR_SWATCHES } from './columns.js';
 
@@ -148,6 +149,61 @@ function EditableStageTitle({ column, onEdit }) {
 }
 
 /**
+ * Свёрнутая/развёрнутая папка карточек внутри колонки — только для
+ * «Пробный назначен» (см. groupLeadsByTrialDay ниже), где карточек может
+ * скопиться много и полезно свернуть то, что не сегодня/завтра. Пустая
+ * группа не рендерится вовсе.
+ * @param {{title: string, leads: Array<Object>, operatorByUid: Map, cardActions: Object}} props
+ */
+function LeadGroup({ title, leads, operatorByUid, cardActions }) {
+  const [open, setOpen] = useState(true);
+  if (leads.length === 0) return null;
+
+  return (
+    <div className="rounded-field border border-border bg-surface">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+      >
+        <span className="flex items-center gap-1.5 text-[13px] font-bold text-text">
+          {open ? <ChevronDown className="h-3.5 w-3.5 text-muted" /> : <ChevronRight className="h-3.5 w-3.5 text-muted" />}
+          {title}
+        </span>
+        <span className="text-[12px] font-bold text-muted">{leads.length}</span>
+      </button>
+      {open && (
+        <div className="space-y-2 border-t border-border p-2">
+          {leads.map((lead) => {
+            const op = operatorByUid.get(lead.assignedOperator);
+            return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Раскладывает лидов «Пробный назначен» по дню пробного — Сегодня/Завтра/
+ * Другой день (включая уже прошедшие и те, что дальше завтра). Порядок
+ * внутри групп лиды приносят уже отсортированным (LeadsPage сортирует весь
+ * список по trialDate раньше).
+ * @param {Array<Object>} leads
+ * @returns {{today: Array, tomorrow: Array, other: Array}}
+ */
+function groupLeadsByTrialDay(leads) {
+  const groups = { today: [], tomorrow: [], other: [] };
+  for (const lead of leads) {
+    const d = lead.trialDate?.toDate?.();
+    if (d && isToday(d)) groups.today.push(lead);
+    else if (d && isTomorrow(d)) groups.tomorrow.push(lead);
+    else groups.other.push(lead);
+  }
+  return groups;
+}
+
+/**
  * Одна колонка kanban-доски «Заявки» — заголовок (название/счётчик/ⓘ/+) и
  * drop-зона. Читает id перетаскиваемого лида из dataTransfer (см.
  * LeadCard.onDragStart) и передаёт наверх через onDropLead — сама колонка
@@ -162,6 +218,8 @@ function EditableStageTitle({ column, onEdit }) {
  */
 export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, onEditColumn, ...cardActions }) {
   const [dragOver, setDragOver] = useState(false);
+  const isTrialScheduled = column.key === 'trial_scheduled';
+  const groups = useMemo(() => (isTrialScheduled ? groupLeadsByTrialDay(leads) : null), [isTrialScheduled, leads]);
 
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
@@ -206,6 +264,12 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
       >
         {leads.length === 0 ? (
           <p className="py-4 text-center text-[14px] text-muted">Пусто</p>
+        ) : groups ? (
+          <>
+            <LeadGroup title="Сегодня" leads={groups.today} operatorByUid={operatorByUid} cardActions={cardActions} />
+            <LeadGroup title="Завтра" leads={groups.tomorrow} operatorByUid={operatorByUid} cardActions={cardActions} />
+            <LeadGroup title="Другой день" leads={groups.other} operatorByUid={operatorByUid} cardActions={cardActions} />
+          </>
         ) : (
           leads.map((lead) => {
             const op = operatorByUid.get(lead.assignedOperator);
