@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { collection, addDoc, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, AlertTriangle, PhoneOff, Info, MessageSquare } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -44,6 +44,10 @@ function LeadCommentsPanel({ leadId }) {
         authorName: staff?.fullName ?? '',
         createdAt: serverTimestamp(),
       });
+      // Денормализованный счётчик на самом лиде — чтобы иконка комментария
+      // могла показать «тут есть записи», не открывая отдельный listener
+      // на comments для каждой из карточек на доске.
+      await updateDoc(doc(db, 'students', leadId), { commentsCount: increment(1) });
       setText('');
     } finally {
       setSaving(false);
@@ -389,6 +393,7 @@ export function LeadCard({
   const attempts = lead.callAttempts ?? [];
   const operatorLabel = (operatorName ?? '').split(' ')[0];
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const hasComments = (lead.commentsCount ?? 0) > 0;
 
   const createdAt = lead.createdAt?.toDate?.();
   const trialDateJs = lead.trialDate?.toDate?.();
@@ -528,9 +533,11 @@ export function LeadCard({
             type="button"
             onClick={() => setCommentsOpen((v) => !v)}
             aria-label="Комментарии"
-            className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${commentsOpen ? 'text-navy' : 'text-muted'}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+              commentsOpen || hasComments ? 'text-navy' : 'text-muted'
+            }`}
           >
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
           </button>
           {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
           <DropdownMenu items={menuItems} />
