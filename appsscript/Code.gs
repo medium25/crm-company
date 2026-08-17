@@ -301,13 +301,20 @@ function validateLeadInput_(body) {
   return null;
 }
 
-/** Ищет активного за последние 24ч по phone/phone2 — дедуп при создании. */
+/**
+ * Ищет активного за последние 24ч по phone/phone2 — дедуп при создании.
+ * Сверяем по `apiSyncedAt` (реальный момент записи в CRM), НЕ по `createdAt` —
+ * тот подменяется на `leadReceivedAt` из таблицы (см. createLead_) и может
+ * быть сколь угодно старым при бэкфилле/задержке, из-за чего два ряда с
+ * одним телефоном, засинканные подряд в один проход, не находили друг друга
+ * (createdAt обоих — старый leadReceivedAt, «давно» относительно `since`).
+ */
 function findRecentDuplicate_(phone, phone2) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const candidates = [];
   if (phone) candidates.push(...runQuery_('students', [{ field: 'phone', op: 'EQUAL', value: phone }], { limit: 5 }));
   if (phone2) candidates.push(...runQuery_('students', [{ field: 'phone2', op: 'EQUAL', value: phone2 }], { limit: 5 }));
-  return candidates.find((c) => c.createdAt && new Date(c.createdAt) >= since) || null;
+  return candidates.find((c) => c.apiSyncedAt && new Date(c.apiSyncedAt) >= since) || null;
 }
 
 /**
@@ -439,6 +446,7 @@ function createLead_(body) {
     trialAt: null,
     leftAt: null,
     createdAt: effectiveCreatedAt,
+    apiSyncedAt: new Date(),
     createdBy: `api:${body.__apiKeyName || 'unknown'}`,
     isArchived: false,
     email: body.email || null,

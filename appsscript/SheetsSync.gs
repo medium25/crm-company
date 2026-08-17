@@ -26,7 +26,7 @@
  *      первую несинхронизированную строку и покажет результат в Execution
  *      log, не трогая остальные строки и не ставя триггер.
  *   5. Когда testSyncOneRow отработал без ошибок — запусти installTrigger
- *      один раз (тоже через Run) — поставит опрос каждые 5 минут.
+ *      один раз (тоже через Run) — поставит опрос каждую минуту.
  */
 
 // Соответствие: ключ — как называется поле в API (см. API.md), значение —
@@ -113,7 +113,7 @@ function sendLead_(payload) {
 /**
  * Основной проход — вызывается таймером (см. installTrigger). Обрабатывает
  * до MAX_ROWS_PER_RUN несинхронизированных строк за раз, остальные подберёт
- * следующий запуск (через 5 минут).
+ * следующий запуск (через минуту).
  */
 function syncNewLeadsToCrm() {
   const sheet = getSheet_();
@@ -206,11 +206,11 @@ function testSyncOneRow() {
   }
 }
 
-/** Запусти один раз вручную — ставит опрос каждые 5 минут. */
+/** Запусти один раз вручную — ставит опрос каждую минуту. */
 function installTrigger() {
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'syncNewLeadsToCrm')
     .forEach((t) => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('syncNewLeadsToCrm').timeBased().everyMinutes(5).create();
-  Logger.log('Триггер поставлен: syncNewLeadsToCrm каждые 5 минут.');
+  ScriptApp.newTrigger('syncNewLeadsToCrm').timeBased().everyMinutes(1).create();
+  Logger.log('Триггер поставлен: syncNewLeadsToCrm каждую минуту.');
 }
