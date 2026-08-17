@@ -163,6 +163,11 @@ export function StudentDetailPage() {
       batch.update(doc(db, 'students', id), {
         isArchived: true,
         archivedAt: serverTimestamp(),
+        // Заархивированные enrollments не видны recomputeStudentAggregates
+        // (фильтрует isArchived==false), поэтому status здесь выставляем
+        // напрямую — иначе он застревает на прежнем значении навсегда.
+        status: 'left',
+        activeGroupsCount: 0,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });
@@ -174,6 +179,9 @@ export function StudentDetailPage() {
         batch.update(doc(db, 'enrollments', e.id), {
           status: 'archived',
           isArchived: true,
+          // Без leftAt студент не попадает в KPI «Ушли из активной группы»
+          // (see src/lib/stats.js countLeftActiveGroup).
+          leftAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
         });

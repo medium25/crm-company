@@ -76,16 +76,24 @@ export async function countPaidThisMonth(db, branchId, month) {
  * датой самого бэкфилла, а не под настоящей датой ухода — сдвигает их в
  * чужой месяц. Записи без `leftAt` — почини `leftAt` самим документом, не
  * подменой здесь. Сверено построчно со старой системой за август 2026.
- * Уникальные студенты.
+ * Студентов, у которых ЕСТЬ другой открытый (active/trial/paused,
+ * isArchived==false) enrollment, не считаем ушедшими — это либо перевод
+ * между группами (TransferGroupModal), либо архивация одной дублирующей
+ * записи при живом основном enrollment'е (bulkArchive/StudentDetailPage
+ * иногда чистят так). Уникальные студенты.
  */
 export async function countLeftActiveGroup(db, branchId, periodStart, periodEnd) {
-  const snap = await getDocs(
-    query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', 'in', ['left', 'archived'])),
-  );
+  const [leftSnap, openSnap] = await Promise.all([
+    getDocs(query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', 'in', ['left', 'archived']))),
+    getDocs(query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', 'in', ['active', 'trial', 'paused']), where('isArchived', '==', false))),
+  ]);
+  const stillEnrolled = new Set(openSnap.docs.map((d) => d.data().studentId));
+
   const studentIds = new Set();
-  for (const d of snap.docs) {
+  for (const d of leftSnap.docs) {
     const e = d.data();
     if (!e.activatedAt) continue;
+    if (stillEnrolled.has(e.studentId)) continue;
     const churnedAt = e.leftAt;
     if (!churnedAt) continue;
     const date = churnedAt.toDate();
