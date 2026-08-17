@@ -339,10 +339,12 @@ export function LeadCard({
   ];
 
   const moveItems = columns.filter(
-    (c) => isForwardAllowed(stage, c.key) && c.key !== 'lost' && c.key !== 'won' && c.key !== 'trial_scheduled',
+    (c) => isForwardAllowed(stage, c.key) && c.key !== 'lost',
   ).map((c) => ({
     label: c.label,
-    onClick: () => onMove(lead, c.key),
+    // «Пробный назначен» требует дату/время/учителя — открываем ту же
+    // форму, что и «⋮ → Записать на пробный», вместо голого onMove.
+    onClick: () => (c.key === 'trial_scheduled' ? onScheduleTrial(lead) : onMove(lead, c.key)),
   }));
 
   return (

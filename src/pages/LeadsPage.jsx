@@ -192,9 +192,9 @@ export function LeadsPage() {
       showToast('Нельзя вернуть лида на предыдущую стадию.', { type: 'error' });
       return;
     }
-    if (stageKey === 'won' || stageKey === 'lost') return; // эти переходы — через оплату/DeclineLeadModal, не через drag
+    if (stageKey === 'lost') return; // этот переход — только через DeclineLeadModal (нужна причина), не drag
     if (stageKey === 'trial_scheduled') {
-      showToast('Укажите дату пробного: меню «⋮» → «Записать на пробный».', { type: 'error' });
+      setTrialTarget({ lead, mode: 'schedule' }); // нужна дата/время/учитель — открываем ту же форму, что и «⋮»
       return;
     }
     const commit = (extraFields) =>
@@ -218,7 +218,12 @@ export function LeadsPage() {
       });
       return;
     }
-    commit({}); // 'trial_completed' — мгновенный проходной этап, дедлайну взяться неоткуда
+    // 'trial_completed' — мгновенный проходной этап; 'won' вручную (стрелка/
+    // drag) — просто переключает стадию, без записи оплаты (по решению
+    // владельца — оплата на странице студента остаётся отдельным, основным
+    // путём в «Оплачено», этот путь запасной). Ни там ни там дедлайну
+    // взяться неоткуда.
+    commit({});
   };
 
   const markTouch = (lead) => {

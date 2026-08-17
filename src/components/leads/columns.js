@@ -132,7 +132,20 @@ export function withStageOverrides(overrides) {
   return COLUMNS.map((c) => (overrides[c.key] ? { ...c, ...overrides[c.key] } : c));
 }
 
-const FORWARD_ORDER = COLUMNS.filter((c) => c.key !== 'lost').map((c) => c.key);
+/**
+ * Разрешённые ручные переходы вперёд (стрелка/drag), по стадии-источнику.
+ * Не строгая цепочка — из «Новый лид» лид может уйти либо в «Дозвон», либо
+ * сразу в «Пробный назначен» (лид согласился на пробный при первом же
+ * звонке, до формальной отметки в «Дозвоне»). 'lost' сюда не входит —
+ * разрешён универсально из любой нетерминальной стадии, см. ниже.
+ */
+const FORWARD_TRANSITIONS = {
+  new: ['calling', 'trial_scheduled'],
+  calling: ['trial_scheduled'],
+  trial_scheduled: ['trial_completed'],
+  trial_completed: ['closing', 'won'],
+  closing: [],
+};
 
 /**
  * Стадия, в которой сейчас находится лид. Дефолт 'new' — для лидов без
@@ -146,10 +159,9 @@ export function columnKeyOf(lead) {
 }
 
 /**
- * Разрешён ли переход `from → to`: строго на следующую стадию по
- * FORWARD_ORDER (пропускать нельзя — каждая стадия обязательна: дозвон,
- * назначение пробного, сам пробный, дожим), либо в 'lost' из любой
- * нетерминальной стадии. 'won'/'lost' — терминальные, из них переходов нет.
+ * Разрешён ли переход `from → to`: см. FORWARD_TRANSITIONS, либо в 'lost'
+ * из любой нетерминальной стадии. 'won'/'lost' — терминальные, из них
+ * переходов нет вовсе.
  * @param {string} from
  * @param {string} to
  * @returns {boolean}
@@ -157,7 +169,5 @@ export function columnKeyOf(lead) {
 export function isForwardAllowed(from, to) {
   if (from === 'won' || from === 'lost') return false;
   if (to === 'lost') return true;
-  const fromIndex = FORWARD_ORDER.indexOf(from);
-  const toIndex = FORWARD_ORDER.indexOf(to);
-  return toIndex === fromIndex + 1;
+  return (FORWARD_TRANSITIONS[from] ?? []).includes(to);
 }
