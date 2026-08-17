@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
-import { isPriorityLead, stageDeadline, overdueReasonLabel, callScheduleHint, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
+import { isPriorityLead, isTrialDay, stageDeadline, overdueReasonLabel, callScheduleHint, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDate, formatDateTime, formatDateTimeShort } from '../../lib/format.js';
 
 /**
@@ -373,6 +373,9 @@ export function LeadCard({
   // после неудачной попытки связаться, даже если до пробного ещё далеко.
   const unreachableAttempts = lead.unreachableAttempts ?? [];
   const trialConfirmAtRisk = stage === 'trial_scheduled' && unreachableAttempts[unreachableAttempts.length - 1]?.result === 'fail';
+  // Чекбокс «Напомнить через звонок» имеет смысл только в день пробного —
+  // до этого дня напоминать ещё не о чем (вместе с этим и загорается overdue).
+  const trialDay = stage === 'trial_scheduled' && lead.trialDate?.toDate ? isTrialDay(lead.trialDate.toDate()) : false;
   const deadline = stageDeadline(lead);
   const overdue = deadline ? Date.now() > deadline.getTime() : false;
   // priority — метка «лид пришёл вне рабочих часов», актуальна только пока
@@ -461,14 +464,16 @@ export function LeadCard({
             onDecline={() => onDecline(lead)}
           />
 
-          <label className="flex items-center gap-1.5 text-[12px] text-muted">
-            <input
-              type="checkbox"
-              checked={Boolean(lead.callReminderDone)}
-              onChange={(e) => onToggleCallReminder(lead, e.target.checked)}
-            />
-            {lead.callReminderDone ? 'Напомнили через звонок' : 'Напомнить через звонок'}
-          </label>
+          {trialDay && (
+            <label className="flex items-center gap-1.5 text-[12px] text-muted">
+              <input
+                type="checkbox"
+                checked={Boolean(lead.callReminderDone)}
+                onChange={(e) => onToggleCallReminder(lead, e.target.checked)}
+              />
+              {lead.callReminderDone ? 'Напомнили через звонок' : 'Напомнить через звонок'}
+            </label>
+          )}
         </div>
       )}
 
