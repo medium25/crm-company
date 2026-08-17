@@ -68,26 +68,44 @@ function TrialCalendar({ value, onChange }) {
   const gridEnd = endOfWeek(endOfMonth(viewMonth), { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
 
-  const quickButtonClass = (d) =>
-    `rounded-field border px-2.5 py-1 text-[12px] font-bold ${
-      isSameDay(d, selected) ? 'border-navy bg-navy text-white' : 'border-border-strong text-text hover:bg-surface-alt'
-    }`;
+  // Сегодня — это почти всегда ЕЩЁ и какой-то день недели (напр. вторник) —
+  // если подсвечивать оба ряда разом, непонятно, что из двух выбрано.
+  // Ряд дней недели подсвечивается, только если выбранная дата не совпадает
+  // ни с одним из трёх быстрых пиков.
+  const matchesQuickDay = quickDays.some((q) => isSameDay(q.date, selected));
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-1.5">
         {quickDays.map((q) => (
-          <button key={q.label} type="button" onClick={() => pick(q.date)} className={quickButtonClass(q.date)}>
+          <button
+            key={q.label}
+            type="button"
+            onClick={() => pick(q.date)}
+            className={`flex-1 rounded-full border px-2 py-1.5 text-[12px] font-semibold transition-colors ${
+              isSameDay(q.date, selected) ? 'border-navy bg-navy text-white' : 'border-border-strong text-text hover:bg-surface-alt'
+            }`}
+          >
             {q.label}
           </button>
         ))}
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {weekdayPicks.map((q) => (
-          <button key={q.label} type="button" onClick={() => pick(q.date)} className={quickButtonClass(q.date)}>
-            {q.label}
-          </button>
-        ))}
+      <div className="flex divide-x divide-border-strong overflow-hidden rounded-full border border-border-strong">
+        {weekdayPicks.map((q) => {
+          const active = !matchesQuickDay && isSameDay(q.date, selected);
+          return (
+            <button
+              key={q.label}
+              type="button"
+              onClick={() => pick(q.date)}
+              className={`flex-1 py-1.5 text-[12px] font-semibold transition-colors ${
+                active ? 'bg-navy text-white' : 'text-muted hover:bg-surface-alt'
+              }`}
+            >
+              {q.label}
+            </button>
+          );
+        })}
       </div>
 
       <button
