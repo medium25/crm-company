@@ -2,15 +2,12 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, query, where, orderBy, updateDoc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { Plus } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useToast } from '../components/ui/Toast.jsx';
-import { PageHeader } from '../components/layout/PageHeader.jsx';
-import { Button } from '../components/ui/Button.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
 import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
@@ -305,35 +302,27 @@ export function LeadsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Заявки"
-        actions={
-          <div className="flex items-center gap-3">
-            {canSeeAllLeads && (
-              <div className="flex gap-1 rounded-full bg-surface-alt p-1">
-                {[
-                  { value: false, label: 'Все' },
-                  { value: true, label: 'Только мои' },
-                ].map((t) => (
-                  <button
-                    key={String(t.value)}
-                    type="button"
-                    onClick={() => setShowOnlyMine(t.value)}
-                    className={`rounded-full px-3 py-1.5 text-[13px] ${
-                      showOnlyMine === t.value ? 'bg-navy text-white' : 'text-muted'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <Button onClick={openAddForm}>
-              <Plus className="h-4 w-4" /> Добавить лида
-            </Button>
+      {canSeeAllLeads && (
+        <div className="mb-2 flex justify-end">
+          <div className="flex gap-1 rounded-full bg-surface-alt p-1">
+            {[
+              { value: false, label: 'Все' },
+              { value: true, label: 'Только мои' },
+            ].map((t) => (
+              <button
+                key={String(t.value)}
+                type="button"
+                onClick={() => setShowOnlyMine(t.value)}
+                className={`rounded-full px-3 py-1.5 text-[13px] ${
+                  showOnlyMine === t.value ? 'bg-navy text-white' : 'text-muted'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-        }
-      />
+        </div>
+      )}
       <div className="flex gap-4 overflow-x-auto pb-2">
         {resolvedColumns.map((column) => (
           <LeadColumn
