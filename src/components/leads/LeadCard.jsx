@@ -309,6 +309,9 @@ function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
           />
         );
       })}
+      {lead.unreachableNextCallDueAt && failStreak < UNREACHABLE_MAX_ATTEMPTS && (
+        <span className="text-[11px] text-muted">до {formatDateTimeShort(lead.unreachableNextCallDueAt)}</span>
+      )}
       {failStreak >= UNREACHABLE_MAX_ATTEMPTS && (
         <button
           type="button"

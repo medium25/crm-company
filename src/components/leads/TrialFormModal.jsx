@@ -210,8 +210,10 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
         trialConfirmDueAt: confirmDueAt,
         trialConfirmAttempts: [],
         telegramReminderSent,
-        // Напоминание на новую дату — старая галочка относилась к прежней.
+        // Напоминание на новую дату — старая галочка относилась к прежней;
+        // дедлайн звонка «не выходит на связь» тоже относился к прежней дате.
         callReminderDone: false,
+        unreachableNextCallDueAt: null,
       };
       if (mode === 'schedule') {
         await advanceStage(db, lead, 'trial_scheduled', { status: 'trial', trialAt: serverTimestamp(), ...trialFields }, user);

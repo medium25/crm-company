@@ -132,6 +132,17 @@ export function trialConfirmDueAt(trialDate) {
 }
 
 /**
+ * Дедлайн следующего звонка после отметки «не выходит на связь» (попытка
+ * дозвона до дня пробного) — конец следующего дня, тот же ориентир, что и
+ * у обычного дозвона. Оператор правит перед сохранением в DeadlineModal,
+ * это только предложение.
+ * @returns {Date}
+ */
+export function unreachableCallDueAt() {
+  return endOfDayIn(1);
+}
+
+/**
  * Наступил ли уже календарный день пробного (или прошёл) — сравнение по
  * дате, не по времени суток. С этого момента карточка показывает
  * «Пришёл»/«Не пришёл» вместо звонка-подтверждения (LeadCard), и дедлайн
@@ -157,12 +168,16 @@ export function stageDeadline(lead) {
   if (stage === 'new') return lead.createdAt?.toDate ? slaDeadline(lead.createdAt.toDate()) : null;
   if (stage === 'calling') return lead.nextCallDueAt?.toDate?.() ?? null;
   if (stage === 'trial_scheduled') {
-    // До дня пробного никакого дедлайна нет — «Не выходит на связь» теперь
-    // ручной, не обязательный шаг со своим SLA. В день пробного — красный,
-    // пока не отмечена галочка «Напомнить через звонок».
+    // Два независимых источника дедлайна: назначенный звонок после «не
+    // выходит на связь» (unreachableNextCallDueAt, пока не отметили
+    // следующую попытку) и день пробного (пока не отмечена галочка
+    // «Напомнить через звонок») — берём ближайший из тех, что применимы.
     const trialDate = lead.trialDate?.toDate?.();
-    if (!trialDate || !isTrialDay(trialDate)) return null;
-    return lead.callReminderDone ? null : trialDate;
+    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? trialDate : null;
+    const unreachableDue = lead.unreachableNextCallDueAt?.toDate?.() ?? null;
+    const candidates = [trialDayDue, unreachableDue].filter(Boolean);
+    if (candidates.length === 0) return null;
+    return candidates.reduce((a, b) => (a < b ? a : b));
   }
   if (stage === 'closing') return lead.nextTouchAt?.toDate?.() ?? null;
   return null;
@@ -180,7 +195,13 @@ export function overdueReasonLabel(lead) {
   const stage = lead.funnelStage ?? 'new';
   if (stage === 'new') return 'Лид не обработан — истёк срок на первый звонок';
   if (stage === 'calling') return 'Просрочен повторный звонок';
-  if (stage === 'trial_scheduled') return 'Не отмечено напоминание звонком перед пробным';
+  if (stage === 'trial_scheduled') {
+    const trialDate = lead.trialDate?.toDate?.();
+    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? trialDate : null;
+    const unreachableDue = lead.unreachableNextCallDueAt?.toDate?.() ?? null;
+    if (unreachableDue && (!trialDayDue || unreachableDue <= trialDayDue)) return 'Просрочен повторный звонок «не выходит на связь»';
+    return 'Не отмечено напоминание звонком перед пробным';
+  }
   if (stage === 'closing') return 'Просрочено плановое касание в дожиме';
   return 'Просрочено плановое действие по лиду';
 }

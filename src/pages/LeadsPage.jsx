@@ -15,7 +15,7 @@ import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
-import { advanceStage, nextCallDueAt, firstTouchDueAt } from '../lib/leadFunnel.js';
+import { advanceStage, nextCallDueAt, firstTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
 
 const WON_LOST_VISIBLE_DAYS = 30;
 const TERMINAL_STAGES = ['won', 'lost'];
@@ -253,12 +253,22 @@ export function LeadsPage() {
     });
   };
 
-  // «Не выходит на связь» — до 3 попыток, каждая либо переносит (открывает
-  // TrialFormModal отдельно, см. onReschedule в TrialUnreachableBlock),
-  // либо просто фиксируется как неуспешная.
+  // «Не выходит на связь» — до 3 попыток (см. UNREACHABLE_MAX_ATTEMPTS в
+  // LeadCard.jsx). «Перенос» открывает TrialFormModal отдельно — новая дата
+  // пробного сама по себе следующий шаг, дедлайну на неё взяться неоткуда.
+  // «Неуспешно», пока попытки не исчерпаны, требует дедлайн следующего
+  // звонка — тот же паттерн подтверждения, что и markAttempt выше.
   const markUnreachable = (lead, result) => {
     const attempts = [...(lead.unreachableAttempts ?? []), { result, at: new Date() }];
-    patch(lead, { unreachableAttempts: attempts });
+    const attemptsExhausted = attempts.length >= 3;
+
+    const commit = (dueDate) => patch(lead, { unreachableAttempts: attempts, unreachableNextCallDueAt: dueDate });
+
+    if (result === 'reschedule' || attemptsExhausted) {
+      commit(null);
+      return;
+    }
+    setDeadlineTarget({ lead, title: 'Дедлайн следующего звонка', suggestedDate: unreachableCallDueAt(), onConfirm: commit });
   };
 
   const openAddForm = () => setFormLead({});
