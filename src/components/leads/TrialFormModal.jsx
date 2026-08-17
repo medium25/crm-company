@@ -173,6 +173,7 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
   const [courseId, setCourseId] = useState('');
   const [telegramReminderSent, setTelegramReminderSent] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState(1);
 
   const coursesQuery = useMemo(() => (db ? query(collection(db, 'courses'), where('isArchived', '==', false)) : null), []);
   const { data: coursesRaw } = useCollection(coursesQuery);
@@ -184,6 +185,7 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
     setTime(timeSlots[0] ?? DEFAULT_TIME_SLOTS[0]);
     setCourseId(target.lead.trialCourseId ?? '');
     setTelegramReminderSent(false);
+    setStep(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
 
@@ -238,49 +240,63 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
       onClose={onClose}
       title={mode === 'schedule' ? `Пробный: ${lead.fullName}` : `Перенос пробного: ${lead.fullName}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button onClick={handleSubmit} loading={saving}>
-            Сохранить
-          </Button>
-        </>
+        step === 1 ? (
+          <>
+            <Button variant="secondary" onClick={onClose}>
+              Отмена
+            </Button>
+            <Button onClick={() => setStep(2)}>Далее</Button>
+          </>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={() => setStep(1)}>
+              Назад
+            </Button>
+            <Button onClick={handleSubmit} loading={saving}>
+              Сохранить
+            </Button>
+          </>
+        )
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Select
-          label="Курс"
-          required
-          options={[{ value: '', label: 'Не выбран' }, ...courses.map((c) => ({ value: c.id, label: c.name }))]}
-          value={courseId}
-          onChange={(e) => setCourseId(e.target.value)}
-        />
-        <label className="block">
-          <span className="mb-1 block text-[13px] text-muted">Дата</span>
-          <TrialCalendar value={date} onChange={setDate} />
-        </label>
-        <Select
-          label="Время"
-          required
-          options={timeSlots.map((t) => ({ value: t, label: t }))}
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-        />
-        <div>
-          <label className="flex items-start gap-2 text-[14px] text-text">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={telegramReminderSent}
-              onChange={(e) => setTelegramReminderSent(e.target.checked)}
+        {step === 1 ? (
+          <>
+            <Select
+              label="Курс"
+              required
+              options={[{ value: '', label: 'Не выбран' }, ...courses.map((c) => ({ value: c.id, label: c.name }))]}
+              value={courseId}
+              onChange={(e) => setCourseId(e.target.value)}
             />
-            <span>Отправка локации и напоминания за 1 день до пробного урока через Telegram</span>
-          </label>
-          <p className="mt-1 text-[12px] text-danger">
-            Ставьте галочку только если действительно отправили локацию и напоминание — за ложную отметку штраф до 100 000 сум.
-          </p>
-        </div>
+            <label className="block">
+              <span className="mb-1 block text-[13px] text-muted">Дата</span>
+              <TrialCalendar value={date} onChange={setDate} />
+            </label>
+            <Select
+              label="Время"
+              required
+              options={timeSlots.map((t) => ({ value: t, label: t }))}
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+            />
+          </>
+        ) : (
+          <div>
+            <label className="flex items-start gap-2 text-[14px] text-text">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={telegramReminderSent}
+                onChange={(e) => setTelegramReminderSent(e.target.checked)}
+              />
+              <span>Отправка локации и напоминания за 1 день до пробного урока через Telegram</span>
+            </label>
+            <p className="mt-1 text-[12px] text-danger">
+              Ставьте галочку только если действительно отправили локацию и напоминание — за ложную отметку штраф до 100 000 сум.
+            </p>
+          </div>
+        )}
       </form>
     </Modal>
   );
