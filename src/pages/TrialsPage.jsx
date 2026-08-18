@@ -28,9 +28,10 @@ const TRIAL_COMPLETED_COLOR = COLUMNS.find((c) => c.key === 'trial_completed').c
 /** Заголовок колонки — та же цветная линия-разделитель, что у колонок «Заявки» (LeadColumn). */
 function TrialColumnHeader({ label, count, color }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-b-2 px-1 pb-2.5" style={{ borderBottomColor: color }}>
-      <span className="text-[15px] font-bold uppercase tracking-wide text-text">{label}</span>
-      <span className="text-[13px] font-bold text-muted">{count}</span>
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 border-b-2 px-1 pb-2.5" style={{ borderBottomColor: color }}>
+      <span />
+      <span className="justify-self-center text-[15px] font-bold uppercase tracking-wide text-text">{label}</span>
+      <span className="justify-self-end text-[13px] font-bold text-muted">{count}</span>
     </div>
   );
 }
