@@ -11,6 +11,7 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
+import { ResetLeadModal } from '../components/leads/ResetLeadModal.jsx';
 import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
@@ -115,6 +116,7 @@ export function LeadsPage() {
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
   const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
   const [bookingTarget, setBookingTarget] = useState(null);
+  const [resetTarget, setResetTarget] = useState(null);
 
   const byColumn = useMemo(() => {
     const map = {};
@@ -311,6 +313,7 @@ export function LeadsPage() {
     onEdit: (lead) => setFormLead(lead),
     onDecline: (lead) => setDeclineTarget(lead),
     onDelete: (lead) => setDeleteTarget(lead),
+    onResetToNew: (lead) => setResetTarget(lead),
     onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
     onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
     onOpenBooking: (lead) => setBookingTarget(lead),
@@ -399,6 +402,7 @@ export function LeadsPage() {
       <StudentFormModal student={formLead} onClose={() => setFormLead(null)} onCreated={handleCreated} />
       <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
       <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
+      <ResetLeadModal lead={resetTarget} onClose={() => setResetTarget(null)} />
       <TrialFormModal target={trialTarget} timeSlots={branchSettings?.trialTimeSlots} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
       <GroupBookingModal lead={bookingTarget} allLeads={allLeads} onClose={() => setBookingTarget(null)} />

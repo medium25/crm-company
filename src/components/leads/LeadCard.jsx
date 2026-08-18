@@ -392,6 +392,7 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
  * @param {(lead: Object, checked: boolean) => void} props.onToggleCallReminder
  * @param {(lead: Object) => void} props.onOpenBooking
  * @param {(lead: Object) => void} props.onDismissFromBoard только для won — скрывает с доски, студент остаётся в системе
+ * @param {(lead: Object) => void} props.onResetToNew полный сброс воронки за кодом доступа (ResetLeadModal)
  */
 export function LeadCard({
   lead,
@@ -411,6 +412,7 @@ export function LeadCard({
   onToggleCallReminder,
   onOpenBooking,
   onDismissFromBoard,
+  onResetToNew,
   columns = COLUMNS,
 }) {
   const stage = lead.funnelStage ?? 'new';
@@ -451,6 +453,10 @@ export function LeadCard({
     // остался 'lead' (ручной drag в «Оплачено» без прохода через оплату) —
     // с этой стадии карточку можно только скрыть с доски (см. won-ветку ниже).
     ...(lead.status === 'lead' && stage !== 'won' ? [{ label: 'Удалить навсегда', danger: true, onClick: () => onDelete(lead) }] : []),
+    // Полный сброс воронки — за кодом доступа (ResetLeadModal), не для
+    // 'new' (сбрасывать уже некуда) и не для 'won' (там своё урезанное
+    // меню без этого пункта вовсе).
+    ...(stage !== 'new' && stage !== 'won' ? [{ label: 'Вернуть в новый лид', danger: true, onClick: () => onResetToNew(lead) }] : []),
   ];
 
   const moveItems = columns.filter(
