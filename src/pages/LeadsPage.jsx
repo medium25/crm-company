@@ -12,6 +12,7 @@ import { useToast } from '../components/ui/Toast.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
 import { ResetLeadModal } from '../components/leads/ResetLeadModal.jsx';
+import { DismissFromBoardModal } from '../components/leads/DismissFromBoardModal.jsx';
 import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
@@ -117,6 +118,7 @@ export function LeadsPage() {
   const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
   const [bookingTarget, setBookingTarget] = useState(null);
   const [resetTarget, setResetTarget] = useState(null);
+  const [dismissTarget, setDismissTarget] = useState(null);
 
   const byColumn = useMemo(() => {
     const map = {};
@@ -319,7 +321,8 @@ export function LeadsPage() {
     onOpenBooking: (lead) => setBookingTarget(lead),
     // Только «Оплачено» — убирает карточку с доски, студент остаётся в
     // системе (просто не рендерится больше в этом списке, см. leads выше).
-    onDismissFromBoard: (lead) => patch(lead, { boardHiddenAt: serverTimestamp() }, `${lead.fullName}: убрано с доски.`),
+    // По паролю (см. DismissFromBoardModal), чтобы не улетало случайным кликом.
+    onDismissFromBoard: (lead) => setDismissTarget(lead),
     onMarkAttended: (lead, engagementScore) => {
       // Проходим через 'trial_completed' в 'closing' одним обновлением —
       // без оплаты в момент отметки явки лид сразу уходит в дожим (спека
@@ -403,6 +406,7 @@ export function LeadsPage() {
       <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
       <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
       <ResetLeadModal lead={resetTarget} onClose={() => setResetTarget(null)} />
+      <DismissFromBoardModal lead={dismissTarget} onClose={() => setDismissTarget(null)} />
       <TrialFormModal target={trialTarget} timeSlots={branchSettings?.trialTimeSlots} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
       <GroupBookingModal lead={bookingTarget} allLeads={allLeads} onClose={() => setBookingTarget(null)} />

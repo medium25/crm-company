@@ -39,7 +39,6 @@ export function DeclineLeadModal({ lead, onClose }) {
         lead,
         'lost',
         {
-          status: 'archived',
           statusReason: detailRequired ? `${selectedOption.label} — ${detail.trim()}` : (selectedOption?.label ?? reason),
           lostReason: reason,
           lostReasonDetail: detailRequired ? detail.trim() : null,
