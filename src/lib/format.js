@@ -1,4 +1,4 @@
-import { format as formatDateFns, differenceInMonths, differenceInCalendarDays, addMonths } from 'date-fns';
+import { format as formatDateFns, differenceInMonths, differenceInCalendarDays, addMonths, isToday, isTomorrow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 /**
@@ -97,6 +97,19 @@ export function formatDateTime(ts) {
 export function formatDateTimeShort(ts) {
   if (!ts) return '';
   return formatDateFns(ts.toDate(), 'dd.MM.yyyy HH:mm', { locale: ru });
+}
+
+/**
+ * @param {import('firebase/firestore').Timestamp|Date} ts
+ * @returns {string} "сегодня в 15:30" / "завтра в 17:00" / "21 августа в 18:00"
+ */
+export function formatRelativeDeadline(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : ts;
+  const time = formatDateFns(d, 'HH:mm');
+  if (isToday(d)) return `сегодня в ${time}`;
+  if (isTomorrow(d)) return `завтра в ${time}`;
+  return `${formatDateFns(d, 'd MMMM', { locale: ru })} в ${time}`;
 }
 
 /**

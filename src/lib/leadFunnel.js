@@ -64,21 +64,6 @@ export function slaDeadline(createdAt) {
   return new Date(start.getTime() + 15 * 60_000);
 }
 
-/**
- * Подсказка расписания дозвона под точками попыток — чисто информационная
- * строка (2 сегодня / 2 завтра / 1 послезавтра из спека §4), без пуш-
- * напоминаний. `null`, если подсказывать нечего (0 попыток или лид уже
- * ушёл с этой стадии).
- * @param {Array<{result: 'success'|'fail'}>} attempts
- */
-export function callScheduleHint(attempts) {
-  const n = attempts.length;
-  if (n === 0 || n >= 5) return null;
-  if (n < 2) return 'Ещё сегодня';
-  if (n < 4) return 'Завтра';
-  return 'Послезавтра';
-}
-
 const END_OF_DAY_HOUR = 18;
 
 function endOfDayIn(daysAhead) {
@@ -89,9 +74,8 @@ function endOfDayIn(daysAhead) {
 }
 
 /**
- * Дедлайн следующей попытки дозвона — та же сетка 2 сегодня/2 завтра/1
- * послезавтра, что и `callScheduleHint`, но как реальная дата (конец
- * рабочего дня), а не текст. Пишется на документ лида при каждой отметке
+ * Дедлайн следующей попытки дозвона — сетка 2 сегодня/2 завтра/1
+ * послезавтра (конец рабочего дня). Пишется на документ лида при каждой отметке
  * попытки (`markAttempt`), чтобы карточка не «зависала» в «Дозвоне»
  * незамеченной. `null` — попыток не осталось (5 уже сделано).
  * @param {Array<{result: 'success'|'fail'}>} attempts

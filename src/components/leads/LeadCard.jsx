@@ -8,8 +8,8 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
-import { isPriorityLead, isTrialDay, stageDeadline, overdueReasonLabel, callScheduleHint, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
-import { formatPhone, formatDate, formatDateTime, formatDateTimeShort } from '../../lib/format.js';
+import { isPriorityLead, isTrialDay, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
+import { formatPhone, formatDate, formatDateTime, formatDateTimeShort, formatRelativeDeadline } from '../../lib/format.js';
 
 /**
  * Компактная лента комментариев лида, разворачивается прямо в карточке.
@@ -141,9 +141,9 @@ function AttemptDot({ ref, toggle, ariaLabel }) {
  * absolute-попап вылезал за край карточки и обрезался/наезжал на соседнюю
  * колонку.
  */
-function CallAttemptDots({ attempts, onMark }) {
+function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
   const isCold = attempts.length === MAX_ATTEMPTS && attempts.every((a) => a.result === 'fail');
-  const hint = callScheduleHint(attempts);
+  const deadlineLabel = !isCold && nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
 
   return (
     <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ function CallAttemptDots({ attempts, onMark }) {
           <Snowflake className="h-4 w-4 text-danger" />
         </span>
       )}
-      {!isCold && hint && <span className="text-[11px] text-muted">{hint}</span>}
+      {deadlineLabel && <span className="text-[11px] text-muted">{deadlineLabel}</span>}
     </div>
   );
 }
@@ -475,7 +475,7 @@ export function LeadCard({
 
       {(stage === 'new' || stage === 'calling') && (
         <div onClick={(e) => e.stopPropagation()}>
-          <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} />
+          <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} nextCallDueAt={lead.nextCallDueAt} />
         </div>
       )}
 
