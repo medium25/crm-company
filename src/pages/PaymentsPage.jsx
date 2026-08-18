@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
-import { ChevronRight, Coins } from 'lucide-react';
+import { ChevronRight, Coins, Wallet } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -17,6 +17,7 @@ import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
+import { EditPaymentMethodModal } from '../components/students/EditPaymentMethodModal.jsx';
 import { formatDate, formatDateTime, formatMoney, formatMethod, PAYMENT_METHOD_OPTIONS } from '../lib/format.js';
 import { getMonthlyRevenue, getDailyRevenueComparison } from '../lib/stats.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
@@ -49,6 +50,7 @@ export function PaymentsPage() {
   const [sortKey, setSortKey] = useState('date');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(1);
+  const [methodTarget, setMethodTarget] = useState(null);
 
   const today = new Date();
   const dateFrom = searchParams.get('from') || format(startOfMonth(today), 'yyyy-MM-dd');
@@ -249,7 +251,22 @@ export function PaymentsPage() {
       key: 'method',
       label: 'Метод оплаты',
       sortable: true,
-      render: (t) => formatMethod(t.method),
+      render: (t) =>
+        t.type === 'payment' ? (
+          <span className="flex items-center gap-1.5">
+            {formatMethod(t.method)}
+            <button
+              type="button"
+              onClick={() => setMethodTarget(t)}
+              aria-label="Изменить способ оплаты"
+              className="text-muted hover:text-navy"
+            >
+              <Wallet className="h-3.5 w-3.5" />
+            </button>
+          </span>
+        ) : (
+          formatMethod(t.method)
+        ),
     },
     { key: 'teacherName', label: 'Учитель', sortable: true, render: (t) => t.teacherName ?? '—' },
     {
@@ -443,6 +460,8 @@ export function PaymentsPage() {
           </p>
         </>
       )}
+
+      <EditPaymentMethodModal open={Boolean(methodTarget)} transaction={methodTarget} onClose={() => setMethodTarget(null)} />
     </>
   );
 }

@@ -30,6 +30,7 @@ import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
 import { MaterialPaymentModal } from '../components/students/MaterialPaymentModal.jsx';
 import { ManualChargeModal } from '../components/students/ManualChargeModal.jsx';
 import { EditChargeModal } from '../components/students/EditChargeModal.jsx';
+import { EditPaymentMethodModal } from '../components/students/EditPaymentMethodModal.jsx';
 import { CommentsTab } from '../components/shared/CommentsTab.jsx';
 import { HistoryTab } from '../components/shared/HistoryTab.jsx';
 import { CallLogsTab } from '../components/students/CallLogsTab.jsx';
@@ -98,6 +99,7 @@ export function StudentDetailPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [editTxTarget, setEditTxTarget] = useState(null);
+  const [methodTarget, setMethodTarget] = useState(null);
 
   if (loading) {
     return (
@@ -442,7 +444,7 @@ export function StudentDetailPage() {
                                   width: '72px',
                                   render: (t) => (
                                     <span className="flex items-center gap-2">
-                                      {t.type !== 'payment' && (
+                                      {t.type !== 'payment' ? (
                                         <button
                                           type="button"
                                           onClick={() => setEditTxTarget(t)}
@@ -450,6 +452,15 @@ export function StudentDetailPage() {
                                           className="text-muted hover:text-navy"
                                         >
                                           <Pencil className="h-4 w-4" />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => setMethodTarget(t)}
+                                          aria-label="Изменить способ оплаты"
+                                          className="text-muted hover:text-navy"
+                                        >
+                                          <Wallet className="h-4 w-4" />
                                         </button>
                                       )}
                                       <button
@@ -507,6 +518,7 @@ export function StudentDetailPage() {
         <>
           <ManualChargeModal open={manualChargeOpen} student={student} onClose={() => setManualChargeOpen(false)} />
           <EditChargeModal open={Boolean(editTxTarget)} transaction={editTxTarget} onClose={() => setEditTxTarget(null)} />
+          <EditPaymentMethodModal open={Boolean(methodTarget)} transaction={methodTarget} onClose={() => setMethodTarget(null)} />
         </>
       )}
 

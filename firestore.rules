@@ -95,9 +95,11 @@ service cloud.firestore {
       // updateTransaction правит сумму/комментарий/дату/месяц записи на
       // месте (без компенсирующих проводок). lessonsCount — дополнительно
       // для дробления списания при переводе студента посреди месяца
-      // (TransferGroupModal, billing.chargeAmountForLessons).
+      // (TransferGroupModal, billing.chargeAmountForLessons). method —
+      // updateTransactionMethod, отдельная лёгкая правка способа оплаты,
+      // не затрагивающая сумму/баланс.
       allow update: if isAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'comment', 'date', 'month', 'lessonsCount', 'updatedAt', 'updatedBy']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'comment', 'date', 'month', 'lessonsCount', 'method', 'updatedAt', 'updatedBy']);
     }
 
     match /enrollments/{id} {

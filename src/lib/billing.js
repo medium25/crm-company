@@ -472,6 +472,24 @@ export async function updateTransaction(db, original, { amount, comment, date },
 }
 
 /**
+ * Правит только способ оплаты — сумму/баланс/monthlyRevenue не трогает,
+ * метод оплаты ни на один из агрегатов не влияет, в отличие от
+ * `updateTransaction` (та про сумму/дату).
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} transactionId
+ * @param {string} method 'cash'|'uzcard'|'click'
+ * @param {{uid: string}} user
+ * @returns {Promise<void>}
+ */
+export async function updateTransactionMethod(db, transactionId, method, user) {
+  await updateDoc(doc(db, 'transactions', transactionId), {
+    method,
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid,
+  });
+}
+
+/**
  * Удаляет транзакцию навсегда (любой type) — без компенсирующей записи.
  * Откатывает эффект на `students.balance`, `monthlyBalances` и (для
  * type=payment) `monthlyRevenue` тем же батчем.
