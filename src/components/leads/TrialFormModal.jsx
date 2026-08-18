@@ -25,6 +25,8 @@ import { advanceStage, trialConfirmDueAt } from '../../lib/leadFunnel.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Select.jsx';
+import { Input } from '../ui/Input.jsx';
+import { DatePicker } from '../ui/DatePicker.jsx';
 
 const DEFAULT_TIME_SLOTS = ['09:00', '10:30', '14:00', '15:30', '17:00', '18:30', '20:00'];
 const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -190,6 +192,8 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
   const [time, setTime] = useState(timeSlots[0] ?? DEFAULT_TIME_SLOTS[0]);
   const [courseId, setCourseId] = useState('');
   const [telegramReminderSent, setTelegramReminderSent] = useState(false);
+  const [confirmDate, setConfirmDate] = useState('');
+  const [confirmTime, setConfirmTime] = useState('');
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(1);
 
@@ -203,6 +207,8 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
     setTime(timeSlots[0] ?? DEFAULT_TIME_SLOTS[0]);
     setCourseId(target.lead.trialCourseId ?? '');
     setTelegramReminderSent(false);
+    setConfirmDate('');
+    setConfirmTime('');
     setStep(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
@@ -210,8 +216,20 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
   if (!target) return null;
   const { lead, mode } = target;
 
+  // Дедлайн звонка-предупреждения обязателен — без него на 2-й шаг не
+  // попасть (см. goToStep2), но проверяем ещё раз перед сохранением на
+  // случай, если оператор его стёр руками.
+  const goToStep2 = () => {
+    const trialDateJs = new Date(`${date}T${time}:00`);
+    const suggested = trialConfirmDueAt(trialDateJs);
+    setConfirmDate(format(suggested, 'yyyy-MM-dd'));
+    setConfirmTime(format(suggested, 'HH:mm'));
+    setStep(2);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!confirmDate || !confirmTime) return;
     setSaving(true);
     try {
       const trialDateJs = new Date(`${date}T${time}:00`);
@@ -220,7 +238,7 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
       // Перенос тоже пересчитывает confirmDueAt и обнуляет попытки — старые
       // попытки дозвона относились к прежней дате пробного (спец «Перенос
       // пробного сбрасывает цикл подтверждения»).
-      const confirmDueAt = Timestamp.fromDate(trialConfirmDueAt(trialDateJs));
+      const confirmDueAt = Timestamp.fromDate(new Date(`${confirmDate}T${confirmTime}:00`));
       const trialFields = {
         trialDate,
         trialCourseId: courseId || null,
@@ -265,14 +283,14 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
             <Button variant="secondary" onClick={onClose}>
               Отмена
             </Button>
-            <Button onClick={() => setStep(2)}>Далее</Button>
+            <Button onClick={goToStep2}>Далее</Button>
           </>
         ) : (
           <>
             <Button variant="secondary" onClick={() => setStep(1)}>
               Назад
             </Button>
-            <Button onClick={handleSubmit} loading={saving}>
+            <Button onClick={handleSubmit} loading={saving} disabled={!confirmDate || !confirmTime}>
               Сохранить
             </Button>
           </>
@@ -302,20 +320,34 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
             />
           </>
         ) : (
-          <div>
-            <label className="flex items-start gap-2 text-[14px] text-text">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={telegramReminderSent}
-                onChange={(e) => setTelegramReminderSent(e.target.checked)}
-              />
-              <span>Отправка локации и напоминания за 1 день до пробного урока через Telegram</span>
-            </label>
-            <p className="mt-1 text-[12px] text-danger">
-              Ставьте галочку только если действительно отправили локацию и напоминание — за ложную отметку штраф до 100 000 сум.
-            </p>
-          </div>
+          <>
+            <div>
+              <p className="mb-1 text-[13px] text-muted">Дедлайн звонка-предупреждения</p>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <DatePicker required value={confirmDate} onChange={(e) => setConfirmDate(e.target.value)} />
+                </div>
+                <Input type="time" required value={confirmTime} onChange={(e) => setConfirmTime(e.target.value)} className="w-32" />
+              </div>
+              <p className="mt-1 text-[12px] text-muted">
+                Без этого дедлайна назначить пробный нельзя — до этого момента нужно позвонить лиду и предупредить.
+              </p>
+            </div>
+            <div>
+              <label className="flex items-start gap-2 text-[14px] text-text">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={telegramReminderSent}
+                  onChange={(e) => setTelegramReminderSent(e.target.checked)}
+                />
+                <span>Отправка локации и напоминания за 1 день до пробного урока через Telegram</span>
+              </label>
+              <p className="mt-1 text-[12px] text-danger">
+                Ставьте галочку только если действительно отправили локацию и напоминание — за ложную отметку штраф до 100 000 сум.
+              </p>
+            </div>
+          </>
         )}
       </form>
     </Modal>
