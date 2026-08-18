@@ -1,6 +1,7 @@
 // src/pages/LeadsPage.jsx
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isSameMonth } from 'date-fns';
 import { collection, doc, query, where, orderBy, updateDoc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -18,7 +19,6 @@ import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
 
-const WON_LOST_VISIBLE_DAYS = 30;
 const TERMINAL_STAGES = ['won', 'lost'];
 
 /**
@@ -79,18 +79,21 @@ export function LeadsPage() {
     );
   };
 
-  // won/lost старше 30 дней не показываем на доске — иначе терминальные
-  // колонки бесконечно растут за месяцы работы (см. план, «Важное
-  // архитектурное решение»). Документ никуда не девается, просто не
-  // рендерится в этом списке.
+  // won/lost видны только в текущем календарном месяце — сбрасываются 1-го
+  // числа, а не скользящим окном (иначе терминальные колонки бесконечно
+  // растут за месяцы работы, см. план, «Важное архитектурное решение»).
+  // Документ никуда не девается, просто не рендерится в этом списке.
+  // boardHiddenAt — то же самое, но вручную и раньше конца месяца
+  // («Оплачено» — крестик на карточке, см. onDismissFromBoard).
   const leads = useMemo(() => {
-    const cutoff = Date.now() - WON_LOST_VISIBLE_DAYS * 86_400_000;
+    const now = new Date();
     const scopedToSelf = !canSeeAllLeads || showOnlyMine;
     return allLeads.filter((l) => {
       if (scopedToSelf && l.assignedOperator !== user.uid) return false;
+      if (l.boardHiddenAt) return false;
       if (!TERMINAL_STAGES.includes(columnKeyOf(l))) return true;
       const at = (l.paidAt ?? l.lostAt ?? l.updatedAt)?.toDate?.();
-      return at ? at.getTime() >= cutoff : true;
+      return at ? isSameMonth(at, now) : true;
     });
   }, [allLeads, canSeeAllLeads, showOnlyMine, user.uid]);
 
@@ -291,6 +294,9 @@ export function LeadsPage() {
     onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
     onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
     onOpenBooking: (lead) => setBookingTarget(lead),
+    // Только «Оплачено» — убирает карточку с доски, студент остаётся в
+    // системе (просто не рендерится больше в этом списке, см. leads выше).
+    onDismissFromBoard: (lead) => patch(lead, { boardHiddenAt: serverTimestamp() }, `${lead.fullName}: убрано с доски.`),
     onMarkAttended: (lead, engagementScore) => {
       // Проходим через 'trial_completed' в 'closing' одним обновлением —
       // без оплаты в момент отметки явки лид сразу уходит в дожим (спека

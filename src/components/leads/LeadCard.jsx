@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, Clock, Users } from 'lucide-react';
+import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, Clock, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -388,6 +388,7 @@ function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
  * @param {(lead: Object, result: 'reschedule'|'fail') => void} props.onMarkUnreachable
  * @param {(lead: Object, checked: boolean) => void} props.onToggleCallReminder
  * @param {(lead: Object) => void} props.onOpenBooking
+ * @param {(lead: Object) => void} props.onDismissFromBoard только для won — скрывает с доски, студент остаётся в системе
  */
 export function LeadCard({
   lead,
@@ -406,6 +407,7 @@ export function LeadCard({
   onMarkUnreachable,
   onToggleCallReminder,
   onOpenBooking,
+  onDismissFromBoard,
   columns = COLUMNS,
 }) {
   const stage = lead.funnelStage ?? 'new';
@@ -442,7 +444,10 @@ export function LeadCard({
     { label: 'Редактировать', onClick: () => onEdit(lead) },
     // Только для настоящих лидов (status=='lead') — правило Firestore всё
     // равно не даст удалить студента с историей, но незачем и предлагать.
-    ...(lead.status === 'lead' ? [{ label: 'Удалить навсегда', danger: true, onClick: () => onDelete(lead) }] : []),
+    // Оплаченных не удаляем насовсем никогда, даже если status почему-то
+    // остался 'lead' (ручной drag в «Оплачено» без прохода через оплату) —
+    // с этой стадии карточку можно только скрыть с доски (см. won-ветку ниже).
+    ...(lead.status === 'lead' && stage !== 'won' ? [{ label: 'Удалить навсегда', danger: true, onClick: () => onDelete(lead) }] : []),
   ];
 
   const moveItems = columns.filter(
@@ -570,33 +575,49 @@ export function LeadCard({
         ) : (
           <span />
         )}
-        <div className="flex shrink-0 items-center gap-0.5">
+        {stage === 'won' ? (
+          // «Оплачено» — карточка ведёт себя как уведомление: только
+          // посмотреть (клик по карточке) и скрыть с доски. Ни коммента, ни
+          // ⋮-меню с «Удалить навсегда» тут никогда не было и не будет —
+          // студент остаётся в системе, убирается только вид на доске
+          // (onDismissFromBoard, см. LeadsPage.boardHiddenAt).
           <button
             type="button"
-            onClick={() => setCommentsOpen((v) => !v)}
-            aria-label="Комментарии"
-            className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-              commentsOpen || hasComments ? 'text-navy' : 'text-muted'
-            }`}
+            onClick={() => onDismissFromBoard(lead)}
+            aria-label="Скрыть с доски"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
           >
-            <MessageSquare className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
+            <X className="h-4 w-4" />
           </button>
-          {!isTerminal && (
+        ) : (
+          <div className="flex shrink-0 items-center gap-0.5">
             <button
               type="button"
-              onClick={() => onOpenBooking(lead)}
-              aria-label="Свободные места в группе"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+              onClick={() => setCommentsOpen((v) => !v)}
+              aria-label="Комментарии"
+              className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+                commentsOpen || hasComments ? 'text-navy' : 'text-muted'
+              }`}
             >
-              <Users className="h-4 w-4" />
+              <MessageSquare className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
             </button>
-          )}
-          {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
-          <DropdownMenu items={menuItems} />
-        </div>
+            {!isTerminal && (
+              <button
+                type="button"
+                onClick={() => onOpenBooking(lead)}
+                aria-label="Свободные места в группе"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+              >
+                <Users className="h-4 w-4" />
+              </button>
+            )}
+            {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
+            <DropdownMenu items={menuItems} />
+          </div>
+        )}
       </div>
 
-      {commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
+      {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
     </div>
   );
 }

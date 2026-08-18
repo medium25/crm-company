@@ -44,8 +44,6 @@ export function DeclineLeadModal({ lead, onClose }) {
           lostReason: reason,
           lostReasonDetail: detailRequired ? detail.trim() : null,
           lostAt: serverTimestamp(),
-          isArchived: true,
-          archivedAt: serverTimestamp(),
         },
         user,
       );
