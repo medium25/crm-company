@@ -229,7 +229,7 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!confirmDate || !confirmTime) return;
+    if (!courseId || !confirmDate || !confirmTime) return;
     setSaving(true);
     try {
       const trialDateJs = new Date(`${date}T${time}:00`);
@@ -283,7 +283,9 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
             <Button variant="secondary" onClick={onClose}>
               Отмена
             </Button>
-            <Button onClick={goToStep2}>Далее</Button>
+            <Button onClick={goToStep2} disabled={!courseId}>
+              Далее
+            </Button>
           </>
         ) : (
           <>
