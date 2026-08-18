@@ -37,8 +37,8 @@ function TrialColumnHeader({ label, count, color }) {
 }
 
 /** Свёрнутая/развёрнутая секция карточек — та же идея, что LeadGroup на «Заявки». */
-function TrialGroup({ title, leads, operatorByUid, renderCard }) {
-  const [open, setOpen] = useState(true);
+function TrialGroup({ title, leads, operatorByUid, renderCard, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
     <div className="rounded-field border border-border bg-surface-alt">
@@ -271,6 +271,7 @@ export function TrialsPage() {
             title="Сегодня"
             leads={groups.today}
             operatorByUid={operatorByUid}
+            defaultOpen
             renderCard={(lead, op) => (
               <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} />
             )}
