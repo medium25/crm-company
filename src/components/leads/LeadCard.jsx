@@ -152,7 +152,23 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
           const attempt = attempts[i];
           if (attempt) {
             const Icon = attempt.result === 'success' ? CheckCircle2 : XCircle;
-            return <Icon key={i} className={`h-4 w-4 ${attempt.result === 'success' ? 'text-success' : 'text-danger'}`} />;
+            return (
+              <DropdownMenu
+                key={i}
+                items={[{ label: attempt.at ? formatDateTimeShort(attempt.at) : '—', disabled: true }]}
+                trigger={({ ref, toggle }) => (
+                  <button
+                    ref={ref}
+                    type="button"
+                    onClick={toggle}
+                    aria-label={`Попытка ${i + 1}: когда отмечена`}
+                    className="flex h-4 w-4 items-center justify-center"
+                  >
+                    <Icon className={`h-4 w-4 ${attempt.result === 'success' ? 'text-success' : 'text-danger'}`} />
+                  </button>
+                )}
+              />
+            );
           }
           if (i === attempts.length) {
             return (
@@ -305,7 +321,23 @@ function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
         const attempt = attempts[i];
         if (attempt) {
           const Icon = attempt.result === 'reschedule' ? Clock : XCircle;
-          return <Icon key={i} className={`h-4 w-4 ${attempt.result === 'reschedule' ? 'text-orange' : 'text-danger'}`} />;
+          return (
+            <DropdownMenu
+              key={i}
+              items={[{ label: attempt.at ? formatDateTimeShort(attempt.at) : '—', disabled: true }]}
+              trigger={({ ref, toggle }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  onClick={toggle}
+                  aria-label={`Попытка ${i + 1}: когда отмечена`}
+                  className="flex h-4 w-4 items-center justify-center"
+                >
+                  <Icon className={`h-4 w-4 ${attempt.result === 'reschedule' ? 'text-orange' : 'text-danger'}`} />
+                </button>
+              )}
+            />
+          );
         }
         if (i !== attempts.length) return <Circle key={i} className="h-4 w-4 text-border" />;
         return (
