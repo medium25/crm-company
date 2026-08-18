@@ -35,7 +35,7 @@ import { CommentsTab } from '../components/shared/CommentsTab.jsx';
 import { HistoryTab } from '../components/shared/HistoryTab.jsx';
 import { CallLogsTab } from '../components/students/CallLogsTab.jsx';
 import { recalcBalance, deleteTransaction } from '../lib/billing.js';
-import { formatDateLong, formatDate, formatMoney, formatMoneySigned, formatMonth, formatPhone, formatMethod } from '../lib/format.js';
+import { formatDateLong, formatDate, formatDateTimeShort, formatMoney, formatMoneySigned, formatMonth, formatPhone, formatMethod } from '../lib/format.js';
 
 const TABS = [
   { key: 'groups', label: 'Группы' },
@@ -432,7 +432,7 @@ export function StudentDetailPage() {
                               <span>
                                 {t.createdByName}
                                 <br />
-                                <span className="text-muted">{formatDate(t.createdAt)}</span>
+                                <span className="text-muted">{formatDateTimeShort(t.createdAt)}</span>
                               </span>
                             ),
                           },
