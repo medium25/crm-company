@@ -197,6 +197,27 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
   );
 }
 
+/** Ряд из 2 точек — касания в «Дожиме» (см. LeadsPage.markTouch), без результата — просто факт касания. */
+function TouchDots({ closingTouchNumber, nextTouchAt, onMark }) {
+  const count = closingTouchNumber ?? 0;
+  const deadlineLabel = count < 2 && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
+        {Array.from({ length: 2 }, (_, i) => {
+          if (i < count) return <CheckCircle2 key={i} className="h-4 w-4 text-success" />;
+          if (i === count) {
+            return <AttemptDot key={i} toggle={onMark} ariaLabel={`Касание ${i + 1}: отметить`} />;
+          }
+          return <Circle key={i} className="h-4 w-4 text-border" />;
+        })}
+      </div>
+      {deadlineLabel && <span className="text-[11px] text-muted">{deadlineLabel}</span>}
+    </div>
+  );
+}
+
 /**
  * Бейдж «!» в углу карточки (просрочен дедлайн стадии) — клик показывает,
  * что именно просрочено и до какого момента. Тот же трюк с позиционированием
@@ -552,20 +573,7 @@ export function LeadCard({
 
       {stage === 'closing' && (
         <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between gap-2 text-[12px]">
-            <span className="truncate text-muted">
-              Касание {lead.closingTouchNumber ?? 0}/2{lead.nextTouchAt && ` · ${formatRelativeDeadline(lead.nextTouchAt)}`}
-            </span>
-            {(lead.closingTouchNumber ?? 0) < 2 && (
-              <button
-                type="button"
-                onClick={() => onMarkTouch(lead)}
-                className="rounded-field border border-border px-2 py-1 text-[12px] font-bold text-text hover:bg-surface-alt"
-              >
-                Отметить касание
-              </button>
-            )}
-          </div>
+          <TouchDots closingTouchNumber={lead.closingTouchNumber} nextTouchAt={lead.nextTouchAt} onMark={() => onMarkTouch(lead)} />
           <UnreachableBlock
             lead={lead}
             onMark={(result) => onMarkUnreachable(lead, result)}
