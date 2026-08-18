@@ -1,3 +1,4 @@
+import { Wallet, Clock, Archive } from 'lucide-react';
 import { formatPhone } from '../../lib/format.js';
 import { surnameInitial, trialScheduleLabel } from './LeadCard.jsx';
 
@@ -42,27 +43,33 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, onOpen, 
           {operatorLabel}
         </span>
       )}
-      <div className="flex flex-wrap gap-1.5 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-0.5 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={() => onPay(lead)}
-          className="rounded-field bg-success px-2 py-1 text-[11px] font-bold text-white hover:opacity-90"
+          aria-label="Добавить оплату"
+          title="Добавить оплату"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt hover:text-success"
         >
-          Оплата
+          <Wallet className="h-4 w-4" />
         </button>
         <button
           type="button"
           onClick={() => onDeferPayment(lead)}
-          className="rounded-field border border-border px-2 py-1 text-[11px] font-bold text-text hover:bg-surface-alt"
+          aria-label="Перенос оплаты"
+          title="Перенос оплаты (в «Дожим»)"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt hover:text-navy"
         >
-          Перенос оплаты
+          <Clock className="h-4 w-4" />
         </button>
         <button
           type="button"
           onClick={() => onArchive(lead)}
-          className="rounded-field border border-border px-2 py-1 text-[11px] font-bold text-danger hover:bg-danger/5"
+          aria-label="Архивировать"
+          title="Архивировать"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt hover:text-danger"
         >
-          Архивировать
+          <Archive className="h-4 w-4" />
         </button>
       </div>
     </div>
