@@ -428,7 +428,9 @@ export function LeadCard({
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
       className={`group relative flex flex-col gap-1.5 rounded-xl border bg-surface p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
-      } ${overdue ? 'border-danger ring-1 ring-danger/40' : ''} ${priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''}`}
+      } ${overdue ? 'border-danger ring-1 ring-danger/40' : !isTerminal ? 'border-success ring-1 ring-success/40' : ''} ${
+        priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
