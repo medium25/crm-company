@@ -533,12 +533,10 @@ export function LeadCard({
             <button
               type="button"
               onClick={() => onOpenBooking(lead)}
-              aria-label="Бронь места в группе"
-              className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-                lead.reservedGroupId ? 'text-navy' : 'text-muted'
-              }`}
+              aria-label="Свободные места в группе"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
             >
-              <Users className="h-4 w-4" fill={lead.reservedGroupId ? 'currentColor' : 'none'} fillOpacity={lead.reservedGroupId ? 0.15 : 1} />
+              <Users className="h-4 w-4" />
             </button>
           )}
           {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
