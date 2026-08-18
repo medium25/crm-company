@@ -297,9 +297,9 @@ export function TrialsPage() {
           <TrialColumnHeader label="Пробный проведён" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
           <SearchField value={completedSearch} onChange={(e) => setCompletedSearch(e.target.value)} placeholder="Найти среди пробных" />
           <div className="rounded-field border border-border bg-surface-alt">
-            <div className="flex flex-col gap-2 p-3">
+            <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2">
               {completedLeads.length === 0 ? (
-                <p className="py-4 text-center text-[13px] text-muted">{completedTerm ? 'Ничего не найдено' : 'Пусто'}</p>
+                <p className="col-span-full py-4 text-center text-[13px] text-muted">{completedTerm ? 'Ничего не найдено' : 'Пусто'}</p>
               ) : (
                 completedLeads.map((lead) => {
                   const op = operatorByUid.get(lead.assignedOperator);
