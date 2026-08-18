@@ -17,7 +17,7 @@ import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
-import { advanceStage, nextCallDueAt, firstTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
+import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
 
 const TERMINAL_STAGES = ['won', 'lost'];
 
@@ -229,8 +229,9 @@ export function LeadsPage() {
       setDeadlineTarget({
         lead,
         title: 'Дедлайн первого касания в «Дожиме»',
-        suggestedDate: firstTouchDueAt(),
-        onConfirm: (dueDate) => commit({ closingTouchNumber: 0, nextTouchAt: dueDate }),
+        suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
+        onConfirm: (dueDate) => commit({ closingTouchNumber: 0, nextTouchAt: dueDate, unreachableAttempts: [] }),
+        lockDate: true,
       });
       return;
     }
@@ -242,33 +243,52 @@ export function LeadsPage() {
     commit({});
   };
 
+  // Дожим — ровно 2 касания (см. firstTouchDueAt/secondTouchDueAt): первое
+  // за день до второго урока, второе — в день второго урока. Оба дня
+  // фиксированы датой пробного, оператору выбирать нечего (lockDate).
   const markTouch = (lead) => {
     const nextNumber = (lead.closingTouchNumber ?? 0) + 1;
-    const daysToAdd = nextNumber === 1 ? 1 : 4;
-    const isFinal = nextNumber >= 3;
+    const isFinal = nextNumber >= 2;
     const commit = (dueDate) =>
-      patch(lead, { closingTouchNumber: nextNumber, nextTouchAt: isFinal ? null : dueDate }, `Касание ${nextNumber} отмечено.`);
+      patch(
+        lead,
+        { closingTouchNumber: nextNumber, nextTouchAt: isFinal ? null : dueDate, unreachableAttempts: [] },
+        `Касание ${nextNumber} отмечено.`,
+      );
 
     if (isFinal) {
-      commit(null); // 3-е касание финальное — дальше дожима нет, дедлайну взяться неоткуда
+      commit(null); // 2-е касание финальное — дальше дожима нет, дедлайну взяться неоткуда
       return;
     }
     setDeadlineTarget({
       lead,
-      title: 'Дедлайн следующего касания',
-      suggestedDate: new Date(Date.now() + daysToAdd * 86_400_000),
+      title: 'Дедлайн второго касания',
+      suggestedDate: secondTouchDueAt(lead.trialDate?.toDate?.()),
       onConfirm: commit,
+      lockDate: true,
     });
   };
 
   // «Не выходит на связь» — до 3 попыток (см. UNREACHABLE_MAX_ATTEMPTS в
-  // LeadCard.jsx). «Перенос» открывает TrialFormModal отдельно — новая дата
-  // пробного сама по себе следующий шаг, дедлайну на неё взяться неоткуда.
-  // «Неуспешно», пока попытки не исчерпаны, требует дедлайн следующего
-  // звонка — тот же паттерн подтверждения, что и markAttempt выше.
+  // LeadCard.jsx), тот же сценарий на «Пробный назначен» и в «Дожиме».
+  // На пробном «Перенос» открывает TrialFormModal отдельно (новая дата
+  // пробного сама по себе следующий шаг), «Неуспешно» требует дедлайн
+  // следующего звонка. В «Дожиме» нет отдельной формы переноса — там и
+  // «Перенос», и «Неуспешно» одинаково просят новый дедлайн касания
+  // (то же поле nextTouchAt, что и у markTouch).
   const markUnreachable = (lead, result) => {
     const attempts = [...(lead.unreachableAttempts ?? []), { result, at: new Date() }];
     const attemptsExhausted = attempts.length >= 3;
+
+    if (lead.funnelStage === 'closing') {
+      const commit = (dueDate) => patch(lead, { unreachableAttempts: attempts, nextTouchAt: dueDate });
+      if (attemptsExhausted) {
+        commit(null);
+        return;
+      }
+      setDeadlineTarget({ lead, title: 'Дедлайн следующего касания', suggestedDate: unreachableCallDueAt(), onConfirm: commit });
+      return;
+    }
 
     const commit = (dueDate) => patch(lead, { unreachableAttempts: attempts, unreachableNextCallDueAt: dueDate });
 
@@ -313,11 +333,18 @@ export function LeadsPage() {
           engagementScore,
           closingTouchNumber: 0,
           nextTouchAt: dueDate,
+          unreachableAttempts: [],
           stageHistory,
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
         }).catch(() => showToast('Не удалось сохранить явку.', { type: 'error' }));
-      setDeadlineTarget({ lead, title: 'Дедлайн первого касания в «Дожиме»', suggestedDate: firstTouchDueAt(), onConfirm: commit });
+      setDeadlineTarget({
+        lead,
+        title: 'Дедлайн первого касания в «Дожиме»',
+        suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
+        onConfirm: commit,
+        lockDate: true,
+      });
     },
     onMarkTouch: markTouch,
     onMove: moveLead,

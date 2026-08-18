@@ -1,6 +1,6 @@
 // src/lib/leadFunnel.js
 import { doc, getDoc, updateDoc, collection, query, where, getCountFromServer, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore';
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, addDays } from 'date-fns';
 
 /**
  * Причины отказа — фиксированный список (см. спек §7). `requiresDetail` —
@@ -91,18 +91,25 @@ export function nextCallDueAt(attempts) {
 }
 
 /**
- * Дедлайн первого касания при входе в «Дожим» — вечер того же дня (21:00),
- * либо прямо сейчас, если пробный отмечен уже вечером (спека §6). Дальше
- * `markTouch` пересчитывает дедлайн следующего касания сам при каждой
- * отметке — здесь только точка входа в стадию.
+ * Дожим — ровно 2 касания, привязанные ко «второму уроку» (пробный
+ * считаем первым; лид ещё не записан в конкретную группу, поэтому второй
+ * урок — trialDate + 2 дня, стандартный шаг занятия через день). Первое
+ * касание — за день до второго урока, второе — в день второго урока. Оба
+ * дедлайна фиксированы (DeadlineModal.lockDate) — оператор не выбирает
+ * день, только время в пределах него.
+ * @param {Date} [trialDate]
  * @returns {Date}
  */
-export function firstTouchDueAt() {
-  const d = new Date();
-  if (d.getHours() < 21) {
-    d.setHours(21, 0, 0, 0);
-    return d;
-  }
+export function firstTouchDueAt(trialDate) {
+  const d = addDays(trialDate ?? new Date(), 1);
+  d.setHours(18, 0, 0, 0);
+  return d;
+}
+
+/** @param {Date} [trialDate] @returns {Date} */
+export function secondTouchDueAt(trialDate) {
+  const d = addDays(trialDate ?? new Date(), 2);
+  d.setHours(18, 0, 0, 0);
   return d;
 }
 

@@ -9,7 +9,7 @@ import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, isTrialDay, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
-import { formatPhone, formatDate, formatDateTime, formatDateTimeShort, formatRelativeDeadline } from '../../lib/format.js';
+import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline } from '../../lib/format.js';
 
 /**
  * Компактная лента комментариев лида, разворачивается прямо в карточке.
@@ -119,7 +119,7 @@ function trialScheduleLabel(lead) {
 const MAX_ATTEMPTS = 5;
 const UNREACHABLE_MAX_ATTEMPTS = 3;
 
-/** Триггер-точка попытки — общий для CallAttemptDots и TrialUnreachableBlock. */
+/** Триггер-точка попытки — общий для CallAttemptDots и UnreachableBlock. */
 function AttemptDot({ ref, toggle, ariaLabel }) {
   return (
     <button
@@ -281,17 +281,20 @@ function LeadInfoPopover({ question, answer }) {
 }
 
 /**
- * «Не выходит на связь» — необязательный трекер на стадии «Пробный
- * назначен». Кнопка-переключатель; открывшись, показывает до 3 попыток
- * связаться. Каждая попытка — «Перенос» (сдвигает дату через ту же форму,
- * что открывает «Не пришёл»; разрешено один раз за цикл) или «Неуспешно»;
- * на 3-й неуспешной подряд открывается «Отказ».
+ * «Не выходит на связь» — необязательный трекер, общий для «Пробный
+ * назначен» и «Дожим» (тот же сценарий на обеих стадиях). Кнопка-
+ * переключатель; открывшись, показывает до 3 попыток связаться. Каждая
+ * попытка — «Перенос» (разрешено один раз за цикл — на пробном сдвигает
+ * дату через TrialFormModal, в дожиме сразу просит новый дедлайн касания
+ * тут же в onMark) или «Неуспешно»; на 3-й неуспешной подряд открывается
+ * «Отказ».
  * @param {Object} lead
  * @param {(result: 'reschedule'|'fail') => Promise<void>|void} onMark
- * @param {() => void} onReschedule
+ * @param {() => void} onReschedule доп. действие при «Перенос» — на пробном открывает TrialFormModal, в дожиме no-op (там дедлайн уже спрошен внутри onMark)
  * @param {() => void} onDecline
+ * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
-function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
+function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt }) {
   const attempts = lead.unreachableAttempts ?? [];
   const [active, setActive] = useState(attempts.length > 0);
 
@@ -351,8 +354,8 @@ function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
           />
         );
       })}
-      {lead.unreachableNextCallDueAt && failStreak < UNREACHABLE_MAX_ATTEMPTS && (
-        <span className="text-[11px] text-muted">до {formatDateTimeShort(lead.unreachableNextCallDueAt)}</span>
+      {nextAttemptDueAt && failStreak < UNREACHABLE_MAX_ATTEMPTS && (
+        <span className="text-[11px] text-muted">до {formatDateTimeShort(nextAttemptDueAt)}</span>
       )}
       {failStreak >= UNREACHABLE_MAX_ATTEMPTS && (
         <button
@@ -520,11 +523,12 @@ export function LeadCard({
         <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <span className="truncate text-[12px] text-muted">{trialScheduleLabel(lead)}</span>
 
-          <TrialUnreachableBlock
+          <UnreachableBlock
             lead={lead}
             onMark={(result) => onMarkUnreachable(lead, result)}
             onReschedule={() => onRescheduleTrial(lead)}
             onDecline={() => onDecline(lead)}
+            nextAttemptDueAt={lead.unreachableNextCallDueAt}
           />
 
           {trialDay && (
@@ -541,19 +545,28 @@ export function LeadCard({
       )}
 
       {stage === 'closing' && (
-        <div className="flex items-center justify-between gap-2 text-[12px]" onClick={(e) => e.stopPropagation()}>
-          <span className="truncate text-muted">
-            Касание {lead.closingTouchNumber ?? 0}/3{lead.nextTouchAt && ` · до ${formatDate(lead.nextTouchAt)}`}
-          </span>
-          {(lead.closingTouchNumber ?? 0) < 3 && (
-            <button
-              type="button"
-              onClick={() => onMarkTouch(lead)}
-              className="rounded-field border border-border px-2 py-1 text-[12px] font-bold text-text hover:bg-surface-alt"
-            >
-              Отметить касание
-            </button>
-          )}
+        <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between gap-2 text-[12px]">
+            <span className="truncate text-muted">
+              Касание {lead.closingTouchNumber ?? 0}/2{lead.nextTouchAt && ` · ${formatRelativeDeadline(lead.nextTouchAt)}`}
+            </span>
+            {(lead.closingTouchNumber ?? 0) < 2 && (
+              <button
+                type="button"
+                onClick={() => onMarkTouch(lead)}
+                className="rounded-field border border-border px-2 py-1 text-[12px] font-bold text-text hover:bg-surface-alt"
+              >
+                Отметить касание
+              </button>
+            )}
+          </div>
+          <UnreachableBlock
+            lead={lead}
+            onMark={(result) => onMarkUnreachable(lead, result)}
+            onReschedule={() => {}}
+            onDecline={() => onDecline(lead)}
+            nextAttemptDueAt={lead.nextTouchAt}
+          />
         </div>
       )}
 
