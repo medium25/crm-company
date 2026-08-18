@@ -203,7 +203,7 @@ export async function funnelByOperator(db, branchId, periodStart, periodEnd) {
     const attended = opLeads.filter((l) => l.attended === true).length;
     const won = opLeads.filter((l) => l.funnelStage === 'won').length;
     const lost = opLeads.filter((l) => l.funnelStage === 'lost');
-    const noAnswerOrNoShow = lost.filter((l) => l.lostReason === 'no_answer' || l.lostReason === 'no_show').length;
+    const noAnswerOrNoShow = lost.filter((l) => l.lostReason === 'no_answer' || l.lostReason === 'no_show' || l.lostReason === 'cold_lead').length;
     return {
       operatorId,
       total,
@@ -224,7 +224,7 @@ export async function funnelByOperator(db, branchId, periodStart, periodEnd) {
  */
 export async function remarketingCandidates(db, branchId, today = new Date()) {
   const snap = await getDocs(
-    query(collection(db, 'students'), where('branchId', '==', branchId), where('funnelStage', '==', 'lost'), where('lostReason', 'in', ['no_answer', 'no_show'])),
+    query(collection(db, 'students'), where('branchId', '==', branchId), where('funnelStage', '==', 'lost'), where('lostReason', 'in', ['no_answer', 'no_show', 'cold_lead'])),
   );
   const cutoff = today.getTime() - 30 * 86_400_000;
   return snap.docs

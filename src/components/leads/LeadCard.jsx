@@ -555,6 +555,7 @@ export function LeadCard({
       {stage === 'lost' && lead.lostReason && (
         <p className="text-[12px] text-danger">
           Причина: {LOST_REASON_OPTIONS.find((o) => o.value === lead.lostReason)?.label ?? lead.lostReason}
+          {lead.lostReasonDetail ? ` — ${lead.lostReasonDetail}` : ''}
         </p>
       )}
 

@@ -168,7 +168,7 @@ export function LeadsPage() {
           stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: new Date() }];
         } else if (isCold) {
           stageFields.funnelStage = 'lost';
-          stageFields.lostReason = 'no_answer';
+          stageFields.lostReason = 'cold_lead';
           stageFields.lostAt = serverTimestamp();
           stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }];
         }

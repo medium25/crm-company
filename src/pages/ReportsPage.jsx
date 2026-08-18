@@ -368,7 +368,11 @@ export function ReportsPage() {
                 columns={[
                   { key: 'studentName', label: 'Имя' },
                   { key: 'phone', label: 'Телефон', render: (r) => formatPhone(r.phone) },
-                  { key: 'lostReason', label: 'Причина', render: (r) => (r.lostReason === 'no_answer' ? 'Не дозвонились' : 'Не пришёл на пробный') },
+                  {
+                    key: 'lostReason',
+                    label: 'Причина',
+                    render: (r) => (r.lostReason === 'no_show' ? 'Не пришёл на пробный' : 'Не дозвонились'),
+                  },
                   { key: 'lostAt', label: 'Дата отказа', render: (r) => fmtDate(r.lostAt) },
                 ]}
                 rows={remarketing.map((r) => ({ id: r.studentId, ...r }))}

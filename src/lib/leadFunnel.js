@@ -2,14 +2,16 @@
 import { doc, getDoc, updateDoc, collection, query, where, getCountFromServer, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore';
 import { differenceInCalendarDays } from 'date-fns';
 
-/** Причины отказа — фиксированный список, свободный текст не допускается (см. спек §7). */
+/**
+ * Причины отказа — фиксированный список (см. спек §7). `requiresDetail` —
+ * для этих двух свободный текст обязателен (DeclineLeadModal), для
+ * остальных выбора причины из списка достаточно.
+ */
 export const LOST_REASON_OPTIONS = [
-  { value: 'expensive', label: 'Дорого' },
-  { value: 'bad_timing', label: 'Не время' },
-  { value: 'other_school', label: 'Выбрал другую школу' },
-  { value: 'no_answer', label: 'Не дозвонились' },
-  { value: 'no_show', label: 'Не пришёл на пробный' },
-  { value: 'undecided', label: 'Думает' },
+  { value: 'no_agreement', label: 'Не смогли договориться', requiresDetail: true },
+  { value: 'invalid_number', label: 'Несуществующий номер' },
+  { value: 'inadequate', label: 'Неадекватный человек', requiresDetail: true },
+  { value: 'cold_lead', label: 'Холодный лид (не дозвонились)' },
 ];
 
 /**

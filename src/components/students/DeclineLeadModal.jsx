@@ -7,10 +7,13 @@ import { advanceStage, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Select.jsx';
+import { Input } from '../ui/Input.jsx';
 
 /**
  * «Отказ» лида — причина строго из фиксированного списка
- * (2026-08-13-leads-funnel-redesign.md §7), свободный текст не допускается.
+ * (2026-08-13-leads-funnel-redesign.md §7). Для причин с
+ * `requiresDetail` (см. LOST_REASON_OPTIONS) оператор обязан ещё
+ * вписать, что именно случилось — без этого текста отказать нельзя.
  * `lead` = null (закрыто) или сущность.
  * @param {Object} props
  * @param {Object|null} props.lead
@@ -20,10 +23,15 @@ export function DeclineLeadModal({ lead, onClose }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [reason, setReason] = useState(LOST_REASON_OPTIONS[0].value);
+  const [detail, setDetail] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const selectedOption = LOST_REASON_OPTIONS.find((o) => o.value === reason);
+  const detailRequired = Boolean(selectedOption?.requiresDetail);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (detailRequired && !detail.trim()) return;
     setSaving(true);
     try {
       await advanceStage(
@@ -32,8 +40,9 @@ export function DeclineLeadModal({ lead, onClose }) {
         'lost',
         {
           status: 'archived',
-          statusReason: LOST_REASON_OPTIONS.find((o) => o.value === reason)?.label ?? reason,
+          statusReason: detailRequired ? `${selectedOption.label} — ${detail.trim()}` : (selectedOption?.label ?? reason),
           lostReason: reason,
+          lostReasonDetail: detailRequired ? detail.trim() : null,
           lostAt: serverTimestamp(),
           isArchived: true,
           archivedAt: serverTimestamp(),
@@ -42,6 +51,7 @@ export function DeclineLeadModal({ lead, onClose }) {
       );
       showToast('Лид отклонён.');
       setReason(LOST_REASON_OPTIONS[0].value);
+      setDetail('');
       onClose();
     } catch {
       showToast('Не удалось сохранить отказ.', { type: 'error' });
@@ -60,14 +70,33 @@ export function DeclineLeadModal({ lead, onClose }) {
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button variant="danger" onClick={handleSubmit} loading={saving}>
+          <Button variant="danger" onClick={handleSubmit} loading={saving} disabled={detailRequired && !detail.trim()}>
             Отказать
           </Button>
         </>
       }
     >
-      <form onSubmit={handleSubmit}>
-        <Select label="Причина" required options={LOST_REASON_OPTIONS} value={reason} onChange={(e) => setReason(e.target.value)} />
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Select
+          label="Причина"
+          required
+          options={LOST_REASON_OPTIONS}
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value);
+            setDetail('');
+          }}
+        />
+        {detailRequired && (
+          <Input
+            label="Что именно случилось"
+            required
+            autoFocus
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            placeholder="Опишите причину своими словами"
+          />
+        )}
       </form>
     </Modal>
   );
