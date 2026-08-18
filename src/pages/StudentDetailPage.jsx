@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { collection, doc, query, where, orderBy, updateDoc, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ArrowLeft, Pencil, Mail, Archive, History, Flag, FolderPlus, Wallet, CircleUserRound, RefreshCw, Trash2, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -35,7 +35,7 @@ import { CommentsTab } from '../components/shared/CommentsTab.jsx';
 import { HistoryTab } from '../components/shared/HistoryTab.jsx';
 import { CallLogsTab } from '../components/students/CallLogsTab.jsx';
 import { recalcBalance, deleteTransaction } from '../lib/billing.js';
-import { NON_TERMINAL_STAGES } from '../lib/leadFunnel.js';
+import { archiveStudent } from '../lib/students.js';
 import { formatDateLong, formatDate, formatDateTimeShort, formatMoney, formatMoneySigned, formatMonth, formatPhone, formatMethod } from '../lib/format.js';
 
 const TABS = [
@@ -162,53 +162,7 @@ export function StudentDetailPage() {
   const confirmArchive = async () => {
     setArchiving(true);
     try {
-      // Студент, ещё не дошедший до «Оплачено»/«Отказ» (создан через
-      // «Пробные», но так и не заплатил) — архивация не должна оставлять
-      // его карточку зависшей в «Дожиме»/«Пробный проведён» навсегда,
-      // поэтому воронка сама закрывается в «Отказ».
-      const stillInFunnel = NON_TERMINAL_STAGES.includes(student.funnelStage);
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'students', id), {
-        isArchived: true,
-        archivedAt: serverTimestamp(),
-        // Заархивированные enrollments не видны recomputeStudentAggregates
-        // (фильтрует isArchived==false), поэтому status здесь выставляем
-        // напрямую — иначе он застревает на прежнем значении навсегда.
-        status: 'left',
-        activeGroupsCount: 0,
-        ...(stillInFunnel
-          ? {
-              funnelStage: 'lost',
-              stageHistory: [...(student.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }],
-              lostReason: 'archived_unpaid',
-              lostAt: serverTimestamp(),
-            }
-          : {}),
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
-      });
-      // Архивация студента должна убирать его из ростеров групп — иначе
-      // группа продолжает показывать давно архивного студента (enrollment
-      // сам по себе не архивируется вместе со студентом).
-      const groupsToDecrement = new Set();
-      for (const e of enrollments) {
-        batch.update(doc(db, 'enrollments', e.id), {
-          status: 'archived',
-          isArchived: true,
-          // Без leftAt студент не попадает в KPI «Ушли из активной группы»
-          // (see src/lib/stats.js countLeftActiveGroup).
-          leftAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid,
-        });
-        if (e.status === 'active' || e.status === 'trial' || e.status === 'paused') {
-          groupsToDecrement.add(e.groupId);
-        }
-      }
-      for (const groupId of groupsToDecrement) {
-        batch.update(doc(db, 'groups', groupId), { studentsCount: increment(-1) });
-      }
-      await batch.commit();
+      await archiveStudent(db, student, user);
       showToast('Студент перенесён в архив.');
       navigate('/students');
     } catch {
