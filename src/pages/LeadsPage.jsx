@@ -13,6 +13,7 @@ import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
 import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
+import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
@@ -110,6 +111,7 @@ export function LeadsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
   const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
+  const [bookingTarget, setBookingTarget] = useState(null);
 
   const byColumn = useMemo(() => {
     const map = {};
@@ -285,6 +287,7 @@ export function LeadsPage() {
     onDelete: (lead) => setDeleteTarget(lead),
     onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
     onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
+    onOpenBooking: (lead) => setBookingTarget(lead),
     onMarkAttended: (lead, engagementScore) => {
       // Проходим через 'trial_completed' в 'closing' одним обновлением —
       // без оплаты в момент отметки явки лид сразу уходит в дожим (спека
@@ -362,6 +365,7 @@ export function LeadsPage() {
       <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
       <TrialFormModal target={trialTarget} timeSlots={branchSettings?.trialTimeSlots} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
+      <GroupBookingModal lead={bookingTarget} allLeads={allLeads} onClose={() => setBookingTarget(null)} />
     </div>
   );
 }

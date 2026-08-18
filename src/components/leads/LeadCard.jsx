@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, Clock, Users } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -345,6 +345,7 @@ function TrialUnreachableBlock({ lead, onMark, onReschedule, onDecline }) {
  * @param {(lead: Object, result: 'success'|'fail') => void} props.onMarkAttempt
  * @param {(lead: Object, result: 'reschedule'|'fail') => void} props.onMarkUnreachable
  * @param {(lead: Object, checked: boolean) => void} props.onToggleCallReminder
+ * @param {(lead: Object) => void} props.onOpenBooking
  */
 export function LeadCard({
   lead,
@@ -362,6 +363,7 @@ export function LeadCard({
   onMarkAttempt,
   onMarkUnreachable,
   onToggleCallReminder,
+  onOpenBooking,
   columns = COLUMNS,
 }) {
   const stage = lead.funnelStage ?? 'new';
@@ -527,6 +529,18 @@ export function LeadCard({
           >
             <MessageSquare className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
           </button>
+          {!isTerminal && (
+            <button
+              type="button"
+              onClick={() => onOpenBooking(lead)}
+              aria-label="Бронь места в группе"
+              className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+                lead.reservedGroupId ? 'text-navy' : 'text-muted'
+              }`}
+            >
+              <Users className="h-4 w-4" fill={lead.reservedGroupId ? 'currentColor' : 'none'} fillOpacity={lead.reservedGroupId ? 0.15 : 1} />
+            </button>
+          )}
           {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
           <DropdownMenu items={menuItems} />
         </div>
