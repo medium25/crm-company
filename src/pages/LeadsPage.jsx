@@ -323,35 +323,6 @@ export function LeadsPage() {
     // системе (просто не рендерится больше в этом списке, см. leads выше).
     // По паролю (см. DismissFromBoardModal), чтобы не улетало случайным кликом.
     onDismissFromBoard: (lead) => setDismissTarget(lead),
-    onMarkAttended: (lead, engagementScore) => {
-      // Проходим через 'trial_completed' в 'closing' одним обновлением —
-      // без оплаты в момент отметки явки лид сразу уходит в дожим (спека
-      // §6), но обе стадии остаются в stageHistory для отчёта по воронке.
-      const stageHistory = [
-        ...(lead.stageHistory ?? []),
-        { stage: 'trial_completed', enteredAt: new Date() },
-        { stage: 'closing', enteredAt: new Date() },
-      ];
-      const commit = (dueDate) =>
-        updateDoc(doc(db, 'students', lead.id), {
-          funnelStage: 'closing',
-          attended: true,
-          engagementScore,
-          closingTouchNumber: 0,
-          nextTouchAt: dueDate,
-          unreachableAttempts: [],
-          stageHistory,
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid,
-        }).catch(() => showToast('Не удалось сохранить явку.', { type: 'error' }));
-      setDeadlineTarget({
-        lead,
-        title: 'Дедлайн первого касания в «Дожиме»',
-        suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
-        onConfirm: commit,
-        lockDate: true,
-      });
-    },
     onMarkTouch: markTouch,
     onMove: moveLead,
     onMarkAttempt: markAttempt,

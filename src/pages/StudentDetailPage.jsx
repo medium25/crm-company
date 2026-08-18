@@ -35,6 +35,7 @@ import { CommentsTab } from '../components/shared/CommentsTab.jsx';
 import { HistoryTab } from '../components/shared/HistoryTab.jsx';
 import { CallLogsTab } from '../components/students/CallLogsTab.jsx';
 import { recalcBalance, deleteTransaction } from '../lib/billing.js';
+import { NON_TERMINAL_STAGES } from '../lib/leadFunnel.js';
 import { formatDateLong, formatDate, formatDateTimeShort, formatMoney, formatMoneySigned, formatMonth, formatPhone, formatMethod } from '../lib/format.js';
 
 const TABS = [
@@ -161,6 +162,11 @@ export function StudentDetailPage() {
   const confirmArchive = async () => {
     setArchiving(true);
     try {
+      // Студент, ещё не дошедший до «Оплачено»/«Отказ» (создан через
+      // «Пробные», но так и не заплатил) — архивация не должна оставлять
+      // его карточку зависшей в «Дожиме»/«Пробный проведён» навсегда,
+      // поэтому воронка сама закрывается в «Отказ».
+      const stillInFunnel = NON_TERMINAL_STAGES.includes(student.funnelStage);
       const batch = writeBatch(db);
       batch.update(doc(db, 'students', id), {
         isArchived: true,
@@ -170,6 +176,14 @@ export function StudentDetailPage() {
         // напрямую — иначе он застревает на прежнем значении навсегда.
         status: 'left',
         activeGroupsCount: 0,
+        ...(stillInFunnel
+          ? {
+              funnelStage: 'lost',
+              stageHistory: [...(student.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }],
+              lostReason: 'archived_unpaid',
+              lostAt: serverTimestamp(),
+            }
+          : {}),
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });

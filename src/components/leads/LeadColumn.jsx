@@ -196,7 +196,7 @@ function LeadGroup({ title, leads, operatorByUid, cardActions }) {
  * @param {Array<Object>} leads
  * @returns {{today: Array, tomorrow: Array, other: Array}}
  */
-function groupLeadsByTrialDay(leads) {
+export function groupLeadsByTrialDay(leads) {
   const groups = { today: [], tomorrow: [], other: [] };
   for (const lead of leads) {
     const d = lead.trialDate?.toDate?.();

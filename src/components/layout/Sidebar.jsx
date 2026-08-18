@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutGrid,
   Inbox,
+  CalendarCheck,
   CircleUserRound,
   GraduationCap,
   Coins,
@@ -28,6 +29,7 @@ const STORAGE_KEY = 'icon-crm:sidebar-collapsed';
 const ITEMS = [
   { key: 'dashboard', to: '/', label: 'Дашборд', icon: LayoutGrid },
   { key: 'leads', to: '/leads', label: 'Заявки', icon: Inbox },
+  { key: 'trials', to: '/trials', label: 'Пробные', icon: CalendarCheck },
   { key: 'students', to: '/students', label: 'Студенты', icon: CircleUserRound },
   { key: 'teachersGroups', to: '/teachers-groups', label: 'Учителя и группы', icon: GraduationCap },
   { key: 'payments', to: '/payments', label: 'Финансы', icon: Coins },
@@ -37,9 +39,9 @@ const ITEMS = [
 
 /** ceo/manager/admin — полный доступ, teacher — только «Учителя и группы» (те же группы, что раньше). */
 const ROLE_ITEM_KEYS = {
-  ceo: ['dashboard', 'leads', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
-  manager: ['dashboard', 'leads', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
-  admin: ['dashboard', 'leads', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  ceo: ['dashboard', 'leads', 'trials', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  manager: ['dashboard', 'leads', 'trials', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  admin: ['dashboard', 'leads', 'trials', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
   teacher: ['teachersGroups'],
 };
 

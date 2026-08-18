@@ -12,6 +12,7 @@ export const LOST_REASON_OPTIONS = [
   { value: 'invalid_number', label: 'Несуществующий номер' },
   { value: 'inadequate', label: 'Неадекватный человек', requiresDetail: true },
   { value: 'cold_lead', label: 'Холодный лид (не дозвонились)' },
+  { value: 'archived_unpaid', label: 'Архивирован до оплаты' },
 ];
 
 /**

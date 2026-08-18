@@ -106,23 +106,28 @@ export function AddToGroupModal({ open, student, onClose }) {
       await updateDoc(doc(db, 'groups', group.id), { studentsCount: increment(1) });
       await recomputeStudentAggregates(db, student.id);
 
-      // Лид, добавленный в группу напрямую (минуя «Пришёл» → оплату на
-      // доске «Заявки»), иначе навсегда зависает карточкой в своей стадии
-      // воронки — funnelStage тут никогда бы не сдвинулся сам. Закрываем
-      // воронку сразу же, раз студент фактически уже не лид — но «Оплачено»
-      // ставим, только если оплата и правда была (firstPaymentAt), иначе
-      // это враньё на доске. Без оплаты — «Дожим»: студент уже учится,
-      // но платёж всё ещё нужно выбить.
+      // Лид, добавленный в группу напрямую, иначе навсегда зависает
+      // карточкой в своей стадии воронки — funnelStage тут никогда бы не
+      // сдвинулся сам. Из «Пробный назначен» (страница «Пробные», кнопка
+      // «Создать студента») — это и есть отметка явки, дальше «Пробный
+      // проведён», оператор сам двигает в «Дожим». Из более ранних стадий
+      // (студент добавлен в группу напрямую, минуя пробный) — сразу
+      // «Дожим»/«Оплачено», как и раньше. «Оплачено» ставим, только если
+      // оплата и правда была (firstPaymentAt), иначе это враньё на доске.
       if (NON_TERMINAL_STAGES.includes(student.funnelStage)) {
         const hasPaid = Boolean(student.firstPaymentAt);
-        const nextStage = hasPaid ? 'won' : 'closing';
-        await updateDoc(doc(db, 'students', student.id), {
-          funnelStage: nextStage,
-          stageHistory: [...(student.stageHistory ?? []), { stage: nextStage, enteredAt: new Date() }],
-          ...(hasPaid ? { paidAt: student.paidAt ?? student.firstPaymentAt } : {}),
-          updatedAt: now,
-          updatedBy: user.uid,
-        });
+        const wasTrialScheduled = student.funnelStage === 'trial_scheduled';
+        const nextStage = hasPaid ? 'won' : wasTrialScheduled ? 'trial_completed' : 'closing';
+        if (nextStage !== student.funnelStage) {
+          await updateDoc(doc(db, 'students', student.id), {
+            funnelStage: nextStage,
+            stageHistory: [...(student.stageHistory ?? []), { stage: nextStage, enteredAt: new Date() }],
+            ...(wasTrialScheduled ? { attended: true } : {}),
+            ...(hasPaid ? { paidAt: student.paidAt ?? student.firstPaymentAt } : {}),
+            updatedAt: now,
+            updatedBy: user.uid,
+          });
+        }
       }
 
       await logActivity(

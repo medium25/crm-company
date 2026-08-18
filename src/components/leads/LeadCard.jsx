@@ -92,7 +92,7 @@ function LeadCommentsPanel({ leadId }) {
 const SURNAME_DIGRAPHS = ['Sh', 'Ch', 'Ng', "O'", "G'"];
 
 /** Первая буква фамилии для бейджа оператора — с поправкой на диграфы («Sh.», не «S.»). */
-function surnameInitial(lastName) {
+export function surnameInitial(lastName) {
   const digraph = SURNAME_DIGRAPHS.find((d) => lastName.toLowerCase().startsWith(d.toLowerCase()));
   return digraph ? lastName.slice(0, digraph.length) : lastName[0];
 }
@@ -106,7 +106,7 @@ function shortCourseLabel(courseName) {
 }
 
 /** «Рус - Понедельник - 14:00» вместо голой даты — курс/день недели/время пробного. */
-function trialScheduleLabel(lead) {
+export function trialScheduleLabel(lead) {
   const trialDateJs = lead.trialDate?.toDate?.();
   if (!trialDateJs) return 'Дата не указана';
   const weekday = format(trialDateJs, 'EEEE', { locale: ru });
@@ -405,7 +405,6 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
  * @param {(lead: Object) => void} props.onDelete полное удаление, только для status=='lead'
  * @param {(lead: Object) => void} props.onScheduleTrial
  * @param {(lead: Object) => void} props.onRescheduleTrial
- * @param {(lead: Object, engagementScore: 'low'|'medium'|'high') => void} props.onMarkAttended
  * @param {(lead: Object) => void} props.onMarkTouch
  * @param {(lead: Object, stageKey: string) => void} props.onMove
  * @param {(lead: Object, result: 'success'|'fail') => void} props.onMarkAttempt
@@ -425,7 +424,6 @@ export function LeadCard({
   onDelete,
   onScheduleTrial,
   onRescheduleTrial,
-  onMarkAttended,
   onMarkTouch,
   onMove,
   onMarkAttempt,
@@ -462,11 +460,8 @@ export function LeadCard({
   const priority = stage === 'new' && createdAt ? isPriorityLead(createdAt) : false;
 
   const menuItems = [
-    // Раньше жили отдельными кнопками на карточке «Пробный назначен» —
-    // унесли сюда, чтобы освободить место под курс/время/чекбоксы.
-    // «Пришёл» без пикера вовлечённости — сразу «средняя», её можно
-    // поправить через «Редактировать» при необходимости.
-    ...(stage === 'trial_scheduled' ? [{ label: 'Пришёл', onClick: () => onMarkAttended(lead, 'medium') }] : []),
+    // «Пришёл» перенесён на отдельную страницу «Пробные» (там же создаётся
+    // сам студент, см. TrialLeadCard) — тут остаётся только «Не пришёл».
     ...(stage === 'trial_scheduled' ? [{ label: 'Не пришёл', onClick: () => onRescheduleTrial(lead) }] : []),
     { label: 'Редактировать', onClick: () => onEdit(lead) },
     // Только для настоящих лидов (status=='lead') — правило Firestore всё

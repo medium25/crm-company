@@ -8,6 +8,7 @@ import { AppShell } from './components/layout/AppShell.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { LeadsPage } from './pages/LeadsPage.jsx';
+import { TrialsPage } from './pages/TrialsPage.jsx';
 import { StudentsPage } from './pages/StudentsPage.jsx';
 import { StudentDetailPage } from './pages/StudentDetailPage.jsx';
 import { GroupsPage } from './pages/GroupsPage.jsx';
@@ -47,6 +48,7 @@ function App() {
               >
                 <Route index element={<HomeRoute />} />
                 <Route path="leads" element={<LeadsPage />} />
+                <Route path="trials" element={<TrialsPage />} />
                 <Route path="students" element={<StudentsPage />} />
                 <Route path="students/:id" element={<StudentDetailPage />} />
                 <Route path="teachers-groups" element={<TeachersAndGroupsPage />} />
