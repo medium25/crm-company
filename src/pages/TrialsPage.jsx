@@ -65,6 +65,25 @@ function TrialGroup({ title, leads, operatorByUid, renderCard }) {
   );
 }
 
+/** Поле поиска — общий визуал для LeadSearch и CompletedSearch. */
+function SearchField({ value, onChange, onFocus, placeholder, trailing }) {
+  return (
+    <div className="flex gap-2">
+      <div className="relative flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        <input
+          value={value}
+          onChange={onChange}
+          onFocus={onFocus}
+          placeholder={placeholder}
+          className="h-10 w-full rounded-field border border-border-strong bg-white pl-9 pr-3 text-[14px] text-text focus:border-navy focus:outline-none"
+        />
+      </div>
+      {trailing}
+    </div>
+  );
+}
+
 /** Поиск лида по всей базе (не только среди «Пробный назначен») — для ручной записи на пробный. */
 function LeadSearch({ onPick, onManualAdd }) {
   const { activeBranchId } = useBranch();
@@ -82,27 +101,23 @@ function LeadSearch({ onPick, onManualAdd }) {
 
   return (
     <div className="relative mb-3">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
-            value={q}
-            onFocus={() => setActive(true)}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Найти лида по всей базе — записать на пробный вручную"
-            className="h-10 w-full rounded-field border border-border-strong bg-white pl-9 pr-3 text-[14px] text-text focus:border-navy focus:outline-none"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={onManualAdd}
-          aria-label="Новый лид с пробным (пришёл не от операторов)"
-          title="Новый лид с пробным (пришёл не от операторов)"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong text-muted hover:bg-surface-alt hover:text-text"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
+      <SearchField
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onFocus={() => setActive(true)}
+        placeholder="Найти лида по всей базе — записать на пробный вручную"
+        trailing={
+          <button
+            type="button"
+            onClick={onManualAdd}
+            aria-label="Новый лид с пробным (пришёл не от операторов)"
+            title="Новый лид с пробным (пришёл не от операторов)"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong text-muted hover:bg-surface-alt hover:text-text"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        }
+      />
       {active && term && (
         <div className="absolute inset-x-0 top-11 z-20 max-h-72 overflow-y-auto rounded-field border border-border bg-surface py-1 shadow-hover">
           {results.length === 0 ? (
@@ -161,7 +176,13 @@ export function TrialsPage() {
     [rawLeads],
   );
   const scheduledLeads = useMemo(() => sorted.filter((l) => l.funnelStage === 'trial_scheduled'), [sorted]);
-  const completedLeads = useMemo(() => sorted.filter((l) => l.funnelStage === 'trial_completed'), [sorted]);
+  const completedLeadsAll = useMemo(() => sorted.filter((l) => l.funnelStage === 'trial_completed'), [sorted]);
+
+  const [completedSearch, setCompletedSearch] = useState('');
+  const completedTerm = completedSearch.trim().toLowerCase();
+  const completedLeads = completedTerm
+    ? completedLeadsAll.filter((l) => l.fullName?.toLowerCase().includes(completedTerm) || l.phone?.includes(completedTerm))
+    : completedLeadsAll;
 
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
@@ -273,11 +294,12 @@ export function TrialsPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <TrialColumnHeader label="Пробный проведён" count={completedLeads.length} color={TRIAL_COMPLETED_COLOR} />
+          <TrialColumnHeader label="Пробный проведён" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
+          <SearchField value={completedSearch} onChange={(e) => setCompletedSearch(e.target.value)} placeholder="Найти среди пробных" />
           <div className="rounded-field border border-border bg-surface-alt">
             <div className="flex flex-col gap-2 p-3">
               {completedLeads.length === 0 ? (
-                <p className="py-4 text-center text-[13px] text-muted">Пусто</p>
+                <p className="py-4 text-center text-[13px] text-muted">{completedTerm ? 'Ничего не найдено' : 'Пусто'}</p>
               ) : (
                 completedLeads.map((lead) => {
                   const op = operatorByUid.get(lead.assignedOperator);
