@@ -87,6 +87,16 @@ function LeadCommentsPanel({ leadId }) {
   );
 }
 
+// Диграфы латиницы узбекского/русского транслита — «Shavkatov» сокращается
+// до «Sh.», а не «S.» (та же буква Ш, просто двумя латинскими символами).
+const SURNAME_DIGRAPHS = ['Sh', 'Ch', 'Ng', "O'", "G'"];
+
+/** Первая буква фамилии для бейджа оператора — с поправкой на диграфы («Sh.», не «S.»). */
+function surnameInitial(lastName) {
+  const digraph = SURNAME_DIGRAPHS.find((d) => lastName.toLowerCase().startsWith(d.toLowerCase()));
+  return digraph ? lastName.slice(0, digraph.length) : lastName[0];
+}
+
 /** «RUS TILI» → «Рус», «INGLIZ TILI» → «Англ» — короткая метка курса для карточки. */
 function shortCourseLabel(courseName) {
   if (!courseName) return '';
@@ -369,7 +379,10 @@ export function LeadCard({
   const stage = lead.funnelStage ?? 'new';
   const isTerminal = stage === 'won' || stage === 'lost';
   const attempts = lead.callAttempts ?? [];
-  const operatorLabel = (operatorName ?? '').split(' ')[0];
+  const [operatorFirstName, operatorLastName] = (operatorName ?? '').trim().split(/\s+/);
+  const operatorLabel = operatorFirstName
+    ? `${operatorFirstName}${operatorLastName ? ` ${surnameInitial(operatorLastName)}.` : ''}`
+    : '';
   const [commentsOpen, setCommentsOpen] = useState(false);
   const hasComments = (lead.commentsCount ?? 0) > 0;
 
@@ -516,8 +529,8 @@ export function LeadCard({
       <div className="flex items-center justify-between border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
         {operatorLabel ? (
           <span
-            className="truncate rounded-badge px-1.5 py-0.5 text-[9px] font-bold text-white"
-            style={{ backgroundColor: operatorColor || '#8B94A3' }}
+            className="truncate rounded-badge border bg-transparent px-1.5 py-0.5 text-[9px] font-bold"
+            style={{ borderColor: operatorColor || '#8B94A3', color: operatorColor || '#8B94A3' }}
           >
             {operatorLabel}
           </span>
