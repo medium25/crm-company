@@ -13,7 +13,10 @@ import { DatePicker } from '../ui/DatePicker.jsx';
  * в stageDeadline), оператор может поправить перед сохранением — тихого
  * автовычисления без подтверждения больше нет ни в одном из этих мест.
  * @param {Object} props
- * @param {{lead: Object, title: string, suggestedDate: Date, onConfirm: (date: Date) => Promise<void>}|null} props.target
+ * @param {{lead: Object, title: string, suggestedDate: Date, onConfirm: (date: Date) => Promise<void>, lockDate?: boolean}|null} props.target
+ *   `lockDate` — день менять нельзя (только время), для дозвона со строгой
+ *   сеткой 2 сегодня/2 завтра/1 послезавтра — иначе оператор мог сдвинуть
+ *   звонок на любой день и сетка переставала что-либо значить.
  * @param {() => void} props.onClose
  */
 export function DeadlineModal({ target, onClose }) {
@@ -58,7 +61,14 @@ export function DeadlineModal({ target, onClose }) {
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <p className="text-[13px] text-muted">Дедлайн следующего действия по «{target.lead.fullName}»</p>
-        <DatePicker label="Дата" required value={date} onChange={(e) => setDate(e.target.value)} />
+        <div>
+          <DatePicker label="Дата" required value={date} onChange={(e) => setDate(e.target.value)} disabled={target.lockDate} />
+          {target.lockDate && (
+            <p className="mt-1 text-[12px] text-muted">
+              День дозвона фиксирован — 2 звонка сегодня, 2 завтра, 1 послезавтра. Можно поправить только время.
+            </p>
+          )}
+        </div>
         <Input label="Время" type="time" required value={time} onChange={(e) => setTime(e.target.value)} />
       </form>
     </Modal>

@@ -192,7 +192,7 @@ export function LeadsPage() {
       commit(null); // терминальная стадия «Отказ» — дедлайну неоткуда взяться, спрашивать нечего
       return;
     }
-    setDeadlineTarget({ lead, title: 'Дедлайн следующего звонка', suggestedDate: nextCallDueAt(nextAttempts), onConfirm: commit });
+    setDeadlineTarget({ lead, title: 'Дедлайн следующего звонка', suggestedDate: nextCallDueAt(nextAttempts), onConfirm: commit, lockDate: true });
   };
 
   const moveLead = (lead, stageKey) => {
@@ -218,6 +218,7 @@ export function LeadsPage() {
         title: 'Дедлайн следующего звонка',
         suggestedDate: nextCallDueAt(lead.callAttempts ?? []),
         onConfirm: (dueDate) => commit({ nextCallDueAt: dueDate }),
+        lockDate: true,
       });
       return;
     }
