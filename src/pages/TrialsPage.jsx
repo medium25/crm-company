@@ -8,11 +8,11 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
 import { useToast } from '../components/ui/Toast.jsx';
-import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx';
 import { TrialLeadCard } from '../components/leads/TrialLeadCard.jsx';
 import { TrialCompletedCard } from '../components/leads/TrialCompletedCard.jsx';
 import { groupLeadsByTrialDay } from '../components/leads/LeadColumn.jsx';
+import { COLUMNS } from '../components/leads/columns.js';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
@@ -21,6 +21,19 @@ import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
 import { advanceStage, firstTouchDueAt } from '../lib/leadFunnel.js';
 import { archiveStudent } from '../lib/students.js';
 import { formatPhone } from '../lib/format.js';
+
+const TRIAL_SCHEDULED_COLOR = COLUMNS.find((c) => c.key === 'trial_scheduled').color;
+const TRIAL_COMPLETED_COLOR = COLUMNS.find((c) => c.key === 'trial_completed').color;
+
+/** Заголовок колонки — та же цветная линия-разделитель, что у колонок «Заявки» (LeadColumn). */
+function TrialColumnHeader({ label, count, color }) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-b-2 px-1 pb-2.5" style={{ borderBottomColor: color }}>
+      <span className="text-[15px] font-bold uppercase tracking-wide text-text">{label}</span>
+      <span className="text-[13px] font-bold text-muted">{count}</span>
+    </div>
+  );
+}
 
 /** Свёрнутая/развёрнутая секция карточек — та же идея, что LeadGroup на «Заявки». */
 function TrialGroup({ title, leads, operatorByUid, renderCard }) {
@@ -225,10 +238,9 @@ export function TrialsPage() {
 
   return (
     <div>
-      <PageHeader title="Пробные" count={scheduledLeads.length + completedLeads.length} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-3">
-          <h2 className="text-[15px] font-bold uppercase tracking-wide text-text">Пробный назначен ({scheduledLeads.length})</h2>
+          <TrialColumnHeader label="Пробный назначен" count={scheduledLeads.length} color={TRIAL_SCHEDULED_COLOR} />
           <LeadSearch
             onPick={(lead) => setTrialTarget({ lead, mode: 'schedule' })}
             onManualAdd={() => setManualLeadTarget({})}
@@ -260,7 +272,7 @@ export function TrialsPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <h2 className="text-[15px] font-bold uppercase tracking-wide text-text">Пробный проведён ({completedLeads.length})</h2>
+          <TrialColumnHeader label="Пробный проведён" count={completedLeads.length} color={TRIAL_COMPLETED_COLOR} />
           <div className="rounded-field border border-border bg-surface-alt">
             <div className="flex flex-col gap-2 p-3">
               {completedLeads.length === 0 ? (
