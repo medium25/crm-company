@@ -112,8 +112,8 @@ function LeadSearch({ onPick, onManualAdd }) {
             onClick={onManualAdd}
             aria-label="Новый лид с пробным (пришёл не от операторов)"
             title="Новый лид с пробным (пришёл не от операторов)"
-            style={{ backgroundColor: TRIAL_SCHEDULED_COLOR }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field text-white shadow-sm transition hover:opacity-90"
+            style={{ borderColor: TRIAL_SCHEDULED_COLOR, color: TRIAL_SCHEDULED_COLOR }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border-2 bg-white transition hover:bg-surface-alt"
           >
             <Plus className="h-5 w-5" strokeWidth={2.5} />
           </button>
