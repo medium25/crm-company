@@ -174,6 +174,20 @@ export function TrialsPage() {
   );
   const { data: paymentEnrollments } = useCollection(enrollmentsQuery);
 
+  // Учитель/группа для карточек «Пробный проведён» — TrialFormModal их не
+  // спрашивает (см. docstring там), они появляются только вместе с
+  // enrollment, который создаёт AddToGroupModal («Создать студента»).
+  const branchEnrollmentsQuery = useMemo(
+    () => (db && activeBranchId ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    [activeBranchId],
+  );
+  const { data: allEnrollments } = useCollection(branchEnrollmentsQuery);
+  const enrollmentByStudent = useMemo(() => {
+    const map = new Map();
+    for (const e of allEnrollments) if (!map.has(e.studentId)) map.set(e.studentId, e);
+    return map;
+  }, [allEnrollments]);
+
   const groups = useMemo(() => groupLeadsByTrialDay(scheduledLeads), [scheduledLeads]);
   const onOpen = (lead) => navigate(`/students/${lead.id}`);
 
@@ -248,18 +262,21 @@ export function TrialsPage() {
         <div className="flex flex-col gap-3">
           <h2 className="text-[15px] font-bold uppercase tracking-wide text-text">Пробный проведён ({completedLeads.length})</h2>
           <div className="rounded-field border border-border bg-surface-alt">
-            <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-2 p-3">
               {completedLeads.length === 0 ? (
-                <p className="col-span-full py-4 text-center text-[13px] text-muted">Пусто</p>
+                <p className="py-4 text-center text-[13px] text-muted">Пусто</p>
               ) : (
                 completedLeads.map((lead) => {
                   const op = operatorByUid.get(lead.assignedOperator);
+                  const enrollment = enrollmentByStudent.get(lead.id);
                   return (
                     <TrialCompletedCard
                       key={lead.id}
                       lead={lead}
                       operatorColor={op?.color}
                       operatorName={op?.name}
+                      teacherName={enrollment?.teacherName}
+                      groupCode={enrollment?.groupCode}
                       onOpen={onOpen}
                       onPay={setPaymentTarget}
                       onDeferPayment={confirmDeferPayment}

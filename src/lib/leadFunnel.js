@@ -115,6 +115,19 @@ export function secondTouchDueAt(trialDate) {
 }
 
 /**
+ * Начало «второго урока» — trialDate + 2 дня, то же время суток, что и у
+ * пробного (в отличие от secondTouchDueAt, тут не фиксируем 18:00: второй
+ * урок идёт в то же время, что и первый). С этого момента карточка на
+ * «Пробный проведён» без действия (оплата/перенос/архивация) считается
+ * просроченной — см. TrialCompletedCard.
+ * @param {Date} trialDate
+ * @returns {Date}
+ */
+export function secondLessonAt(trialDate) {
+  return addDays(trialDate, 2);
+}
+
+/**
  * Дедлайн звонка-подтверждения перед пробным — trialDate минус 24 часа
  * (спек «Данные»). Пишется на документ лида при назначении и при каждом
  * переносе пробного (TrialFormModal), читается в stageDeadline.
