@@ -14,6 +14,7 @@ const SOURCE_OPTIONS = [
   { value: '', label: 'Не указан' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'telegram', label: 'Telegram' },
+  { value: 'meta_target', label: 'Таргет в Meta' },
   { value: 'friends', label: 'Друзья' },
   { value: 'outdoor', label: 'Наружная реклама' },
   { value: 'other', label: 'Другое' },

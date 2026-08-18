@@ -89,7 +89,7 @@ function buildPayload_(row, idx) {
     phone: (get('phone') || '').toString().trim(),
     russianLevel: (get('russianLevel') || '').toString().trim() || undefined,
     leadReceivedAt: toIsoDate_(get('leadReceivedAt')) || undefined,
-    source: 'other', // из этой таблицы приходят все с одного канала — при необходимости поменяй
+    source: 'meta_target', // из этой таблицы приходят все с таргета в Meta
   };
 }
 
