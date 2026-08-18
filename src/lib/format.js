@@ -113,6 +113,18 @@ export function formatRelativeDeadline(ts) {
 }
 
 /**
+ * @param {import('firebase/firestore').Timestamp|Date} ts
+ * @returns {string} "сегодня" / "завтра" / "21 августа" — без времени, для дней-меток
+ */
+export function formatRelativeDay(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : ts;
+  if (isToday(d)) return 'сегодня';
+  if (isTomorrow(d)) return 'завтра';
+  return formatDateFns(d, 'd MMMM', { locale: ru });
+}
+
+/**
  * @param {string} month "2026-07"
  * @returns {string} "июль 2026"
  */

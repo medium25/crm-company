@@ -8,8 +8,8 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
-import { isPriorityLead, isTrialDay, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
-import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline } from '../../lib/format.js';
+import { isPriorityLead, isTrialDay, contactDueDate, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
+import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay } from '../../lib/format.js';
 
 /**
  * Компактная лента комментариев лида, разворачивается прямо в карточке.
@@ -550,6 +550,11 @@ export function LeadCard({
       {stage === 'trial_scheduled' && (
         <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <span className="truncate text-[12px] text-muted">{trialScheduleLabel(lead)}</span>
+          {!trialDay && lead.trialDate?.toDate && (
+            <span className="text-[11px] text-muted">
+              Напомнить: {formatRelativeDay(contactDueDate(lead.trialDate.toDate()))}
+            </span>
+          )}
 
           {trialDay && (
             <UnreachableBlock
