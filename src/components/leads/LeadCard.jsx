@@ -435,11 +435,15 @@ export function LeadCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
-          {overdue && (
+          {overdue ? (
             <OverdueBadge
               reason={overdueReasonLabel(lead)}
               deadline={deadline ? format(deadline, 'dd.MM.yyyy HH:mm', { locale: ru }) : null}
             />
+          ) : (
+            !isTerminal && (
+              <span className="shrink-0 rounded-badge bg-success/10 px-1.5 py-0.5 text-[10px] font-bold text-success">В норме</span>
+            )
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
