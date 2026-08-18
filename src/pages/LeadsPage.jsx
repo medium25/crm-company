@@ -117,9 +117,11 @@ export function LeadsPage() {
     const map = {};
     for (const c of COLUMNS) map[c.key] = [];
     for (const lead of leads) map[columnKeyOf(lead)].push(lead);
-    // «Пробный назначен» — ближайший пробный первым, а не по дате создания
-    // лида (порядок остальных колонок), чтобы срочное было видно сразу.
+    // «Пробный назначен» — ближайший пробный первым, «Дозвон» — ближайший
+    // дедлайн следующего звонка первым, а не по дате создания лида (порядок
+    // остальных колонок), чтобы срочное было видно сразу.
     map.trial_scheduled.sort((a, b) => (a.trialDate?.seconds ?? Infinity) - (b.trialDate?.seconds ?? Infinity));
+    map.calling.sort((a, b) => (a.nextCallDueAt?.seconds ?? Infinity) - (b.nextCallDueAt?.seconds ?? Infinity));
     return map;
   }, [leads]);
 
