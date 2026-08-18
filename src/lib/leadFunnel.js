@@ -135,16 +135,33 @@ export function unreachableCallDueAt() {
   return endOfDayIn(1);
 }
 
+// Пробный в 9:00 — самый ранний слот, до занятия утром звонить уже некогда,
+// поэтому для него контактный день сдвигается на день раньше. Для всех
+// остальных слотов (от 10:30) контакт — в день самого пробного.
+const EARLY_SLOT_HOUR = 10;
+const EARLY_SLOT_MINUTE = 30;
+
 /**
- * Наступил ли уже календарный день пробного (или прошёл) — сравнение по
- * дате, не по времени суток. С этого момента карточка показывает
- * «Пришёл»/«Не пришёл» вместо звонка-подтверждения (LeadCard), и дедлайн
- * стадии возвращается к самому trialDate (см. stageDeadline ниже).
+ * День, когда нужно связаться с лидом перед пробным — сам день пробного,
+ * кроме самого раннего слота (9:00), для которого это день накануне.
+ * @param {Date} trialDate
+ * @returns {Date}
+ */
+export function contactDueDate(trialDate) {
+  const isEarlySlot = trialDate.getHours() < EARLY_SLOT_HOUR || (trialDate.getHours() === EARLY_SLOT_HOUR && trialDate.getMinutes() < EARLY_SLOT_MINUTE);
+  return isEarlySlot ? addDays(trialDate, -1) : trialDate;
+}
+
+/**
+ * Наступил ли уже контактный день (см. contactDueDate) или прошёл —
+ * сравнение по дате, не по времени суток. С этого момента карточка
+ * показывает «Не выходит на связь»/«Напомнить через звонок», и дедлайн
+ * стадии возвращается к contactDueDate (см. stageDeadline ниже).
  * @param {Date} trialDate
  * @returns {boolean}
  */
 export function isTrialDay(trialDate) {
-  return differenceInCalendarDays(trialDate, new Date()) <= 0;
+  return differenceInCalendarDays(contactDueDate(trialDate), new Date()) <= 0;
 }
 
 /**
@@ -166,7 +183,7 @@ export function stageDeadline(lead) {
     // следующую попытку) и день пробного (пока не отмечена галочка
     // «Напомнить через звонок») — берём ближайший из тех, что применимы.
     const trialDate = lead.trialDate?.toDate?.();
-    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? trialDate : null;
+    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? contactDueDate(trialDate) : null;
     const unreachableDue = lead.unreachableNextCallDueAt?.toDate?.() ?? null;
     const candidates = [trialDayDue, unreachableDue].filter(Boolean);
     if (candidates.length === 0) return null;
@@ -190,7 +207,7 @@ export function overdueReasonLabel(lead) {
   if (stage === 'calling') return 'Просрочен повторный звонок';
   if (stage === 'trial_scheduled') {
     const trialDate = lead.trialDate?.toDate?.();
-    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? trialDate : null;
+    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? contactDueDate(trialDate) : null;
     const unreachableDue = lead.unreachableNextCallDueAt?.toDate?.() ?? null;
     if (unreachableDue && (!trialDayDue || unreachableDue <= trialDayDue)) return 'Просрочен повторный звонок «не выходит на связь»';
     return 'Не отмечено напоминание звонком перед пробным';

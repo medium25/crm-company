@@ -451,8 +451,9 @@ export function LeadCard({
   // после неудачной попытки связаться, даже если до пробного ещё далеко.
   const unreachableAttempts = lead.unreachableAttempts ?? [];
   const trialConfirmAtRisk = stage === 'trial_scheduled' && unreachableAttempts[unreachableAttempts.length - 1]?.result === 'fail';
-  // Чекбокс «Напомнить через звонок» имеет смысл только в день пробного —
-  // до этого дня напоминать ещё не о чем (вместе с этим и загорается overdue).
+  // «Не выходит на связь» и «Напомнить через звонок» имеют смысл только в
+  // контактный день (см. contactDueDate в leadFunnel.js — обычно день
+  // пробного, для слота 9:00 — днём раньше) — до этого связываться ещё рано.
   const trialDay = stage === 'trial_scheduled' && lead.trialDate?.toDate ? isTrialDay(lead.trialDate.toDate()) : false;
   const deadline = stageDeadline(lead);
   const overdue = deadline ? Date.now() > deadline.getTime() : false;
@@ -550,13 +551,15 @@ export function LeadCard({
         <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <span className="truncate text-[12px] text-muted">{trialScheduleLabel(lead)}</span>
 
-          <UnreachableBlock
-            lead={lead}
-            onMark={(result) => onMarkUnreachable(lead, result)}
-            onReschedule={() => onRescheduleTrial(lead)}
-            onDecline={() => onDecline(lead)}
-            nextAttemptDueAt={lead.unreachableNextCallDueAt}
-          />
+          {trialDay && (
+            <UnreachableBlock
+              lead={lead}
+              onMark={(result) => onMarkUnreachable(lead, result)}
+              onReschedule={() => onRescheduleTrial(lead)}
+              onDecline={() => onDecline(lead)}
+              nextAttemptDueAt={lead.unreachableNextCallDueAt}
+            />
+          )}
 
           {trialDay && (
             <label className="flex items-center gap-1.5 text-[12px] text-muted">
