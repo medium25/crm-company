@@ -105,7 +105,7 @@ function LeadSearch({ onPick, onManualAdd }) {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onFocus={() => setActive(true)}
-        placeholder="Найти лида по всей базе — записать на пробный вручную"
+        placeholder="Найти лида по всей базе"
         trailing={
           <button
             type="button"
