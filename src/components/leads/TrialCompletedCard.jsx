@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { formatPhone, formatDateTimeShort } from '../../lib/format.js';
+import { formatPhone, formatDateTimeShort, formatOverdueBy } from '../../lib/format.js';
 import { operatorInitials } from './LeadCard.jsx';
 import { secondLessonAt } from '../../lib/leadFunnel.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
@@ -41,7 +41,8 @@ export function TrialCompletedCard({
   const operatorLabel = operatorInitials(operatorName);
 
   const trialDateJs = lead.trialDate?.toDate?.();
-  const overdue = trialDateJs ? Date.now() > secondLessonAt(trialDateJs).getTime() : false;
+  const secondLessonDate = trialDateJs ? secondLessonAt(trialDateJs) : null;
+  const overdue = secondLessonDate ? Date.now() > secondLessonDate.getTime() : false;
 
   return (
     <div
@@ -56,7 +57,11 @@ export function TrialCompletedCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
-          {overdue && <span className="shrink-0 rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger">Просрочено</span>}
+          {overdue && (
+            <span className="shrink-0 rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger">
+              {formatOverdueBy(secondLessonDate) || 'Просрочено'}
+            </span>
+          )}
         </div>
         <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="truncate text-[12px] text-link">
           {formatPhone(lead.phone)}

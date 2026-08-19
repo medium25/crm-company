@@ -9,7 +9,7 @@ import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, isTrialDay, contactDueDate, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
-import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay } from '../../lib/format.js';
+import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay, formatOverdueBy } from '../../lib/format.js';
 
 /**
  * Компактная лента комментариев лида, разворачивается прямо в карточке.
@@ -222,7 +222,7 @@ function TouchDots({ closingTouchNumber, nextTouchAt, onMark }) {
  * относительно карточки, что у LeadInfoPopover (см. ниже) — сам бейдж уже
  * absolute в углу, попап растягивается на всю ширину карточки под ним.
  */
-function OverdueBadge({ reason, deadline }) {
+function OverdueBadge({ reason, deadline, overdueBy }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -243,7 +243,7 @@ function OverdueBadge({ reason, deadline }) {
         aria-label="Причина просрочки"
         className="rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger"
       >
-        Просрочено
+        {overdueBy || 'Просрочено'}
       </button>
       {open && (
         <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-field border border-border bg-surface p-3 shadow-hover">
@@ -510,6 +510,7 @@ export function LeadCard({
             <OverdueBadge
               reason={overdueReasonLabel(lead)}
               deadline={deadline ? format(deadline, 'dd.MM.yyyy HH:mm', { locale: ru }) : null}
+              overdueBy={deadline ? formatOverdueBy(deadline) : null}
             />
           ) : (
             !isTerminal && (

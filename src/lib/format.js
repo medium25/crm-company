@@ -244,6 +244,23 @@ export function formatDaysLeft(deadlineTs) {
 }
 
 /**
+ * На сколько просрочен дедлайн стадии — «на 3 ч» (< суток) или «на 2 дн»
+ * (>= суток), вместо голого «Просрочено» на бейдже карточки лида.
+ * @param {Date} deadline уже прошедший момент
+ * @returns {string} "на 45 мин" | "на 3 ч" | "на 2 дн"
+ */
+export function formatOverdueBy(deadline) {
+  const ms = Date.now() - deadline.getTime();
+  if (ms <= 0) return '';
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 60) return `${minutes} ${pluralize(minutes, ['минута', 'минуты', 'минут'])}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${pluralize(hours, ['час', 'часа', 'часов'])}`;
+  const days = Math.floor(hours / 24);
+  return `${days} ${pluralize(days, ['день', 'дня', 'дней'])}`;
+}
+
+/**
  * @param {number} n
  * @param {[string, string, string]} forms [1 месяц, 2 месяца, 5 месяцев]
  * @returns {string}
