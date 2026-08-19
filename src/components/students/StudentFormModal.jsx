@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { useEffect, useMemo, useState } from 'react';
+import { collection, addDoc, updateDoc, doc, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
+import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -20,7 +21,7 @@ const SOURCE_OPTIONS = [
   { value: 'other', label: 'Другое' },
 ];
 
-const EMPTY_FORM = { fullName: '', phone: '', phone2: '', source: '' };
+const EMPTY_FORM = { fullName: '', phone: '', phone2: '', source: '', assignedOperator: '' };
 
 /**
  * Создание/редактирование студента (он же лид — одна коллекция). `student` =
@@ -51,6 +52,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
         phone: student.phone ?? '',
         phone2: student.phone2 ?? '',
         source: student.source ?? '',
+        assignedOperator: '',
       });
     } else {
       setForm(EMPTY_FORM);
@@ -58,6 +60,19 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
   }, [student]);
 
   const isEdit = Boolean(student?.id);
+  // При ручном добавлении пробного (в обход авто-распределения «Заявки»)
+  // ответственного выбирает сам — ICON (пустое значение) для пришедших
+  // без ответственного лица.
+  const needsOperatorPick = !isEdit && createMode !== 'lead';
+  const staffQuery = useMemo(
+    () => (db && activeBranchId && needsOperatorPick ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
+    [activeBranchId, needsOperatorPick],
+  );
+  const { data: staffList } = useCollection(staffQuery);
+  const operatorOptions = [
+    { value: '', label: 'ICON (без ответственного)' },
+    ...[...staffList].sort((a, b) => a.fullName.localeCompare(b.fullName)).map((s) => ({ value: s.id, label: s.fullName })),
+  ];
   // При создании — обязательно 2 номера, без второго лид не заводится (это
   // не про редактирование старых карточек, у которых его могло не быть).
   const missingSecondPhone = !isEdit && !form.phone2.trim();
@@ -92,6 +107,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           photoUrl: null,
           status: 'trial',
           statusReason: null,
+          assignedOperator: form.assignedOperator || null,
           balance: 0,
           balanceUpdatedAt: serverTimestamp(),
           note: '',
@@ -121,6 +137,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           photoUrl: null,
           status: 'trial',
           statusReason: null,
+          assignedOperator: form.assignedOperator || null,
           funnelStage: 'trial_completed',
           stageHistory: [{ stage: 'trial_completed', enteredAt: new Date() }],
           attended: true,
@@ -229,6 +246,14 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           value={form.source}
           onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
         />
+        {needsOperatorPick && (
+          <Select
+            label="Ответственный"
+            options={operatorOptions}
+            value={form.assignedOperator}
+            onChange={(e) => setForm((f) => ({ ...f, assignedOperator: e.target.value }))}
+          />
+        )}
       </form>
     </Modal>
   );
