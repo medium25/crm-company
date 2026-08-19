@@ -529,9 +529,6 @@ export function LeadCard({
         </div>
       </div>
 
-      {/* Время прихода лида — не показываем на «Пробном назначен», там своя строка (курс/день/время). */}
-      {stage !== 'trial_scheduled' && <span className="text-[12px] text-muted">{formatDateTimeShort(lead.createdAt)}</span>}
-
       {(stage === 'new' || stage === 'calling') && (
         <div onClick={(e) => e.stopPropagation()}>
           <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} nextCallDueAt={lead.nextCallDueAt} />
@@ -644,6 +641,8 @@ export function LeadCard({
       </div>
 
       {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
+
+      <span className="text-[10px] text-muted">{formatDateTimeShort(lead.createdAt)}</span>
     </div>
   );
 }
