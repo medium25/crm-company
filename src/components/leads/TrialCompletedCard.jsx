@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { formatPhone, formatDateTimeShort } from '../../lib/format.js';
 import { operatorInitials } from './LeadCard.jsx';
 import { secondLessonAt } from '../../lib/leadFunnel.js';
+import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 
 /**
  * Карточка лида на стадии «Пробный проведён» (студент уже создан на
@@ -20,8 +21,22 @@ import { secondLessonAt } from '../../lib/leadFunnel.js';
  * @param {(lead: Object) => void} props.onPay
  * @param {(lead: Object) => void} props.onDeferPayment
  * @param {(lead: Object) => void} props.onArchive
+ * @param {(lead: Object) => void} props.onEdit
+ * @param {(lead: Object) => void} props.onDelete полное удаление за паролем (DeleteLeadModal)
  */
-export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherName, groupCode, onOpen, onPay, onDeferPayment, onArchive }) {
+export function TrialCompletedCard({
+  lead,
+  operatorColor,
+  operatorName,
+  teacherName,
+  groupCode,
+  onOpen,
+  onPay,
+  onDeferPayment,
+  onArchive,
+  onEdit,
+  onDelete,
+}) {
   const [expanded, setExpanded] = useState(false);
   const operatorLabel = operatorInitials(operatorName);
 
@@ -50,14 +65,24 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherN
       <span className="truncate text-[12px] text-muted">
         {teacherName ?? '—'} · {groupCode ?? '—'} · {trialDateJs ? formatDateTimeShort(lead.trialDate) : 'дата не указана'}
       </span>
-      {operatorLabel && (
-        <span
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
-          style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
-        >
-          {operatorLabel}
-        </span>
-      )}
+      <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+        {operatorLabel ? (
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+            style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
+          >
+            {operatorLabel}
+          </span>
+        ) : (
+          <span />
+        )}
+        <DropdownMenu
+          items={[
+            { label: 'Редактировать', onClick: () => onEdit(lead) },
+            { label: 'Удалить навсегда', danger: true, onClick: () => onDelete(lead) },
+          ]}
+        />
+      </div>
       <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"

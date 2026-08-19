@@ -14,6 +14,7 @@ import { TrialCompletedCard } from '../components/leads/TrialCompletedCard.jsx';
 import { groupLeadsByTrialDay } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS } from '../components/leads/columns.js';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
+import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { AddToGroupModal } from '../components/students/AddToGroupModal.jsx';
@@ -197,6 +198,8 @@ export function TrialsPage() {
 
   const [createStudentTarget, setCreateStudentTarget] = useState(null);
   const [manualLeadTarget, setManualLeadTarget] = useState(null); // {} — StudentFormModal открыт
+  const [editTarget, setEditTarget] = useState(null); // StudentFormModal в режиме редактирования
+  const [deleteTarget, setDeleteTarget] = useState(null); // DeleteLeadModal
   const [manualCompletedTarget, setManualCompletedTarget] = useState(null); // {} — StudentFormModal (createMode="trial_completed")
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule' } — TrialFormModal
   const [deferTarget, setDeferTarget] = useState(null); // DeadlineModal
@@ -333,6 +336,8 @@ export function TrialsPage() {
                       onPay={setPaymentTarget}
                       onDeferPayment={confirmDeferPayment}
                       onArchive={setArchiveTarget}
+                      onEdit={setEditTarget}
+                      onDelete={setDeleteTarget}
                     />
                   );
                 })
@@ -344,6 +349,8 @@ export function TrialsPage() {
 
       <AddToGroupModal open={Boolean(createStudentTarget)} student={createStudentTarget} onClose={() => setCreateStudentTarget(null)} />
       <StudentFormModal student={manualLeadTarget} onClose={() => setManualLeadTarget(null)} onCreated={handleManualCreated} />
+      <StudentFormModal student={editTarget} onClose={() => setEditTarget(null)} />
+      <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
       <StudentFormModal
         student={manualCompletedTarget}
         onClose={() => setManualCompletedTarget(null)}
