@@ -62,23 +62,26 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherN
         <button
           type="button"
           onClick={() => onPay(lead)}
-          className="flex-1 whitespace-nowrap rounded-field border border-success/40 px-1.5 py-1 text-[11px] font-bold text-success hover:bg-success/5"
+          title="Оплата"
+          className="min-w-0 flex-1 truncate rounded-field border border-success/40 px-1.5 py-1 text-[11px] font-bold text-success hover:bg-success/5"
         >
           Оплата
         </button>
         <button
           type="button"
           onClick={() => onDeferPayment(lead)}
-          className="flex-1 whitespace-nowrap rounded-field border border-navy/40 px-1.5 py-1 text-[11px] font-bold text-navy hover:bg-navy/5"
+          title="Перенос оплаты"
+          className="min-w-0 flex-1 truncate rounded-field border border-navy/40 px-1.5 py-1 text-[11px] font-bold text-navy hover:bg-navy/5"
         >
-          Перенос оплаты
+          Перенос
         </button>
         <button
           type="button"
           onClick={() => onArchive(lead)}
-          className="flex-1 whitespace-nowrap rounded-field border border-danger/40 px-1.5 py-1 text-[11px] font-bold text-danger hover:bg-danger/5"
+          title="Архивировать"
+          className="min-w-0 flex-1 truncate rounded-field border border-danger/40 px-1.5 py-1 text-[11px] font-bold text-danger hover:bg-danger/5"
         >
-          Архивировать
+          Архив
         </button>
       </div>
     </div>
