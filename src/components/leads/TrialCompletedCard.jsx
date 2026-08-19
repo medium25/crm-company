@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { formatPhone, formatDateTimeShort } from '../../lib/format.js';
-import { surnameInitial } from './LeadCard.jsx';
+import { operatorInitials } from './LeadCard.jsx';
 import { secondLessonAt } from '../../lib/leadFunnel.js';
 
 /**
@@ -23,10 +23,7 @@ import { secondLessonAt } from '../../lib/leadFunnel.js';
  */
 export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherName, groupCode, onOpen, onPay, onDeferPayment, onArchive }) {
   const [expanded, setExpanded] = useState(false);
-  const [operatorFirstName, operatorLastName] = (operatorName ?? '').trim().split(/\s+/);
-  const operatorLabel = operatorFirstName
-    ? `${operatorFirstName}${operatorLastName ? ` ${surnameInitial(operatorLastName)}.` : ''}`
-    : '';
+  const operatorLabel = operatorInitials(operatorName);
 
   const trialDateJs = lead.trialDate?.toDate?.();
   const overdue = trialDateJs ? Date.now() > secondLessonAt(trialDateJs).getTime() : false;
@@ -55,8 +52,8 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherN
       </span>
       {operatorLabel && (
         <span
-          className="w-fit truncate rounded-badge border bg-transparent px-1.5 py-0.5 text-[9px] font-bold"
-          style={{ borderColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+          style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
         >
           {operatorLabel}
         </span>

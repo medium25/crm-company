@@ -87,14 +87,12 @@ function LeadCommentsPanel({ leadId }) {
   );
 }
 
-// Диграфы латиницы узбекского/русского транслита — «Shavkatov» сокращается
-// до «Sh.», а не «S.» (та же буква Ш, просто двумя латинскими символами).
-const SURNAME_DIGRAPHS = ['Sh', 'Ch', 'Ng', "O'", "G'"];
-
-/** Первая буква фамилии для бейджа оператора — с поправкой на диграфы («Sh.», не «S.»). */
-export function surnameInitial(lastName) {
-  const digraph = SURNAME_DIGRAPHS.find((d) => lastName.toLowerCase().startsWith(d.toLowerCase()));
-  return digraph ? lastName.slice(0, digraph.length) : lastName[0];
+/** «Muslima Azizova» → «MA» — инициалы оператора для бейджа-квадрата, как в Telegram. */
+export function operatorInitials(name) {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? '';
+  const last = parts[1]?.[0] ?? '';
+  return (first + last).toUpperCase();
 }
 
 /** «RUS TILI» → «Рус», «INGLIZ TILI» → «Англ» — короткая метка курса для карточки. */
@@ -437,10 +435,7 @@ export function LeadCard({
   const stage = lead.funnelStage ?? 'new';
   const isTerminal = stage === 'won' || stage === 'lost';
   const attempts = lead.callAttempts ?? [];
-  const [operatorFirstName, operatorLastName] = (operatorName ?? '').trim().split(/\s+/);
-  const operatorLabel = operatorFirstName
-    ? `${operatorFirstName}${operatorLastName ? ` ${surnameInitial(operatorLastName)}.` : ''}`
-    : '';
+  const operatorLabel = operatorInitials(operatorName);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const hasComments = (lead.commentsCount ?? 0) > 0;
 
@@ -597,8 +592,8 @@ export function LeadCard({
       <div className="mt-auto flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         {operatorLabel ? (
           <span
-            className="truncate rounded-badge border bg-transparent px-1.5 py-0.5 text-[9px] font-bold"
-            style={{ borderColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+            style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
           >
             {operatorLabel}
           </span>

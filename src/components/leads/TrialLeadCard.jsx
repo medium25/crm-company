@@ -1,5 +1,5 @@
 import { formatPhone } from '../../lib/format.js';
-import { surnameInitial, trialScheduleLabel } from './LeadCard.jsx';
+import { operatorInitials, trialScheduleLabel } from './LeadCard.jsx';
 
 /**
  * Карточка лида на странице «Пробные» — только просмотр, без операторских
@@ -15,10 +15,7 @@ import { surnameInitial, trialScheduleLabel } from './LeadCard.jsx';
  * @param {(lead: Object) => void} props.onCreateStudent
  */
 export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCreateStudent }) {
-  const [operatorFirstName, operatorLastName] = (operatorName ?? '').trim().split(/\s+/);
-  const operatorLabel = operatorFirstName
-    ? `${operatorFirstName}${operatorLastName ? ` ${surnameInitial(operatorLastName)}.` : ''}`
-    : '';
+  const operatorLabel = operatorInitials(operatorName);
 
   return (
     <div
@@ -38,8 +35,8 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
       <div className="mt-auto flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         {operatorLabel ? (
           <span
-            className="truncate rounded-badge border bg-transparent px-1.5 py-0.5 text-[9px] font-bold"
-            style={{ borderColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+            style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
           >
             {operatorLabel}
           </span>
