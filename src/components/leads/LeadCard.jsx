@@ -190,7 +190,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
           <Snowflake className="h-4 w-4 text-danger" />
         </span>
       )}
-      {deadlineLabel && <span className="text-[11px] text-muted">{deadlineLabel}</span>}
+      {deadlineLabel && <span className="text-[12px] font-bold text-text">{deadlineLabel}</span>}
     </div>
   );
 }
@@ -211,7 +211,7 @@ function TouchDots({ closingTouchNumber, nextTouchAt, onMark }) {
           return <Circle key={i} className="h-4 w-4 text-border" />;
         })}
       </div>
-      {deadlineLabel && <span className="text-[11px] text-muted">{deadlineLabel}</span>}
+      {deadlineLabel && <span className="text-[12px] font-bold text-text">{deadlineLabel}</span>}
     </div>
   );
 }
