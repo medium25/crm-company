@@ -54,7 +54,7 @@ export function TrialCompletedCard({
         overdue ? 'border-danger ring-1 ring-danger/40' : 'border-border hover:border-navy/20'
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 border-b border-border pb-2.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
           {overdue && (
