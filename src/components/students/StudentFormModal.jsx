@@ -29,8 +29,12 @@ const EMPTY_FORM = { fullName: '', phone: '', phone2: '', source: '' };
  * @param {Object|null} props.student
  * @param {() => void} props.onClose
  * @param {(id: string) => void} [props.onCreated] коллбэк с ID нового студента
+ * @param {boolean} [props.createAsTrial] при создании — сразу status:'trial',
+ *   минуя воронку «Заявки» (без funnelStage/assignedOperator/stageHistory).
+ *   Для кнопки «Добавить ученика» на «Студенты» — там не лид, а сразу
+ *   пробный студент, группу/учителя ему добавляют отдельно.
  */
-export function StudentFormModal({ student, onClose, onCreated }) {
+export function StudentFormModal({ student, onClose, onCreated, createAsTrial = false }) {
   const { user } = useAuth();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
@@ -72,6 +76,35 @@ export function StudentFormModal({ student, onClose, onCreated }) {
       if (student?.id) {
         await updateDoc(doc(db, 'students', student.id), payload);
         showToast('Студент обновлён.');
+        onClose();
+      } else if (createAsTrial) {
+        // Пробный студент напрямую, минуя воронку «Заявки» — без
+        // funnelStage/assignedOperator/stageHistory, иначе он попадёт
+        // карточкой в «Новый лид», хотя это не лид.
+        const created = await addDoc(collection(db, 'students'), {
+          ...payload,
+          branchId: activeBranchId,
+          publicId: Math.floor(1000000 + Math.random() * 9000000),
+          birthDate: null,
+          gender: null,
+          photoUrl: null,
+          status: 'trial',
+          statusReason: null,
+          balance: 0,
+          balanceUpdatedAt: serverTimestamp(),
+          note: '',
+          isFlagged: false,
+          activeGroupsCount: 0,
+          firstPaymentAt: null,
+          lastPaymentAt: null,
+          trialAt: serverTimestamp(),
+          leftAt: null,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid,
+          isArchived: false,
+        });
+        showToast('Студент добавлен.');
+        onCreated?.(created.id);
         onClose();
       } else {
         const [operatorIds, operatorSchedules] = await Promise.all([
@@ -120,7 +153,7 @@ export function StudentFormModal({ student, onClose, onCreated }) {
     <Modal
       open={Boolean(student)}
       onClose={onClose}
-      title={student?.id ? 'Редактировать студента' : 'Добавить лида'}
+      title={student?.id ? 'Редактировать студента' : createAsTrial ? 'Добавить ученика' : 'Добавить лида'}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>

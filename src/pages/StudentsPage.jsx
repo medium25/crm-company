@@ -671,7 +671,7 @@ export function StudentsPage() {
           })}
         </div>
 
-        <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} />
+        <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} createAsTrial />
       </>
     );
   }
