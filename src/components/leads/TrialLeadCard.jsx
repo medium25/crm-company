@@ -1,8 +1,5 @@
 import { formatPhone } from '../../lib/format.js';
 import { surnameInitial, trialScheduleLabel } from './LeadCard.jsx';
-import { COLUMNS } from './columns.js';
-
-const ACCENT_COLOR = COLUMNS.find((c) => c.key === 'trial_scheduled').color;
 
 /**
  * Карточка лида на странице «Пробные» — только просмотр, без операторских
@@ -52,8 +49,7 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
         <button
           type="button"
           onClick={() => onCreateStudent(lead)}
-          style={{ borderColor: `${ACCENT_COLOR}66`, color: ACCENT_COLOR }}
-          className="rounded-field border px-2.5 py-1.5 text-[12px] font-bold hover:bg-surface-alt"
+          className="rounded-field border border-border-strong px-2.5 py-1.5 text-[12px] font-bold text-text hover:bg-surface-alt"
         >
           Создать студента
         </button>
