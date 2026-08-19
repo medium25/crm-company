@@ -37,7 +37,7 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherN
       tabIndex={0}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className={`flex cursor-pointer flex-col gap-2.5 rounded-xl border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`flex min-h-[190px] cursor-pointer flex-col gap-2.5 rounded-xl border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         overdue ? 'border-danger ring-1 ring-danger/40' : 'border-border hover:border-navy/20'
       }`}
     >
@@ -61,7 +61,7 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherN
           {operatorLabel}
         </span>
       )}
-      <div className="flex flex-col gap-1.5 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
+      <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}

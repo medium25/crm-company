@@ -502,7 +502,7 @@ export function LeadCard({
       }}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className={`group relative flex flex-col gap-2.5 rounded-xl border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group relative flex min-h-[190px] flex-col gap-2.5 rounded-xl border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
       } ${overdue ? 'border-danger ring-1 ring-danger/40' : !isTerminal ? 'border-success ring-1 ring-success/40' : ''} ${
         priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''
@@ -594,7 +594,7 @@ export function LeadCard({
         </p>
       )}
 
-      <div className="flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
+      <div className="mt-auto flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         {operatorLabel ? (
           <span
             className="truncate rounded-badge border bg-transparent px-1.5 py-0.5 text-[9px] font-bold"

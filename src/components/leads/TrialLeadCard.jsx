@@ -26,7 +26,7 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
       tabIndex={0}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className="flex cursor-pointer flex-col gap-2.5 rounded-xl border border-border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md"
+      className="flex min-h-[190px] cursor-pointer flex-col gap-2.5 rounded-xl border border-border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md"
     >
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
@@ -35,7 +35,7 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
         </a>
       </div>
       <span className="truncate text-[12px] text-muted">{trialScheduleLabel(lead)}</span>
-      <div className="flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
+      <div className="mt-auto flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         {operatorLabel ? (
           <span
             className="truncate rounded-badge border bg-transparent px-1.5 py-0.5 text-[9px] font-bold"
