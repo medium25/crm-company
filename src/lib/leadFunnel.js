@@ -1,6 +1,6 @@
 // src/lib/leadFunnel.js
 import { doc, getDoc, updateDoc, collection, query, where, getCountFromServer, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore';
-import { differenceInCalendarDays, addDays } from 'date-fns';
+import { differenceInCalendarDays, addDays, startOfDay } from 'date-fns';
 
 /**
  * Причины отказа — фиксированный список (см. спек §7). `requiresDetail` —
@@ -196,8 +196,10 @@ export function stageDeadline(lead) {
     // выходит на связь» (unreachableNextCallDueAt, пока не отметили
     // следующую попытку) и день пробного (пока не отмечена галочка
     // «Напомнить через звонок») — берём ближайший из тех, что применимы.
+    // Дедлайн дня пробного — начало суток контактного дня (не само время
+    // пробного) — карточка красная весь день, а не только после урока.
     const trialDate = lead.trialDate?.toDate?.();
-    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? contactDueDate(trialDate) : null;
+    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? startOfDay(contactDueDate(trialDate)) : null;
     const unreachableDue = lead.unreachableNextCallDueAt?.toDate?.() ?? null;
     const candidates = [trialDayDue, unreachableDue].filter(Boolean);
     if (candidates.length === 0) return null;
@@ -221,7 +223,7 @@ export function overdueReasonLabel(lead) {
   if (stage === 'calling') return 'Просрочен повторный звонок';
   if (stage === 'trial_scheduled') {
     const trialDate = lead.trialDate?.toDate?.();
-    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? contactDueDate(trialDate) : null;
+    const trialDayDue = trialDate && isTrialDay(trialDate) && !lead.callReminderDone ? startOfDay(contactDueDate(trialDate)) : null;
     const unreachableDue = lead.unreachableNextCallDueAt?.toDate?.() ?? null;
     if (unreachableDue && (!trialDayDue || unreachableDue <= trialDayDue)) return 'Просрочен повторный звонок «не выходит на связь»';
     return 'Не отмечено напоминание звонком перед пробным';
