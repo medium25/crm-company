@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { formatPhone, formatDateTimeShort } from '../../lib/format.js';
 import { surnameInitial } from './LeadCard.jsx';
 import { secondLessonAt } from '../../lib/leadFunnel.js';
@@ -20,6 +22,7 @@ import { secondLessonAt } from '../../lib/leadFunnel.js';
  * @param {(lead: Object) => void} props.onArchive
  */
 export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherName, groupCode, onOpen, onPay, onDeferPayment, onArchive }) {
+  const [expanded, setExpanded] = useState(false);
   const [operatorFirstName, operatorLastName] = (operatorName ?? '').trim().split(/\s+/);
   const operatorLabel = operatorFirstName
     ? `${operatorFirstName}${operatorLastName ? ` ${surnameInitial(operatorLastName)}.` : ''}`
@@ -58,31 +61,45 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherN
           {operatorLabel}
         </span>
       )}
-      <div className="flex items-center gap-1 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => onPay(lead)}
-          title="Оплата"
-          className="min-w-0 flex-1 truncate rounded-field border border-success/40 px-1.5 py-1 text-[11px] font-bold text-success hover:bg-success/5"
-        >
-          Оплата
-        </button>
-        <button
-          type="button"
-          onClick={() => onDeferPayment(lead)}
-          title="Перенос оплаты"
-          className="min-w-0 flex-1 truncate rounded-field border border-navy/40 px-1.5 py-1 text-[11px] font-bold text-navy hover:bg-navy/5"
-        >
-          Перенос
-        </button>
-        <button
-          type="button"
-          onClick={() => onArchive(lead)}
-          title="Архивировать"
-          className="min-w-0 flex-1 truncate rounded-field border border-danger/40 px-1.5 py-1 text-[11px] font-bold text-danger hover:bg-danger/5"
-        >
-          Архив
-        </button>
+      <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1 border-t border-border pt-1.5">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            title="Продвинуть"
+            className="flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-field border border-border-strong px-1.5 py-1 text-[11px] font-bold text-text hover:bg-surface-alt"
+          >
+            Продвинуть <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onArchive(lead)}
+            title="Архивировать"
+            className="min-w-0 flex-1 truncate rounded-field border border-danger/40 px-1.5 py-1 text-[11px] font-bold text-danger hover:bg-danger/5"
+          >
+            Архив
+          </button>
+        </div>
+        {expanded && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onPay(lead)}
+              title="Оплата"
+              className="min-w-0 flex-1 truncate rounded-field border border-success/40 px-1.5 py-1 text-[11px] font-bold text-success hover:bg-success/5"
+            >
+              Оплата
+            </button>
+            <button
+              type="button"
+              onClick={() => onDeferPayment(lead)}
+              title="Перенос оплаты"
+              className="min-w-0 flex-1 truncate rounded-field border border-navy/40 px-1.5 py-1 text-[11px] font-bold text-navy hover:bg-navy/5"
+            >
+              Перенос
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
