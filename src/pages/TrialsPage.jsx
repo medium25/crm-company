@@ -263,7 +263,7 @@ export function TrialsPage() {
     <div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-3">
-          <TrialColumnHeader label="Пробный назначен" count={scheduledLeads.length} color={TRIAL_SCHEDULED_COLOR} />
+          <TrialColumnHeader label="Записи" count={scheduledLeads.length} color={TRIAL_SCHEDULED_COLOR} />
           <LeadSearch
             onPick={(lead) => setTrialTarget({ lead, mode: 'schedule' })}
             onManualAdd={() => setManualLeadTarget({})}
@@ -296,7 +296,7 @@ export function TrialsPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <TrialColumnHeader label="Пробный проведён" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
+          <TrialColumnHeader label="Пробные" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
           <SearchField
             value={completedSearch}
             onChange={(e) => setCompletedSearch(e.target.value)}
