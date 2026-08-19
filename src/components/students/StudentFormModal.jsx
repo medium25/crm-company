@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, addDoc, updateDoc, doc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, query, where, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -10,6 +10,7 @@ import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
 import { getActiveLeadOperators, getOperatorSchedules, assignOperatorForLead } from '../../lib/leadFunnel.js';
+import { recomputeStudentAggregates } from '../../lib/students.js';
 
 const SOURCE_OPTIONS = [
   { value: '', label: 'Не указан' },
@@ -53,6 +54,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
         phone2: student.phone2 ?? '',
         source: student.source ?? '',
         assignedOperator: '',
+        groupId: '',
       });
     } else {
       setForm(EMPTY_FORM);
@@ -60,6 +62,27 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
   }, [student]);
 
   const isEdit = Boolean(student?.id);
+  // Выбор/смена группы прямо из формы — только для пробных (не лидов в
+  // воронке «Заявки» и не платящих активных, у тех — свои «Добавить в
+  // группу»/«Перевести» с биллингом, тут его нет: пробный ещё не платит).
+  const isTrialStatus = isEdit && student?.status === 'trial';
+  const groupsQuery = useMemo(
+    () => (db && activeBranchId && isTrialStatus ? query(collection(db, 'groups'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    [activeBranchId, isTrialStatus],
+  );
+  const { data: groups } = useCollection(groupsQuery);
+  const enrollmentsQuery = useMemo(
+    () => (db && isTrialStatus && student?.id ? query(collection(db, 'enrollments'), where('studentId', '==', student.id), where('isArchived', '==', false)) : null),
+    [isTrialStatus, student?.id],
+  );
+  const { data: studentEnrollments } = useCollection(enrollmentsQuery);
+  const currentEnrollment = studentEnrollments[0] ?? null;
+
+  useEffect(() => {
+    if (!isTrialStatus) return;
+    setForm((f) => ({ ...f, groupId: currentEnrollment?.groupId ?? '' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEnrollment?.groupId, isTrialStatus, student?.id]);
   // При ручном добавлении пробного (в обход авто-распределения «Заявки»)
   // ответственного выбирает сам — ICON (пустое значение) для пришедших
   // без ответственного лица.
@@ -92,6 +115,63 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
       };
       if (student?.id) {
         await updateDoc(doc(db, 'students', student.id), payload);
+
+        if (isTrialStatus && form.groupId && form.groupId !== (currentEnrollment?.groupId ?? '')) {
+          const group = groups.find((g) => g.id === form.groupId);
+          if (group) {
+            const now = serverTimestamp();
+            if (currentEnrollment) {
+              // Пробный ещё не платит — просто переносим запись в другую
+              // группу, без дробления списаний (в отличие от TransferGroupModal
+              // для уже активных платящих студентов).
+              await updateDoc(doc(db, 'enrollments', currentEnrollment.id), {
+                groupId: group.id,
+                groupCode: group.code,
+                courseName: group.courseName,
+                teacherId: group.teacherId,
+                teacherName: group.teacherName,
+                price: group.price,
+                updatedAt: now,
+                updatedBy: user.uid,
+              });
+              if (currentEnrollment.groupId !== group.id) {
+                await updateDoc(doc(db, 'groups', currentEnrollment.groupId), { studentsCount: increment(-1) });
+                await updateDoc(doc(db, 'groups', group.id), { studentsCount: increment(1) });
+              }
+            } else {
+              await addDoc(collection(db, 'enrollments'), {
+                branchId: activeBranchId,
+                studentId: student.id,
+                studentName: payload.fullName,
+                groupId: group.id,
+                groupCode: group.code,
+                courseName: group.courseName,
+                teacherId: group.teacherId,
+                teacherName: group.teacherName,
+                status: 'trial',
+                statusLabel: 'Пробный урок',
+                price: group.price,
+                discountPercent: 0,
+                discountReason: '',
+                addedAt: now,
+                activatedAt: null,
+                pausedFrom: null,
+                pausedTo: null,
+                leftAt: null,
+                leftReason: null,
+                lastChargedMonth: null,
+                isArchived: false,
+                createdAt: now,
+                createdBy: user.uid,
+                updatedAt: now,
+                updatedBy: user.uid,
+              });
+              await updateDoc(doc(db, 'groups', group.id), { studentsCount: increment(1) });
+            }
+            await recomputeStudentAggregates(db, student.id);
+          }
+        }
+
         showToast('Студент обновлён.');
         onClose();
       } else if (createMode === 'trial') {
@@ -252,6 +332,14 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
             options={operatorOptions}
             value={form.assignedOperator}
             onChange={(e) => setForm((f) => ({ ...f, assignedOperator: e.target.value }))}
+          />
+        )}
+        {isTrialStatus && (
+          <Select
+            label="Группа"
+            options={[{ value: '', label: 'Не выбрана' }, ...groups.map((g) => ({ value: g.id, label: `${g.code} · ${g.courseName}` }))]}
+            value={form.groupId}
+            onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}
           />
         )}
       </form>
