@@ -197,6 +197,7 @@ export function TrialsPage() {
 
   const [createStudentTarget, setCreateStudentTarget] = useState(null);
   const [manualLeadTarget, setManualLeadTarget] = useState(null); // {} — StudentFormModal открыт
+  const [manualCompletedTarget, setManualCompletedTarget] = useState(null); // {} — StudentFormModal (createMode="trial_completed")
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule' } — TrialFormModal
   const [deferTarget, setDeferTarget] = useState(null); // DeadlineModal
   const [paymentTarget, setPaymentTarget] = useState(null); // AddPaymentModal
@@ -296,7 +297,22 @@ export function TrialsPage() {
 
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Пробный проведён" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
-          <SearchField value={completedSearch} onChange={(e) => setCompletedSearch(e.target.value)} placeholder="Найти среди пробных" />
+          <SearchField
+            value={completedSearch}
+            onChange={(e) => setCompletedSearch(e.target.value)}
+            placeholder="Найти среди пробных"
+            trailing={
+              <button
+                type="button"
+                onClick={() => setManualCompletedTarget({})}
+                aria-label="Пробный без записи оператором — сразу студентом сюда"
+                title="Пробный без записи оператором — сразу студентом сюда"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong bg-white text-text transition hover:bg-surface-alt"
+              >
+                <Plus className="h-5 w-5" strokeWidth={2.5} />
+              </button>
+            }
+          />
           <div className="rounded-field border border-border bg-surface-alt">
             <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2">
               {completedLeads.length === 0 ? (
@@ -328,6 +344,11 @@ export function TrialsPage() {
 
       <AddToGroupModal open={Boolean(createStudentTarget)} student={createStudentTarget} onClose={() => setCreateStudentTarget(null)} />
       <StudentFormModal student={manualLeadTarget} onClose={() => setManualLeadTarget(null)} onCreated={handleManualCreated} />
+      <StudentFormModal
+        student={manualCompletedTarget}
+        onClose={() => setManualCompletedTarget(null)}
+        createMode="trial_completed"
+      />
       <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deferTarget} onClose={() => setDeferTarget(null)} />
       <AddPaymentModal open={Boolean(paymentTarget)} student={paymentTarget} enrollments={paymentEnrollments} onClose={() => setPaymentTarget(null)} />

@@ -671,7 +671,7 @@ export function StudentsPage() {
           })}
         </div>
 
-        <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} createAsTrial />
+        <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} createMode="trial" />
       </>
     );
   }
@@ -830,7 +830,7 @@ export function StudentsPage() {
         </>
       )}
 
-      <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} />
+      <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} createMode="trial" />
 
       <EditFreezeStartModal enrollment={editFreezeTarget} onClose={() => setEditFreezeTarget(null)} />
 
