@@ -598,7 +598,7 @@ export function LeadCard({
         {operatorLabel ? (
           <span
             className="truncate rounded-badge border bg-transparent px-1.5 py-0.5 text-[9px] font-bold"
-            style={{ borderColor: operatorColor || '#8B94A3', color: operatorColor || '#8B94A3' }}
+            style={{ borderColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
           >
             {operatorLabel}
           </span>

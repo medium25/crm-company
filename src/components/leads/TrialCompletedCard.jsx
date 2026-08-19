@@ -56,30 +56,20 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherN
       {operatorLabel && (
         <span
           className="w-fit truncate rounded-badge border bg-transparent px-1.5 py-0.5 text-[9px] font-bold"
-          style={{ borderColor: operatorColor || '#8B94A3', color: operatorColor || '#8B94A3' }}
+          style={{ borderColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
         >
           {operatorLabel}
         </span>
       )}
-      <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-1 border-t border-border pt-1.5">
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            title="Продвинуть"
-            className="flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-field border border-border-strong px-1.5 py-1 text-[11px] font-bold text-text hover:bg-surface-alt"
-          >
-            Продвинуть <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onArchive(lead)}
-            title="Архивировать"
-            className="min-w-0 flex-1 truncate rounded-field border border-danger/40 px-1.5 py-1 text-[11px] font-bold text-danger hover:bg-danger/5"
-          >
-            Архив
-          </button>
-        </div>
+      <div className="flex flex-col gap-1 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          title="Продвинуть"
+          className="flex items-center justify-center gap-1 truncate rounded-field border border-border-strong px-1.5 py-1 text-[11px] font-bold text-text hover:bg-surface-alt"
+        >
+          Продвинуть <ArrowRight className="h-3.5 w-3.5" />
+        </button>
         {expanded && (
           <div className="flex items-center gap-1">
             <button
@@ -97,6 +87,14 @@ export function TrialCompletedCard({ lead, operatorColor, operatorName, teacherN
               className="min-w-0 flex-1 truncate rounded-field border border-navy/40 px-1.5 py-1 text-[11px] font-bold text-navy hover:bg-navy/5"
             >
               Перенос
+            </button>
+            <button
+              type="button"
+              onClick={() => onArchive(lead)}
+              title="Архивировать"
+              className="min-w-0 flex-1 truncate rounded-field border border-danger/40 px-1.5 py-1 text-[11px] font-bold text-danger hover:bg-danger/5"
+            >
+              Архив
             </button>
           </div>
         )}
