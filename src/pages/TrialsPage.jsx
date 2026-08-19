@@ -260,7 +260,7 @@ export function TrialsPage() {
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Пробный назначен" count={scheduledLeads.length} color={TRIAL_SCHEDULED_COLOR} />
           <LeadSearch
