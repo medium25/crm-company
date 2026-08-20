@@ -88,17 +88,19 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
     setForm((f) => ({ ...f, groupId: currentEnrollment?.groupId ?? '' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEnrollment?.groupId, isTrialStatus, student?.id]);
-  // При ручном добавлении пробного (в обход авто-распределения «Заявки»)
-  // ответственного выбирает сам — ICON (пустое значение) для пришедших
-  // без ответственного лица.
-  const needsOperatorPick = !isEdit && createMode !== 'lead';
+  // Ответственного можно выбрать вручную при любом ручном создании.
+  // У пробных (в обход авто-распределения «Заявки») пустое значение —
+  // ICON, для пришедших без ответственного лица; у лида пустое значение —
+  // не «без ответственного» (лиду он нужен всегда), а «доверить
+  // авто-распределению по очереди», как раньше по умолчанию.
+  const needsOperatorPick = !isEdit;
   const staffQuery = useMemo(
     () => (db && activeBranchId && needsOperatorPick ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
     [activeBranchId, needsOperatorPick],
   );
   const { data: staffList } = useCollection(staffQuery);
   const operatorOptions = [
-    { value: '', label: 'ICON (без ответственного)' },
+    { value: '', label: createMode === 'lead' ? 'Автоматически (по очереди)' : 'ICON (без ответственного)' },
     ...[...staffList].sort((a, b) => a.fullName.localeCompare(b.fullName)).map((s) => ({ value: s.id, label: s.fullName })),
   ];
   // При создании — обязательно 2 номера, без второго лид не заводится (это
@@ -253,12 +255,15 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
         onCreated?.(created.id);
         onClose();
       } else {
-        const [operatorIds, operatorSchedules] = await Promise.all([
-          getActiveLeadOperators(db, activeBranchId),
-          getOperatorSchedules(db, activeBranchId),
-        ]);
-        const operators = operatorIds.map((id) => ({ id, workSchedule: operatorSchedules[id] }));
-        const assignedOperator = await assignOperatorForLead(db, activeBranchId, operators, new Date());
+        let assignedOperator = form.assignedOperator || null;
+        if (!assignedOperator) {
+          const [operatorIds, operatorSchedules] = await Promise.all([
+            getActiveLeadOperators(db, activeBranchId),
+            getOperatorSchedules(db, activeBranchId),
+          ]);
+          const operators = operatorIds.map((id) => ({ id, workSchedule: operatorSchedules[id] }));
+          assignedOperator = await assignOperatorForLead(db, activeBranchId, operators, new Date());
+        }
         const created = await addDoc(collection(db, 'students'), {
           ...payload,
           branchId: activeBranchId,
