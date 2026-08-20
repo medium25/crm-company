@@ -1,8 +1,8 @@
 // src/pages/LeadsPage.jsx
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isSameMonth } from 'date-fns';
-import { collection, doc, query, where, orderBy, updateDoc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, onSnapshot, updateDoc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -20,6 +20,7 @@ import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt, validateCallDeadline } from '../lib/leadFunnel.js';
+import { playNewLeadChime } from '../lib/notificationSound.js';
 
 const TERMINAL_STAGES = ['won', 'lost'];
 
@@ -62,6 +63,26 @@ export function LeadsPage() {
     [activeBranchId],
   );
   const { data: allLeads } = useCollection(leadsQuery);
+
+  // Звук нового лида — играет только тем, у кого сейчас открыта эта
+  // страница, при появлении лида в «Новый лид» (вручную или из синка
+  // Sheets). Отдельная подписка на тот же query, а не хук useCollection —
+  // нужны сырые docChanges, а не готовый список; на первом снапшоте
+  // (загрузка уже существующих лидов) звук не играет, только на реальных
+  // «added» после него.
+  const isFirstLeadsSnapshot = useRef(true);
+  useEffect(() => {
+    if (!leadsQuery) return;
+    isFirstLeadsSnapshot.current = true;
+    return onSnapshot(leadsQuery, (snap) => {
+      if (isFirstLeadsSnapshot.current) {
+        isFirstLeadsSnapshot.current = false;
+        return;
+      }
+      const hasNewLead = snap.docChanges().some((c) => c.type === 'added' && c.doc.data().funnelStage === 'new');
+      if (hasNewLead) playNewLeadChime();
+    });
+  }, [leadsQuery]);
 
   // Название и цвет стадии редактируются через ⚙ в заголовке колонки и
   // хранятся per-branch, а не в самом COLUMNS — ключ и порядок стадий
