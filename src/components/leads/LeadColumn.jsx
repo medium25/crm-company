@@ -201,12 +201,12 @@ export function groupLeadsByTrialDay(leads) {
   const groups = { overdue: [], today: [], tomorrow: [], other: [] };
   const now = Date.now();
   for (const lead of leads) {
+    const d = lead.trialDate?.toDate?.();
     const deadline = stageDeadline(lead);
-    if (deadline && now > deadline.getTime()) {
+    if (deadline && now > deadline.getTime() && !(d && isToday(d))) {
       groups.overdue.push(lead);
       continue;
     }
-    const d = lead.trialDate?.toDate?.();
     if (d && isToday(d)) groups.today.push(lead);
     else if (d && isTomorrow(d)) groups.tomorrow.push(lead);
     else groups.other.push(lead);

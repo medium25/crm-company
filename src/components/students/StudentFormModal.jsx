@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, addDoc, updateDoc, doc, query, where, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, query, where, getDocs, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -48,9 +48,11 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
   const { showToast } = useToast();
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [duplicateName, setDuplicateName] = useState('');
 
   useEffect(() => {
     if (!student) return;
+    setDuplicateName('');
     if (student.id) {
       setForm({
         fullName: student.fullName ?? '',
@@ -107,6 +109,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (missingSecondPhone) return;
+    setDuplicateName('');
     setSaving(true);
     try {
       const payload = {
@@ -117,6 +120,15 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       };
+      if (!isEdit) {
+        const dupSnap = await getDocs(
+          query(collection(db, 'students'), where('branchId', '==', activeBranchId), where('phone', '==', payload.phone), where('isArchived', '==', false)),
+        );
+        if (!dupSnap.empty) {
+          setDuplicateName(dupSnap.docs[0].data().fullName);
+          return;
+        }
+      }
       if (student?.id) {
         await updateDoc(doc(db, 'students', student.id), payload);
 
@@ -323,6 +335,9 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
         />
         {missingSecondPhone && (
           <p className="-mt-2 text-[13px] text-danger">Без второго номера телефона добавить ученика нельзя.</p>
+        )}
+        {duplicateName && (
+          <p className="-mt-2 text-[13px] text-danger">Студент с этим номером уже есть в базе: {duplicateName}.</p>
         )}
         <Select
           label="Источник"
