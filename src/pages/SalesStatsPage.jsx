@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, query, where } from 'firebase/firestore';
 import { format, startOfMonth } from 'date-fns';
-import { ChevronLeft, Settings2, TrendingUp } from 'lucide-react';
+import { ChevronLeft, Settings2, TrendingUp, Info } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -66,6 +66,64 @@ function ConvBadge({ fromLabel, fromCount, toCount, grade }) {
           от «{fromLabel}» — {toCount} из {fromCount}
         </span>
       </span>
+    </div>
+  );
+}
+
+/**
+ * ⓘ «Как считается» — кратко и по конкретным цифрам (не абстрактно, а с
+ * реальными порогами из настроек) объясняет, почему у оператора именно
+ * такой результат по каждому критерию, включая правило сборки итоговой
+ * оценки (по худшему показателю).
+ */
+function CriteriaInfoButton({ criteria, workingDays }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  const rules = [
+    { label: 'Лидов в день', text: `сумма лидов ÷ ${workingDays} раб. дн. (пн–сб). ≥${criteria.leadsPerDay.green}/дн — зелёный, ≥${criteria.leadsPerDay.yellow}/дн — жёлтый, меньше — красный.` },
+    { label: 'Дозвон', text: `доля от «Лиды». ≥${criteria.dozvon.green}% — зелёный, ≥${criteria.dozvon.yellow}% — жёлтый, меньше — красный.` },
+    { label: 'Пробный', text: `доля от «Дозвон». ≥${criteria.probny.green}% — зелёный, ≥${criteria.probny.yellow}% — жёлтый, меньше — красный.` },
+    { label: 'Проведён', text: `доля от «Пробный». ≥${criteria.provoden.green}% — зелёный, ≥${criteria.provoden.yellow}% — жёлтый, меньше — красный.` },
+    { label: 'Оплата', text: `доля от «Проведён». ≥${criteria.oplata.green}% — зелёный, ≥${criteria.oplata.yellow}% — жёлтый, меньше — красный.` },
+    { label: 'Просрочка сейчас', text: `среднее часов у карточек, просроченных прямо сейчас. ≤${criteria.overdueHours.green} ч — зелёный, ≤${criteria.overdueHours.yellow} ч — жёлтый, больше — красный.` },
+  ];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1 rounded-field border px-2.5 py-1.5 text-[11.5px] font-bold transition-colors ${
+          open ? 'border-navy text-navy' : 'border-border-strong text-muted hover:text-navy'
+        }`}
+      >
+        <Info className="h-3.5 w-3.5" /> Как считается
+      </button>
+      {open && (
+        <div className="absolute right-0 top-9 z-20 w-80 rounded-field border border-border bg-surface p-3.5 shadow-hover">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Правила оценки</p>
+          <ul className="flex flex-col gap-2">
+            {rules.map((r) => (
+              <li key={r.label} className="text-[12px] leading-snug text-muted">
+                <b className="text-text">{r.label}</b> — {r.text}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2.5 border-t border-border pt-2.5 text-[11px] leading-snug text-muted">
+            Итог по карточке — по <b className="text-text">худшему</b> из показателей: хоть один красный → карточка называет его причиной; иначе есть жёлтый → «Хорошо»; всё зелёное → «Отлично». Пороги меняются в Настройках → Оценка операторов.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -182,17 +240,6 @@ export function SalesStatsPage() {
 
                 <div className="flex flex-col gap-0.5">
                   <FunnelStep label="Лиды" count={r.total} total={r.total} grade={leadsGrade} />
-                  <div className="grid h-[30px] grid-cols-[78px_1fr_38px] items-center">
-                    <span />
-                    <span className="flex items-center gap-2.5">
-                      <span className={`inline-flex w-[64px] items-center justify-center rounded-[6px] py-1 text-[11px] font-extrabold tabular-nums ${GRADE_BADGE[leadsGrade]}`}>
-                        {workingDays > 0 ? (r.total / workingDays).toFixed(1) : '0'}/дн
-                      </span>
-                      <span className="text-[10.5px] text-muted">
-                        норма {criteria.leadsPerDay.yellow}–{criteria.leadsPerDay.green}+/день · {workingDays} раб. дн. (пн–сб)
-                      </span>
-                    </span>
-                  </div>
                   <ConvBadge fromLabel="Лиды" fromCount={r.total} toCount={r.dozvon} grade={dozvonGrade} />
                   <FunnelStep label="Дозвон" count={r.dozvon} total={r.total} grade={dozvonGrade} />
                   <ConvBadge fromLabel="Дозвон" fromCount={r.dozvon} toCount={r.trialScheduled} grade={probnyGrade} />
@@ -203,7 +250,7 @@ export function SalesStatsPage() {
                   <FunnelStep label="Оплата" count={r.won} total={r.total} grade={oplataGrade} />
                 </div>
 
-                <div className="mt-3.5 border-t border-border pt-3">
+                <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-border pt-3">
                   <div
                     className="w-fit rounded-field bg-surface-alt px-2.5 py-2"
                     style={{ borderLeft: `3px solid ${GRADE_HEX[overdueGrade]}` }}
@@ -211,6 +258,7 @@ export function SalesStatsPage() {
                     <div className="text-[9.5px] font-bold uppercase tracking-wide text-muted">Средняя просрочка сейчас</div>
                     <div className="mt-0.5 text-[14px] font-extrabold">{overdueHours > 0 ? formatOverdueHours(overdueHours) : 'нет просрочек'}</div>
                   </div>
+                  <CriteriaInfoButton criteria={criteria} workingDays={workingDays} />
                 </div>
               </Card>
             );
