@@ -41,7 +41,7 @@ function avatarColor(operatorId) {
 /** grade=null — нейтральный шаг без оценки (сама «Лиды», база 100%). */
 function FunnelStep({ label, count, total, grade }) {
   const pct = total > 0 ? (count / total) * 100 : 0;
-  const color = grade ? GRADE_HEX[grade] : '#22406B';
+  const color = grade ? GRADE_HEX[grade] : '#8B94A3';
   return (
     <div className="grid h-[26px] grid-cols-[78px_1fr_38px] items-center gap-2.5">
       <span className="text-[11.5px] font-bold text-text">{label}</span>
