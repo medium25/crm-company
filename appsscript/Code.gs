@@ -536,6 +536,203 @@ function doPost(e) {
   });
 }
 
+// --- Ежедневный отчёт по оператору → Telegram ------------------------------
+
+/**
+ * Окно отчёта у каждого оператора — «плавающее», привязано к концу ЕГО
+ * смены (settings/{branchId}.operatorSchedules[opId][weekday].end), не к
+ * фиксированному времени для всех. Пример: смена до 16:00 → окно данных
+ * [15:50 вчера, 15:50 сегодня), отчёт уходит в 15:51. Логика:
+ *   windowEnd = конец смены сегодня − REPORT_WINDOW_BEFORE_SHIFT_END_MIN
+ *   windowStart = windowEnd − 24 часа
+ *   sendAt = windowEnd + REPORT_SEND_DELAY_MIN
+ * Триггер (checkAndSendDailyOperatorReports) должен быть установлен на
+ * каждые REPORT_TRIGGER_TOLERANCE_MIN минут — Apps Script не гарантирует
+ * секундную точность, поэтому окно допуска [sendAt, sendAt+tolerance)
+ * ловит момент, даже если конкретный тик триггера пришёл на пару минут
+ * позже расчётного sendAt.
+ */
+const REPORT_WINDOW_BEFORE_SHIFT_END_MIN = 10;
+const REPORT_SEND_DELAY_MIN = 1;
+const REPORT_TRIGGER_TOLERANCE_MIN = 5;
+const REPORT_TARGET_SOURCES = ['meta_target', 'target_manual'];
+
+function pad2_(n) {
+  return String(n).padStart(2, '0');
+}
+
+function hhmmDdMm_(date) {
+  return `${pad2_(date.getHours())}:${pad2_(date.getMinutes())} ${pad2_(date.getDate())}.${pad2_(date.getMonth() + 1)}`;
+}
+
+function telegramSendMessage_(text) {
+  const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
+  const chatId = props_().getProperty('TELEGRAM_CHAT_ID');
+  const threadId = props_().getProperty('TELEGRAM_REPORTS_THREAD_ID');
+  if (!token || !chatId) {
+    Logger.log('Telegram не настроен — нет TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID в Script Properties.');
+    return;
+  }
+  const payload = { chat_id: chatId, text, parse_mode: 'HTML' };
+  if (threadId) payload.message_thread_id = Number(threadId);
+  const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+  if (resp.getResponseCode() >= 400) {
+    Logger.log(`Telegram sendMessage упал (${resp.getResponseCode()}): ${resp.getContentText()}`);
+  }
+}
+
+/**
+ * Все 6 метрик считаются из ОДНОЙ выборки лидов оператора (assignedOperator
+ * = opId, без фильтра по дате — Firestore REST не даёт дешёво фильтровать
+ * по элементу массива типа callAttempts[0].at, поэтому тянем разумный
+ * лимит и фильтруем на клиенте) — дешевле, чем 6 отдельных запросов, и то
+ * же самое, чем уже пользуется nextLeastLoadedOperator_ выше в этом файле.
+ * Платежи — отдельный запрос по transactions за окно (весь филиал, не
+ * только этот оператор — так дешевле, чем IN по потенциально многим
+ * studentId), сверяем studentId с набором лидов оператора.
+ * @returns {string|null} текст отчёта, или null если оператор не был
+ *   активен за окно (все метрики нулевые) — по нему отчёт не шлём.
+ */
+function buildOperatorReportText_(op, windowStart, windowEnd) {
+  const leads = runQuery_('students', [{ field: 'assignedOperator', op: 'EQUAL', value: op.id }], { limit: 3000 });
+
+  const inWindow = (iso) => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return t >= windowStart.getTime() && t < windowEnd.getTime();
+  };
+
+  const newLeadsCount = leads.filter((l) => inWindow(l.createdAt)).length;
+
+  const takenCount = leads.filter((l) => {
+    const attempts = l.callAttempts;
+    return Array.isArray(attempts) && attempts[0] && inWindow(attempts[0].at);
+  }).length;
+
+  const lostCount = leads.filter((l) => l.funnelStage === 'lost' && inWindow(l.lostAt)).length;
+
+  const attended = leads.filter((l) => l.attended === true && inWindow(l.trialDate));
+  const attendedTargetCount = attended.filter((l) => REPORT_TARGET_SOURCES.includes(l.source)).length;
+  const attendedOtherCount = attended.length - attendedTargetCount;
+
+  const leadIds = new Set(leads.map((l) => l.id));
+  const payments = runQuery_(
+    'transactions',
+    [
+      { field: 'type', op: 'EQUAL', value: 'payment' },
+      { field: 'date', op: 'GREATER_THAN_OR_EQUAL', value: windowStart },
+      { field: 'date', op: 'LESS_THAN', value: windowEnd },
+    ],
+    { limit: 500 },
+  );
+  const newPaymentsCount = payments.filter((p) => leadIds.has(p.studentId)).length;
+
+  const isActive = newLeadsCount || takenCount || lostCount || attendedTargetCount || attendedOtherCount || newPaymentsCount;
+  if (!isActive) return null;
+
+  return (
+    `📊 Отчёт за смену — <b>${op.fullName}</b>\n` +
+    `Период: ${hhmmDdMm_(windowStart)} — ${hhmmDdMm_(windowEnd)}\n\n` +
+    `Лидов поступило: <b>${newLeadsCount}</b>\n` +
+    `Взято в работу: <b>${takenCount}</b>\n` +
+    `Потеряно: <b>${lostCount}</b>\n` +
+    `Посетили (таргет): <b>${attendedTargetCount}</b>\n` +
+    `Посетили (другое): <b>${attendedOtherCount}</b>\n` +
+    `Новых оплат: <b>${newPaymentsCount}</b>`
+  );
+}
+
+/**
+ * Раз в REPORT_TRIGGER_TOLERANCE_MIN минут (см. installDailyOperatorReportTrigger)
+ * проверяет по каждому оператору филиала, не настал ли момент слать ему
+ * отчёт (конец его смены сегодня минус 10 мин, плюс 1 мин), и если да —
+ * считает метрики за 24ч перед этим моментом и шлёт в Telegram. Дедуп на
+ * сегодня — через CacheService, чтобы несколько тиков триггера подряд не
+ * отправили один отчёт дважды.
+ */
+function checkAndSendDailyOperatorReports() {
+  const branchId = defaultBranchId_();
+  const settingsDoc = fsGetOptional_(`/settings/${branchId}`);
+  const schedules = (settingsDoc ? fromFsDoc_(settingsDoc) : {}).operatorSchedules || {};
+
+  const operators = runQuery_(
+    'staff',
+    [
+      { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
+      { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
+    ],
+    { limit: 30 },
+  );
+
+  const now = new Date();
+  const cache = CacheService.getScriptCache();
+
+  operators.forEach((op) => {
+    const todaySchedule = schedules[op.id] && schedules[op.id][now.getDay()];
+    if (!todaySchedule || !todaySchedule.end) return; // выходной или график не задан — не шлём
+
+    const [endH, endM] = todaySchedule.end.split(':').map(Number);
+    const shiftEndToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM);
+    const windowEnd = new Date(shiftEndToday.getTime() - REPORT_WINDOW_BEFORE_SHIFT_END_MIN * 60000);
+    const sendAt = new Date(windowEnd.getTime() + REPORT_SEND_DELAY_MIN * 60000);
+
+    const diffMin = (now.getTime() - sendAt.getTime()) / 60000;
+    if (diffMin < 0 || diffMin > REPORT_TRIGGER_TOLERANCE_MIN) return; // ещё рано, или окно допуска уже прошло
+
+    const dateKey = `${now.getFullYear()}-${pad2_(now.getMonth() + 1)}-${pad2_(now.getDate())}`;
+    const sentKey = `dailyReportSent_${op.id}_${dateKey}`;
+    if (cache.get(sentKey)) return;
+    cache.put(sentKey, '1', 6 * 60 * 60);
+
+    const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1000);
+    const text = buildOperatorReportText_(op, windowStart, windowEnd);
+    if (text) telegramSendMessage_(text);
+  });
+}
+
+/**
+ * Разовая установка — запусти вручную (выбери installDailyOperatorReportTrigger
+ * в выпадающем списке функций сверху редактора → Run) один раз после
+ * настройки Script Properties. Безопасно перезапускать — сносит старые
+ * триггеры с тем же именем перед созданием нового, дублей не будет.
+ */
+function installDailyOperatorReportTrigger() {
+  ScriptApp.getProjectTriggers()
+    .filter((t) => t.getHandlerFunction() === 'checkAndSendDailyOperatorReports')
+    .forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('checkAndSendDailyOperatorReports').timeBased().everyMinutes(REPORT_TRIGGER_TOLERANCE_MIN).create();
+  Logger.log(`Триггер установлен — проверка каждые ${REPORT_TRIGGER_TOLERANCE_MIN} мин.`);
+}
+
+/**
+ * Отладка — считает отчёт для КАЖДОГО оператора прямо сейчас (окно 24ч до
+ * текущего момента, не привязано к графику) и пишет в Execution log, БЕЗ
+ * отправки в Telegram. Запускай вручную, чтобы проверить, что метрики
+ * считаются правильно, до того как полагаться на реальный график/триггер.
+ */
+function previewDailyOperatorReports() {
+  const branchId = defaultBranchId_();
+  const operators = runQuery_(
+    'staff',
+    [
+      { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
+      { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
+    ],
+    { limit: 30 },
+  );
+  const windowEnd = new Date();
+  const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1000);
+  operators.forEach((op) => {
+    const text = buildOperatorReportText_(op, windowStart, windowEnd);
+    Logger.log(text ? `\n${text}` : `${op.fullName}: не активен за последние 24ч, отчёт не шлём.`);
+  });
+}
+
 function doGet(e) {
   return handle_(() => {
     const params = e.parameter || {};
