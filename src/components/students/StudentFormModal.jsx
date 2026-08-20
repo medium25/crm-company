@@ -9,7 +9,6 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
-import { getActiveLeadOperators, getOperatorSchedules, assignOperatorForLead } from '../../lib/leadFunnel.js';
 import { recomputeStudentAggregates } from '../../lib/students.js';
 
 // meta_target ставит только appsscript/SheetsSync.gs автоматически лидам
@@ -88,11 +87,8 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
     setForm((f) => ({ ...f, groupId: currentEnrollment?.groupId ?? '' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEnrollment?.groupId, isTrialStatus, student?.id]);
-  // Ответственного можно выбрать вручную при любом ручном создании.
-  // У пробных (в обход авто-распределения «Заявки») пустое значение —
-  // ICON, для пришедших без ответственного лица; у лида пустое значение —
-  // не «без ответственного» (лиду он нужен всегда), а «доверить
-  // авто-распределению по очереди», как раньше по умолчанию.
+  // Ответственного выбирает сам при любом ручном создании — ICON (пустое
+  // значение) для пришедших без ответственного лица.
   const needsOperatorPick = !isEdit;
   const staffQuery = useMemo(
     () => (db && activeBranchId && needsOperatorPick ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
@@ -100,7 +96,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
   );
   const { data: staffList } = useCollection(staffQuery);
   const operatorOptions = [
-    { value: '', label: createMode === 'lead' ? 'Автоматически (по очереди)' : 'ICON (без ответственного)' },
+    { value: '', label: 'ICON (без ответственного)' },
     ...[...staffList].sort((a, b) => a.fullName.localeCompare(b.fullName)).map((s) => ({ value: s.id, label: s.fullName })),
   ];
   // При создании — обязательно 2 номера, без второго лид не заводится (это
@@ -255,15 +251,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
         onCreated?.(created.id);
         onClose();
       } else {
-        let assignedOperator = form.assignedOperator || null;
-        if (!assignedOperator) {
-          const [operatorIds, operatorSchedules] = await Promise.all([
-            getActiveLeadOperators(db, activeBranchId),
-            getOperatorSchedules(db, activeBranchId),
-          ]);
-          const operators = operatorIds.map((id) => ({ id, workSchedule: operatorSchedules[id] }));
-          assignedOperator = await assignOperatorForLead(db, activeBranchId, operators, new Date());
-        }
+        const assignedOperator = form.assignedOperator || null;
         const created = await addDoc(collection(db, 'students'), {
           ...payload,
           branchId: activeBranchId,
