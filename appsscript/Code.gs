@@ -287,7 +287,7 @@ function runQuery_(collectionId, filters, opts) {
 
 // --- lead helpers ----------------------------------------------------------
 
-const LEAD_SOURCES = ['instagram', 'telegram', 'meta_target', 'friends', 'outdoor', 'other'];
+const LEAD_SOURCES = ['meta_target', 'target_manual', 'instagram', 'street', 'word_of_mouth', 'returned', 'other'];
 
 function validateLeadInput_(body) {
   const fullName = (body.fullName || '').toString().trim();

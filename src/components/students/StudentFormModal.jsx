@@ -12,13 +12,17 @@ import { Select } from '../ui/Select.jsx';
 import { getActiveLeadOperators, getOperatorSchedules, assignOperatorForLead } from '../../lib/leadFunnel.js';
 import { recomputeStudentAggregates } from '../../lib/students.js';
 
+// meta_target — то же значение, что ставит appsscript/SheetsSync.gs
+// автоматически лидам из гугл-таблицы; target_manual — тот же таргет, но
+// когда оператор заводит лида руками (не через синк).
 const SOURCE_OPTIONS = [
   { value: '', label: 'Не указан' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'telegram', label: 'Telegram' },
-  { value: 'meta_target', label: 'Таргет в Meta' },
-  { value: 'friends', label: 'Друзья' },
-  { value: 'outdoor', label: 'Наружная реклама' },
+  { value: 'meta_target', label: 'Таргет' },
+  { value: 'target_manual', label: 'Таргет (р)' },
+  { value: 'instagram', label: 'Инстаграм' },
+  { value: 'street', label: 'Улица' },
+  { value: 'word_of_mouth', label: 'Сарафан' },
+  { value: 'returned', label: 'Вернулся' },
   { value: 'other', label: 'Другое' },
 ];
 

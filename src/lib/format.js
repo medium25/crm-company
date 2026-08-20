@@ -25,6 +25,35 @@ export function formatMethod(method) {
 }
 
 /**
+ * Источники лида — из Sheets всегда meta_target («Таргет», см.
+ * appsscript/SheetsSync.gs), вручную оператор выбирает между этими же
+ * значениями через StudentFormModal.SOURCE_OPTIONS. Старые значения
+ * (telegram/friends/outdoor) оставлены только для корректного отображения
+ * уже существующих записей — в форме больше не выбираются.
+ */
+const SOURCE_LABELS = {
+  meta_target: 'Таргет',
+  target_manual: 'Таргет (р)',
+  instagram: 'Инстаграм',
+  street: 'Улица',
+  word_of_mouth: 'Сарафан',
+  returned: 'Вернулся',
+  other: 'Другое',
+  telegram: 'Telegram',
+  friends: 'Друзья',
+  outdoor: 'Наружная реклама',
+};
+
+/**
+ * @param {string|null|undefined} source
+ * @returns {string|null} подпись источника лида, null если не указан
+ */
+export function formatSource(source) {
+  if (!source) return null;
+  return SOURCE_LABELS[source] ?? source;
+}
+
+/**
  * @param {number} amount целое число в сумах
  * @returns {string} "840 000 UZS" (неразрывные пробелы)
  */

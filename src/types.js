@@ -120,7 +120,7 @@
  * @property {string|null} photoUrl
  * @property {StudentStatus} status
  * @property {string|null} statusReason причина ухода
- * @property {string|null} source instagram | telegram | meta_target | друзья | наружная | другое
+ * @property {string|null} source meta_target | target_manual | instagram | street | word_of_mouth | returned | другое
  * @property {number} balance денорм. агрегат: оплаты − списания
  * @property {import('firebase/firestore').Timestamp} balanceUpdatedAt
  * @property {string} note

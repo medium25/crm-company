@@ -9,7 +9,7 @@ import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, isTrialDay, contactDueDate, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
-import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay, formatOverdueBy } from '../../lib/format.js';
+import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay, formatOverdueBy, formatSource } from '../../lib/format.js';
 
 /**
  * Компактная лента комментариев лида, разворачивается прямо в карточке.
@@ -642,7 +642,10 @@ export function LeadCard({
 
       {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
 
-      <span className="-mt-1.5 text-[10px] text-muted">{formatDateTimeShort(lead.createdAt)}</span>
+      <span className="-mt-1.5 text-[10px] text-muted">
+        {formatDateTimeShort(lead.createdAt)}
+        {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
+      </span>
     </div>
   );
 }
