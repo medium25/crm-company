@@ -642,9 +642,9 @@ export function LeadCard({
 
       {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
 
-      <span className="-mt-1.5 flex items-center justify-between gap-2 text-[10px] text-muted">
-        <span>{formatDateTimeShort(lead.createdAt)}</span>
-        {formatSource(lead.source) && <span>{formatSource(lead.source)}</span>}
+      <span className="-mt-1.5 text-[10px] text-muted">
+        {formatDateTimeShort(lead.createdAt)}
+        {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
       </span>
     </div>
   );
