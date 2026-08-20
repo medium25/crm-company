@@ -181,7 +181,7 @@ export function TrialsPage() {
 
   const [completedSearch, setCompletedSearch] = useState('');
   const completedTerm = completedSearch.trim().toLowerCase();
-  const completedLeads = completedTerm
+  const completedSearched = completedTerm
     ? completedLeadsAll.filter((l) => l.fullName?.toLowerCase().includes(completedTerm) || l.phone?.includes(completedTerm))
     : completedLeadsAll;
 
@@ -226,6 +226,33 @@ export function TrialsPage() {
     for (const e of allEnrollments) if (!map.has(e.studentId)) map.set(e.studentId, e);
     return map;
   }, [allEnrollments]);
+
+  // Чётность/нечётность «Пробных» — по расписанию группы, куда уже
+  // записан студент (enrollment.groupId), а не по дню недели пробного.
+  // Нечётная — только если у группы явно schedule.type==='odd'; всё
+  // остальное (чётная, «по дням недели», группы ещё нет) — в чётные,
+  // операторы сами перенесут после того как группа станет известна.
+  const branchGroupsQuery = useMemo(
+    () => (db && activeBranchId ? query(collection(db, 'groups'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    [activeBranchId],
+  );
+  const { data: branchGroups } = useCollection(branchGroupsQuery);
+  const scheduleTypeByGroupId = useMemo(() => {
+    const map = new Map();
+    for (const g of branchGroups) map.set(g.id, g.schedule?.type);
+    return map;
+  }, [branchGroups]);
+  const [completedParityTab, setCompletedParityTab] = useState('even');
+  const completedLeadsByParity = useMemo(() => {
+    const buckets = { even: [], odd: [] };
+    for (const lead of completedSearched) {
+      const groupId = enrollmentByStudent.get(lead.id)?.groupId;
+      const scheduleType = groupId ? scheduleTypeByGroupId.get(groupId) : null;
+      buckets[scheduleType === 'odd' ? 'odd' : 'even'].push(lead);
+    }
+    return buckets;
+  }, [completedSearched, enrollmentByStudent, scheduleTypeByGroupId]);
+  const completedLeads = completedLeadsByParity[completedParityTab];
 
   const groups = useMemo(() => groupLeadsByTrialDay(scheduledLeads), [scheduledLeads]);
   const onOpen = (lead) => navigate(`/students/${lead.id}`);
@@ -311,6 +338,23 @@ export function TrialsPage() {
 
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Пробные" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
+          <div className="flex gap-1 self-start rounded-full bg-surface-alt p-1">
+            {[
+              { value: 'even', label: `Чётные (${completedLeadsByParity.even.length})` },
+              { value: 'odd', label: `Нечётные (${completedLeadsByParity.odd.length})` },
+            ].map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setCompletedParityTab(t.value)}
+                className={`rounded-full px-3 py-1.5 text-[13px] font-bold ${
+                  completedParityTab === t.value ? 'bg-navy text-white' : 'text-muted'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           <SearchField
             value={completedSearch}
             onChange={(e) => setCompletedSearch(e.target.value)}
