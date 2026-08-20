@@ -56,14 +56,11 @@ function FunnelStep({ label, count, total, grade }) {
 function ConvBadge({ fromLabel, fromCount, toCount, grade }) {
   const pct = fromCount > 0 ? Math.round((toCount / fromCount) * 100) : 0;
   return (
-    <div className="grid h-[34px] grid-cols-[78px_1fr_38px] items-center">
+    <div className="grid h-[30px] grid-cols-[78px_1fr_38px] items-center">
       <span />
       <span className="flex items-center gap-2.5">
         <span className={`inline-flex w-[64px] items-center justify-center gap-1 rounded-[6px] py-1 text-[15px] font-extrabold tabular-nums ${CONV_BADGE[grade]}`}>
           {pct}%
-        </span>
-        <span className="relative h-1.5 w-16 overflow-hidden rounded-full bg-surface-alt">
-          <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: GRADE_HEX[grade] }} />
         </span>
         <span className="text-[10.5px] text-muted">
           от «{fromLabel}» — {toCount} из {fromCount}
