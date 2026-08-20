@@ -1,21 +1,26 @@
+import { useState } from 'react';
+import { MessageSquare } from 'lucide-react';
 import { formatPhone, formatDateTimeShort, formatSource } from '../../lib/format.js';
-import { operatorInitials, trialScheduleLabel } from './LeadCard.jsx';
+import { operatorInitials, trialScheduleLabel, LeadCommentsPanel } from './LeadCard.jsx';
+import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 
 /**
- * Карточка лида на странице «Пробные» — только просмотр, без операторских
- * кнопок (дозвон/«не выходит на связь»/комментарии/меню). Единственное
- * действие — «Создать студента» (открывает «Добавить в группу», см.
- * TrialsPage), после чего лид у оператора на «Заявки» переходит в «Пробный
- * проведён».
+ * Карточка лида на странице «Пробные» — просмотр + комментарии, перенос
+ * даты пробного (⋮) и «Создать студента» (открывает «Добавить в группу»,
+ * см. TrialsPage), после чего лид у оператора на «Заявки» переходит в
+ * «Пробный проведён».
  * @param {Object} props
  * @param {Object} props.lead документ `students`
  * @param {string} [props.operatorColor]
  * @param {string} [props.operatorName]
  * @param {(lead: Object) => void} props.onOpen
  * @param {(lead: Object) => void} props.onCreateStudent
+ * @param {(lead: Object) => void} props.onReschedule «⋮ → Перенести пробный» — открывает TrialFormModal(mode:'reschedule')
  */
-export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCreateStudent }) {
+export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCreateStudent, onReschedule }) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const operatorLabel = operatorInitials(operatorName);
+  const hasComments = (lead.commentsCount ?? 0) > 0;
 
   return (
     <div
@@ -32,7 +37,7 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
         </a>
       </div>
       <span className="truncate text-[12px] text-muted">{trialScheduleLabel(lead)}</span>
-      <div className="mt-auto flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
         {operatorLabel ? (
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
@@ -43,10 +48,26 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
         ) : (
           <span />
         )}
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setCommentsOpen((v) => !v)}
+            aria-label="Комментарии"
+            className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+              commentsOpen || hasComments ? 'text-navy' : 'text-muted'
+            }`}
+          >
+            <MessageSquare className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
+          </button>
+          <DropdownMenu items={[{ label: 'Перенести пробный', onClick: () => onReschedule(lead) }]} />
+        </div>
+      </div>
+      {commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
+      <div className="mt-auto border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={() => onCreateStudent(lead)}
-          className="rounded-field border border-border-strong px-2.5 py-1.5 text-[12px] font-bold text-text hover:bg-surface-alt"
+          className="w-full rounded-field border border-border-strong px-2.5 py-1.5 text-[12px] font-bold text-text hover:bg-surface-alt"
         >
           Создать студента
         </button>

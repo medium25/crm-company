@@ -307,7 +307,7 @@ export function TrialsPage() {
               operatorByUid={operatorByUid}
               defaultOpen
               renderCard={(lead, op) => (
-                <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} />
+                <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
               )}
             />
           )}
@@ -317,7 +317,7 @@ export function TrialsPage() {
             operatorByUid={operatorByUid}
             defaultOpen
             renderCard={(lead, op) => (
-              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} />
+              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
             )}
           />
           <TrialGroup
@@ -325,7 +325,7 @@ export function TrialsPage() {
             leads={groups.tomorrow}
             operatorByUid={operatorByUid}
             renderCard={(lead, op) => (
-              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} />
+              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
             )}
           />
           <TrialGroup
@@ -333,7 +333,7 @@ export function TrialsPage() {
             leads={groups.other}
             operatorByUid={operatorByUid}
             renderCard={(lead, op) => (
-              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} />
+              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
             )}
           />
         </div>
