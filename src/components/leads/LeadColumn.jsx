@@ -3,6 +3,7 @@ import { isToday, isTomorrow } from 'date-fns';
 import { ChevronDown, ChevronRight, Info, Plus } from 'lucide-react';
 import { LeadCard } from './LeadCard.jsx';
 import { STAGE_COLOR_SWATCHES } from './columns.js';
+import { stageDeadline } from '../../lib/leadFunnel.js';
 
 /**
  * Значок «ⓘ» рядом с названием колонки — попап с инструкцией по работе с
@@ -197,8 +198,14 @@ function LeadGroup({ title, leads, operatorByUid, cardActions }) {
  * @returns {{today: Array, tomorrow: Array, other: Array}}
  */
 export function groupLeadsByTrialDay(leads) {
-  const groups = { today: [], tomorrow: [], other: [] };
+  const groups = { overdue: [], today: [], tomorrow: [], other: [] };
+  const now = Date.now();
   for (const lead of leads) {
+    const deadline = stageDeadline(lead);
+    if (deadline && now > deadline.getTime()) {
+      groups.overdue.push(lead);
+      continue;
+    }
     const d = lead.trialDate?.toDate?.();
     if (d && isToday(d)) groups.today.push(lead);
     else if (d && isTomorrow(d)) groups.tomorrow.push(lead);
@@ -270,6 +277,9 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
           <p className="py-4 text-center text-[14px] text-muted">Пусто</p>
         ) : groups ? (
           <>
+            {groups.overdue.length > 0 && (
+              <LeadGroup title="Просроченные" leads={groups.overdue} operatorByUid={operatorByUid} cardActions={cardActions} />
+            )}
             <LeadGroup title="Сегодня" leads={groups.today} operatorByUid={operatorByUid} cardActions={cardActions} />
             <LeadGroup title="Завтра" leads={groups.tomorrow} operatorByUid={operatorByUid} cardActions={cardActions} />
             <LeadGroup title="Другой день" leads={groups.other} operatorByUid={operatorByUid} cardActions={cardActions} />

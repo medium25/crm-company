@@ -271,6 +271,17 @@ export function TrialsPage() {
             onPick={(lead) => setTrialTarget({ lead, mode: 'schedule' })}
             onManualAdd={() => setManualLeadTarget({})}
           />
+          {groups.overdue.length > 0 && (
+            <TrialGroup
+              title="Просроченные"
+              leads={groups.overdue}
+              operatorByUid={operatorByUid}
+              defaultOpen
+              renderCard={(lead, op) => (
+                <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} />
+              )}
+            />
+          )}
           <TrialGroup
             title="Сегодня"
             leads={groups.today}
