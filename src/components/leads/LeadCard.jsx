@@ -17,7 +17,7 @@ import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadlin
  * студента/группы, но своя вёрстка — под тесную карточку в канбане, ввод
  * одной строкой («командная строка»), без textarea и большой кнопки.
  */
-function LeadCommentsPanel({ leadId }) {
+export function LeadCommentsPanel({ leadId }) {
   const { user, staff } = useAuth();
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);

@@ -101,7 +101,7 @@ function LeadSearch({ onPick, onManualAdd }) {
   const results = term ? allLeads.filter((s) => s.fullName?.toLowerCase().includes(term) || s.phone?.includes(term)).slice(0, 8) : [];
 
   return (
-    <div className="relative mb-3">
+    <div className="relative">
       <SearchField
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -242,7 +242,6 @@ export function TrialsPage() {
     for (const g of branchGroups) map.set(g.id, g.schedule?.type);
     return map;
   }, [branchGroups]);
-  const [completedParityTab, setCompletedParityTab] = useState('even');
   const completedLeadsByParity = useMemo(() => {
     const buckets = { even: [], odd: [] };
     for (const lead of completedSearched) {
@@ -252,7 +251,10 @@ export function TrialsPage() {
     }
     return buckets;
   }, [completedSearched, enrollmentByStudent, scheduleTypeByGroupId]);
-  const completedLeads = completedLeadsByParity[completedParityTab];
+  // Пн/Ср/Пт — нечётные дни группы (см. ODD_WEEKDAYS в lib/schedule.js),
+  // остальные (включая вс) — чётные. Открываем по умолчанию ту вкладку,
+  // что актуальна сегодня.
+  const isOddDayToday = [1, 3, 5].includes(new Date().getDay());
 
   const groups = useMemo(() => groupLeadsByTrialDay(scheduledLeads), [scheduledLeads]);
   const onOpen = (lead) => navigate(`/students/${lead.id}`);
@@ -338,23 +340,6 @@ export function TrialsPage() {
 
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Пробные" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
-          <div className="flex gap-1 self-start rounded-full bg-surface-alt p-1">
-            {[
-              { value: 'even', label: `Чётные (${completedLeadsByParity.even.length})` },
-              { value: 'odd', label: `Нечётные (${completedLeadsByParity.odd.length})` },
-            ].map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => setCompletedParityTab(t.value)}
-                className={`rounded-full px-3 py-1.5 text-[13px] font-bold ${
-                  completedParityTab === t.value ? 'bg-navy text-white' : 'text-muted'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
           <SearchField
             value={completedSearch}
             onChange={(e) => setCompletedSearch(e.target.value)}
@@ -371,34 +356,54 @@ export function TrialsPage() {
               </button>
             }
           />
-          <div className="rounded-field border border-border bg-surface-alt">
-            <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2">
-              {completedLeads.length === 0 ? (
-                <p className="col-span-full py-4 text-center text-[13px] text-muted">{completedTerm ? 'Ничего не найдено' : 'Пусто'}</p>
-              ) : (
-                completedLeads.map((lead) => {
-                  const op = operatorByUid.get(lead.assignedOperator);
-                  const enrollment = enrollmentByStudent.get(lead.id);
-                  return (
-                    <TrialCompletedCard
-                      key={lead.id}
-                      lead={lead}
-                      operatorColor={op?.color}
-                      operatorName={op?.name}
-                      teacherName={enrollment?.teacherName}
-                      groupCode={enrollment?.groupCode}
-                      onOpen={onOpen}
-                      onPay={setPaymentTarget}
-                      onDeferPayment={confirmDeferPayment}
-                      onArchive={setArchiveTarget}
-                      onEdit={setEditTarget}
-                      onDelete={setDeleteTarget}
-                    />
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <TrialGroup
+            title="Чётные"
+            leads={completedLeadsByParity.even}
+            operatorByUid={operatorByUid}
+            defaultOpen={!isOddDayToday}
+            renderCard={(lead, op) => {
+              const enrollment = enrollmentByStudent.get(lead.id);
+              return (
+                <TrialCompletedCard
+                  lead={lead}
+                  operatorColor={op?.color}
+                  operatorName={op?.name}
+                  teacherName={enrollment?.teacherName}
+                  groupCode={enrollment?.groupCode}
+                  onOpen={onOpen}
+                  onPay={setPaymentTarget}
+                  onDeferPayment={confirmDeferPayment}
+                  onArchive={setArchiveTarget}
+                  onEdit={setEditTarget}
+                  onDelete={setDeleteTarget}
+                />
+              );
+            }}
+          />
+          <TrialGroup
+            title="Нечётные"
+            leads={completedLeadsByParity.odd}
+            operatorByUid={operatorByUid}
+            defaultOpen={isOddDayToday}
+            renderCard={(lead, op) => {
+              const enrollment = enrollmentByStudent.get(lead.id);
+              return (
+                <TrialCompletedCard
+                  lead={lead}
+                  operatorColor={op?.color}
+                  operatorName={op?.name}
+                  teacherName={enrollment?.teacherName}
+                  groupCode={enrollment?.groupCode}
+                  onOpen={onOpen}
+                  onPay={setPaymentTarget}
+                  onDeferPayment={confirmDeferPayment}
+                  onArchive={setArchiveTarget}
+                  onEdit={setEditTarget}
+                  onDelete={setDeleteTarget}
+                />
+              );
+            }}
+          />
         </div>
       </div>
 

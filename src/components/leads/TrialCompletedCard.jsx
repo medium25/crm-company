@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, MessageSquare } from 'lucide-react';
 import { formatPhone, formatDateTimeShort, formatOverdueBy, formatSource } from '../../lib/format.js';
-import { operatorInitials } from './LeadCard.jsx';
+import { operatorInitials, LeadCommentsPanel } from './LeadCard.jsx';
 import { secondLessonAt } from '../../lib/leadFunnel.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 
@@ -38,7 +38,9 @@ export function TrialCompletedCard({
   onDelete,
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const operatorLabel = operatorInitials(operatorName);
+  const hasComments = (lead.commentsCount ?? 0) > 0;
 
   const trialDateJs = lead.trialDate?.toDate?.();
   const secondLessonDate = trialDateJs ? secondLessonAt(trialDateJs) : null;
@@ -81,13 +83,27 @@ export function TrialCompletedCard({
         ) : (
           <span />
         )}
-        <DropdownMenu
-          items={[
-            { label: 'Редактировать', onClick: () => onEdit(lead) },
-            { label: 'Удалить навсегда', danger: true, onClick: () => onDelete(lead) },
-          ]}
-        />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setCommentsOpen((v) => !v)}
+            aria-label="Комментарии"
+            className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+              commentsOpen || hasComments ? 'text-navy' : 'text-muted'
+            }`}
+          >
+            <MessageSquare className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
+          </button>
+          <DropdownMenu
+            items={[
+              { label: 'Редактировать', onClick: () => onEdit(lead) },
+              { label: 'Удалить навсегда', danger: true, onClick: () => onDelete(lead) },
+            ]}
+          />
+        </div>
       </div>
+
+      {commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
       <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
