@@ -33,7 +33,7 @@ const ITEMS = [
   { key: 'students', to: '/students', label: 'Студенты', icon: CircleUserRound },
   { key: 'teachersGroups', to: '/teachers-groups', label: 'Учителя и группы', icon: GraduationCap },
   { key: 'payments', to: '/payments', label: 'Финансы', icon: Coins },
-  { key: 'reports', to: '/reports', label: 'Отчёты', icon: BarChart3 },
+  { key: 'reports', to: '/reports', label: 'Отчёты и статистика', icon: BarChart3 },
   { key: 'settings', to: '/settings', label: 'Настройки', icon: Settings },
 ];
 

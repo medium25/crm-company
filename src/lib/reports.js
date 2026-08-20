@@ -1,5 +1,6 @@
 import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { differenceInCalendarDays } from 'date-fns';
+import { stageDeadline } from './leadFunnel.js';
 
 /**
  * Отчёты — раздел 04 §11: выручка по курсам/учителям, посещаемость по
@@ -207,6 +208,10 @@ export async function funnelByOperator(db, branchId, periodStart, periodEnd) {
     return {
       operatorId,
       total,
+      dozvon,
+      trialScheduled,
+      attended,
+      won,
       dozvonRate: total > 0 ? Math.round((dozvon / total) * 100) : 0,
       trialScheduledRate: total > 0 ? Math.round((trialScheduled / total) * 100) : 0,
       attendedRate: total > 0 ? Math.round((attended / total) * 100) : 0,
@@ -215,6 +220,41 @@ export async function funnelByOperator(db, branchId, periodStart, periodEnd) {
       lostCount: lost.length,
     };
   });
+}
+
+/**
+ * Средняя просрочка «прямо сейчас» по каждому оператору — среди лидов,
+ * которые ПРЯМО СЕЙЧАС висят просроченными на доске (тот же stageDeadline,
+ * что красит бейдж на карточке), сколько в среднем часов прошло с
+ * дедлайна. Это снимок текущего состояния, не историческое среднее за
+ * период — исторических дедлайнов нигде не хранится (они пересчитываются
+ * на лету и перезаписываются при каждом действии), так что ретроспективно
+ * их не восстановить. Снимок honest и практичен: показывает реальную боль
+ * оператора прямо сейчас, а не архивную статистику.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @returns {Promise<Map<string, number>>} operatorId → часы (0, если нет просроченных)
+ */
+export async function currentOverdueHoursByOperator(db, branchId) {
+  const snap = await getDocs(
+    query(collection(db, 'students'), where('branchId', '==', branchId), where('isArchived', '==', false), where('funnelStage', 'in', ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing'])),
+  );
+  const now = Date.now();
+  const hoursByOperator = new Map();
+  for (const doc of snap.docs) {
+    const lead = doc.data();
+    const deadline = stageDeadline(lead);
+    if (!deadline || now <= deadline.getTime()) continue;
+    const opId = lead.assignedOperator ?? 'unassigned';
+    const hours = (now - deadline.getTime()) / 3_600_000;
+    if (!hoursByOperator.has(opId)) hoursByOperator.set(opId, []);
+    hoursByOperator.get(opId).push(hours);
+  }
+  const avgByOperator = new Map();
+  for (const [opId, hoursList] of hoursByOperator) {
+    avgByOperator.set(opId, hoursList.reduce((a, b) => a + b, 0) / hoursList.length);
+  }
+  return avgByOperator;
 }
 
 /**

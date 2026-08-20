@@ -20,6 +20,9 @@ import { CoursesPage } from './pages/CoursesPage.jsx';
 import { RoomsPage } from './pages/RoomsPage.jsx';
 import { PaymentsPage } from './pages/PaymentsPage.jsx';
 import { ReportsPage } from './pages/ReportsPage.jsx';
+import { ReportsLandingPage } from './pages/ReportsLandingPage.jsx';
+import { StatsDepartmentsPage } from './pages/StatsDepartmentsPage.jsx';
+import { SalesStatsPage } from './pages/SalesStatsPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { UiKitShowcasePage } from './pages/UiKitShowcasePage.jsx';
 
@@ -73,7 +76,10 @@ function App() {
                   }
                 />
                 <Route path="payments" element={<PaymentsPage />} />
-                <Route path="reports" element={<ReportsPage />} />
+                <Route path="reports" element={<ReportsLandingPage />} />
+                <Route path="reports/list" element={<ReportsPage />} />
+                <Route path="reports/stats" element={<StatsDepartmentsPage />} />
+                <Route path="reports/stats/sales" element={<SalesStatsPage />} />
                 <Route
                   path="settings"
                   element={
