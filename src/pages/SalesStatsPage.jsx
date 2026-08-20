@@ -47,12 +47,17 @@ function FunnelStep({ label, count, total, color }) {
   );
 }
 
-function ConvBadge({ fromCount, toCount, grade }) {
+function ConvBadge({ fromLabel, fromCount, toCount, grade }) {
   const pct = fromCount > 0 ? Math.round((toCount / fromCount) * 100) : 0;
   return (
     <div className="grid h-[30px] grid-cols-[78px_1fr_38px] items-center">
       <span />
-      <span className={`inline-flex w-fit items-center gap-1 rounded-[6px] px-2.5 py-0.5 text-[15px] font-extrabold ${CONV_BADGE[grade]}`}>↓ {pct}%</span>
+      <span className="flex items-center gap-2">
+        <span className={`inline-flex w-fit items-center gap-1 rounded-[6px] px-2.5 py-0.5 text-[15px] font-extrabold ${CONV_BADGE[grade]}`}>↓ {pct}%</span>
+        <span className="text-[10.5px] text-muted">
+          от «{fromLabel}» ({toCount} из {fromCount})
+        </span>
+      </span>
     </div>
   );
 }
@@ -167,13 +172,13 @@ export function SalesStatsPage() {
 
                 <div className="flex flex-col gap-0.5">
                   <FunnelStep label="Лиды" count={r.total} total={r.total} color="#22406B" />
-                  <ConvBadge fromCount={r.total} toCount={r.dozvon} grade={dozvonGrade} />
+                  <ConvBadge fromLabel="Лиды" fromCount={r.total} toCount={r.dozvon} grade={dozvonGrade} />
                   <FunnelStep label="Дозвон" count={r.dozvon} total={r.total} color={dozvonGrade === 'bad' ? '#C0392B' : '#22406B'} />
-                  <ConvBadge fromCount={r.dozvon} toCount={r.trialScheduled} grade={probnyGrade} />
+                  <ConvBadge fromLabel="Дозвон" fromCount={r.dozvon} toCount={r.trialScheduled} grade={probnyGrade} />
                   <FunnelStep label="Пробный" count={r.trialScheduled} total={r.total} color={probnyGrade === 'bad' ? '#C0392B' : '#22406B'} />
-                  <ConvBadge fromCount={r.trialScheduled} toCount={r.attended} grade={provodenGrade} />
+                  <ConvBadge fromLabel="Пробный" fromCount={r.trialScheduled} toCount={r.attended} grade={provodenGrade} />
                   <FunnelStep label="Проведён" count={r.attended} total={r.total} color={provodenGrade === 'bad' ? '#C0392B' : '#22406B'} />
-                  <ConvBadge fromCount={r.attended} toCount={r.won} grade={oplataGrade} />
+                  <ConvBadge fromLabel="Проведён" fromCount={r.attended} toCount={r.won} grade={oplataGrade} />
                   <FunnelStep label="Оплата" count={r.won} total={r.total} color="#34A853" />
                 </div>
 
