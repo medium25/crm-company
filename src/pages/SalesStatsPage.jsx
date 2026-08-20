@@ -14,7 +14,7 @@ import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { funnelByOperator, currentOverdueHoursByOperator } from '../lib/reports.js';
 import { operatorInitials } from '../components/leads/LeadCard.jsx';
-import { DEFAULT_OPERATOR_SCORE_CRITERIA, gradeRate, gradeOverdue, overallGrade, formatOverdueHours } from '../lib/operatorScoring.js';
+import { DEFAULT_OPERATOR_SCORE_CRITERIA, gradeRate, gradeOverdue, gradeLeadsVolume, countWorkingDays, overallGrade, formatOverdueHours } from '../lib/operatorScoring.js';
 
 const GRADE_BADGE = {
   good: 'bg-success/10 text-success',
@@ -80,6 +80,7 @@ export function SalesStatsPage() {
   const [to, setTo] = useState(format(today, 'yyyy-MM-dd'));
   const fromDate = useMemo(() => new Date(`${from}T00:00:00`), [from]);
   const toDate = useMemo(() => new Date(`${to}T23:59:59`), [to]);
+  const workingDays = useMemo(() => countWorkingDays(fromDate, toDate), [fromDate, toDate]);
 
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
@@ -94,7 +95,7 @@ export function SalesStatsPage() {
 
   const settingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
   const { data: branchSettings } = useDoc(settingsRef);
-  const criteria = branchSettings?.operatorScoreCriteria ?? DEFAULT_OPERATOR_SCORE_CRITERIA;
+  const criteria = { ...DEFAULT_OPERATOR_SCORE_CRITERIA, ...branchSettings?.operatorScoreCriteria };
 
   const [loading, setLoading] = useState(false);
   const [funnelRows, setFunnelRows] = useState([]);
@@ -157,12 +158,13 @@ export function SalesStatsPage() {
             const provodenConvPct = r.trialScheduled > 0 ? (r.attended / r.trialScheduled) * 100 : 0;
             const oplataConvPct = r.attended > 0 ? (r.won / r.attended) * 100 : 0;
 
+            const leadsGrade = gradeLeadsVolume(r.total, workingDays, criteria.leadsPerDay);
             const dozvonGrade = gradeRate(dozvonConvPct, criteria.dozvon);
             const probnyGrade = gradeRate(probnyConvPct, criteria.probny);
             const provodenGrade = gradeRate(provodenConvPct, criteria.provoden);
             const oplataGrade = gradeRate(oplataConvPct, criteria.oplata);
             const overdueGrade = gradeOverdue(overdueHours, criteria.overdueHours);
-            const grade = overallGrade({ dozvonGrade, probnyGrade, provodenGrade, oplataGrade, overdueGrade });
+            const grade = overallGrade({ leadsGrade, dozvonGrade, probnyGrade, provodenGrade, oplataGrade, overdueGrade });
 
             return (
               <Card key={r.operatorId} className="p-4 sm:p-[18px]">
@@ -179,7 +181,18 @@ export function SalesStatsPage() {
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <FunnelStep label="Лиды" count={r.total} total={r.total} grade={null} />
+                  <FunnelStep label="Лиды" count={r.total} total={r.total} grade={leadsGrade} />
+                  <div className="grid h-[30px] grid-cols-[78px_1fr_38px] items-center">
+                    <span />
+                    <span className="flex items-center gap-2.5">
+                      <span className={`inline-flex w-[64px] items-center justify-center rounded-[6px] py-1 text-[11px] font-extrabold tabular-nums ${GRADE_BADGE[leadsGrade]}`}>
+                        {workingDays > 0 ? (r.total / workingDays).toFixed(1) : '0'}/дн
+                      </span>
+                      <span className="text-[10.5px] text-muted">
+                        норма {criteria.leadsPerDay.yellow}–{criteria.leadsPerDay.green}+/день · {workingDays} раб. дн. (пн–сб)
+                      </span>
+                    </span>
+                  </div>
                   <ConvBadge fromLabel="Лиды" fromCount={r.total} toCount={r.dozvon} grade={dozvonGrade} />
                   <FunnelStep label="Дозвон" count={r.dozvon} total={r.total} grade={dozvonGrade} />
                   <ConvBadge fromLabel="Дозвон" fromCount={r.dozvon} toCount={r.trialScheduled} grade={probnyGrade} />

@@ -29,7 +29,7 @@ export function OperatorScoringCriteriaTab() {
 
   const settingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
   const { data: settingsDoc, loading } = useDoc(settingsRef);
-  const criteria = settingsDoc?.operatorScoreCriteria ?? DEFAULT_OPERATOR_SCORE_CRITERIA;
+  const criteria = { ...DEFAULT_OPERATOR_SCORE_CRITERIA, ...settingsDoc?.operatorScoreCriteria };
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
