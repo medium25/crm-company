@@ -1,4 +1,4 @@
-import { formatPhone } from '../../lib/format.js';
+import { formatPhone, formatDateTimeShort, formatSource } from '../../lib/format.js';
 import { operatorInitials, trialScheduleLabel } from './LeadCard.jsx';
 
 /**
@@ -51,6 +51,10 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
           Создать студента
         </button>
       </div>
+      <span className="-mt-1.5 text-[10px] text-muted">
+        {formatDateTimeShort(lead.createdAt)}
+        {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
+      </span>
     </div>
   );
 }

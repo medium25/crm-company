@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { formatPhone, formatDateTimeShort, formatOverdueBy } from '../../lib/format.js';
+import { formatPhone, formatDateTimeShort, formatOverdueBy, formatSource } from '../../lib/format.js';
 import { operatorInitials } from './LeadCard.jsx';
 import { secondLessonAt } from '../../lib/leadFunnel.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
@@ -126,6 +126,10 @@ export function TrialCompletedCard({
           </div>
         )}
       </div>
+      <span className="-mt-1.5 text-[10px] text-muted">
+        {formatDateTimeShort(lead.createdAt)}
+        {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
+      </span>
     </div>
   );
 }
