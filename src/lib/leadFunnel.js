@@ -182,8 +182,7 @@ export function isTrialDay(trialDate) {
  * Дедлайн следующего действия по лиду — единая проверка «не залежалась ли
  * карточка» для всех нетерминальных стадий (каждое следующее действие
  * переназначает его заново, см. соответствующие вызовы в LeadsPage.jsx).
- * `null` для стадий без операторского действия (`trial_completed` —
- * мгновенный переход) и терминальных (`won`/`lost`).
+ * `null` только для терминальных (`won`/`lost`).
  * @param {Object} lead
  * @returns {Date|null}
  */
@@ -204,6 +203,12 @@ export function stageDeadline(lead) {
     const candidates = [trialDayDue, unreachableDue].filter(Boolean);
     if (candidates.length === 0) return null;
     return candidates.reduce((a, b) => (a < b ? a : b));
+  }
+  if (stage === 'trial_completed') {
+    // Карточка не должна задерживаться тут — просрочена с самого момента
+    // входа в стадию (см. stageHistory), пока её не перевели в «Дожим».
+    const enteredAt = [...(lead.stageHistory ?? [])].reverse().find((h) => h.stage === 'trial_completed')?.enteredAt;
+    return enteredAt?.toDate?.() ?? null;
   }
   if (stage === 'closing') return lead.nextTouchAt?.toDate?.() ?? null;
   return null;
@@ -228,6 +233,7 @@ export function overdueReasonLabel(lead) {
     if (unreachableDue && (!trialDayDue || unreachableDue <= trialDayDue)) return 'Просрочен повторный звонок «не выходит на связь»';
     return 'Не отмечено напоминание звонком перед пробным';
   }
+  if (stage === 'trial_completed') return 'Пробный проведён — пора перевести в «Дожим»';
   if (stage === 'closing') return 'Просрочено плановое касание в дожиме';
   return 'Просрочено плановое действие по лиду';
 }
