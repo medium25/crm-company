@@ -26,6 +26,10 @@ const CONV_BADGE = {
   warn: 'bg-orange-soft text-orange',
   bad: 'bg-danger/10 text-danger',
 };
+// Один и тот же светофор везде — полосы воронки, конверсия между шагами,
+// бейдж просрочки — красим по фактическому grade (good/warn/bad), не
+// отдельным hardcoded «плохо = красное, иначе синее».
+const GRADE_HEX = { good: '#34A853', warn: '#E5842B', bad: '#C0392B' };
 const AVATAR_PALETTE = ['#E5842B', '#22406B', '#3E8B84', '#2F80D8', '#8B5CF6', '#C0392B'];
 
 function avatarColor(operatorId) {
@@ -34,8 +38,10 @@ function avatarColor(operatorId) {
   return AVATAR_PALETTE[hash];
 }
 
-function FunnelStep({ label, count, total, color }) {
+/** grade=null — нейтральный шаг без оценки (сама «Лиды», база 100%). */
+function FunnelStep({ label, count, total, grade }) {
   const pct = total > 0 ? (count / total) * 100 : 0;
+  const color = grade ? GRADE_HEX[grade] : '#22406B';
   return (
     <div className="grid h-[26px] grid-cols-[78px_1fr_38px] items-center gap-2.5">
       <span className="text-[11.5px] font-bold text-text">{label}</span>
@@ -50,12 +56,17 @@ function FunnelStep({ label, count, total, color }) {
 function ConvBadge({ fromLabel, fromCount, toCount, grade }) {
   const pct = fromCount > 0 ? Math.round((toCount / fromCount) * 100) : 0;
   return (
-    <div className="grid h-[30px] grid-cols-[78px_1fr_38px] items-center">
+    <div className="grid h-[34px] grid-cols-[78px_1fr_38px] items-center">
       <span />
-      <span className="flex items-center gap-2">
-        <span className={`inline-flex w-fit items-center gap-1 rounded-[6px] px-2.5 py-0.5 text-[15px] font-extrabold ${CONV_BADGE[grade]}`}>↓ {pct}%</span>
+      <span className="flex items-center gap-2.5">
+        <span className={`inline-flex w-[64px] items-center justify-center gap-1 rounded-[6px] py-1 text-[15px] font-extrabold tabular-nums ${CONV_BADGE[grade]}`}>
+          {pct}%
+        </span>
+        <span className="relative h-1.5 w-16 overflow-hidden rounded-full bg-surface-alt">
+          <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: GRADE_HEX[grade] }} />
+        </span>
         <span className="text-[10.5px] text-muted">
-          от «{fromLabel}» ({toCount} из {fromCount})
+          от «{fromLabel}» — {toCount} из {fromCount}
         </span>
       </span>
     </div>
@@ -171,21 +182,21 @@ export function SalesStatsPage() {
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <FunnelStep label="Лиды" count={r.total} total={r.total} color="#22406B" />
+                  <FunnelStep label="Лиды" count={r.total} total={r.total} grade={null} />
                   <ConvBadge fromLabel="Лиды" fromCount={r.total} toCount={r.dozvon} grade={dozvonGrade} />
-                  <FunnelStep label="Дозвон" count={r.dozvon} total={r.total} color={dozvonGrade === 'bad' ? '#C0392B' : '#22406B'} />
+                  <FunnelStep label="Дозвон" count={r.dozvon} total={r.total} grade={dozvonGrade} />
                   <ConvBadge fromLabel="Дозвон" fromCount={r.dozvon} toCount={r.trialScheduled} grade={probnyGrade} />
-                  <FunnelStep label="Пробный" count={r.trialScheduled} total={r.total} color={probnyGrade === 'bad' ? '#C0392B' : '#22406B'} />
+                  <FunnelStep label="Пробный" count={r.trialScheduled} total={r.total} grade={probnyGrade} />
                   <ConvBadge fromLabel="Пробный" fromCount={r.trialScheduled} toCount={r.attended} grade={provodenGrade} />
-                  <FunnelStep label="Проведён" count={r.attended} total={r.total} color={provodenGrade === 'bad' ? '#C0392B' : '#22406B'} />
+                  <FunnelStep label="Проведён" count={r.attended} total={r.total} grade={provodenGrade} />
                   <ConvBadge fromLabel="Проведён" fromCount={r.attended} toCount={r.won} grade={oplataGrade} />
-                  <FunnelStep label="Оплата" count={r.won} total={r.total} color="#34A853" />
+                  <FunnelStep label="Оплата" count={r.won} total={r.total} grade={oplataGrade} />
                 </div>
 
                 <div className="mt-3.5 border-t border-border pt-3">
                   <div
                     className="w-fit rounded-field bg-surface-alt px-2.5 py-2"
-                    style={{ borderLeft: `3px solid ${overdueGrade === 'good' ? '#34A853' : overdueGrade === 'warn' ? '#E5842B' : '#C0392B'}` }}
+                    style={{ borderLeft: `3px solid ${GRADE_HEX[overdueGrade]}` }}
                   >
                     <div className="text-[9.5px] font-bold uppercase tracking-wide text-muted">Средняя просрочка сейчас</div>
                     <div className="mt-0.5 text-[14px] font-extrabold">{overdueHours > 0 ? formatOverdueHours(overdueHours) : 'нет просрочек'}</div>
