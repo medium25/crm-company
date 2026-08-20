@@ -19,7 +19,7 @@ import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
-import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
+import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt, validateCallDeadline } from '../lib/leadFunnel.js';
 
 const TERMINAL_STAGES = ['won', 'lost'];
 
@@ -199,7 +199,14 @@ export function LeadsPage() {
       commit(null); // терминальная стадия «Отказ» — дедлайну неоткуда взяться, спрашивать нечего
       return;
     }
-    setDeadlineTarget({ lead, title: 'Дедлайн следующего звонка', suggestedDate: nextCallDueAt(nextAttempts), onConfirm: commit, lockDate: true });
+    setDeadlineTarget({
+      lead,
+      title: 'Дедлайн следующего звонка',
+      suggestedDate: nextCallDueAt(nextAttempts),
+      onConfirm: commit,
+      lockDate: true,
+      validate: (candidate) => validateCallDeadline(candidate, nextAttempts, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
+    });
   };
 
   const moveLead = (lead, stageKey) => {
@@ -226,6 +233,7 @@ export function LeadsPage() {
         suggestedDate: nextCallDueAt(lead.callAttempts ?? []),
         onConfirm: (dueDate) => commit({ nextCallDueAt: dueDate }),
         lockDate: true,
+        validate: (candidate) => validateCallDeadline(candidate, lead.callAttempts ?? [], branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }

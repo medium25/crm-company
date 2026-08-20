@@ -299,6 +299,55 @@ export function isOperatorWorkingAt(workSchedule, date) {
   return hhmm >= today.start && hhmm < today.end;
 }
 
+const MIN_GAP_BETWEEN_CALLS_MS = 60 * 60 * 1000;
+
+/**
+ * Проверка дедлайна дозвона — сетка 2 звонка сегодня/2 завтра/1 послезавтра
+ * (см. nextCallDueAt), внутри пары день делится на «первый» и «второй»
+ * звонок (индекс попытки, для которой ставим этот дедлайн, — 0/2 первый в
+ * паре, 1/3 второй, 4 — одиночный послезавтра). Правила:
+ * — дедлайн должен попадать в рабочее время оператора;
+ * — первому в паре нельзя вплотную к концу рабочего дня — не успеет
+ *   сделать второй звонок (мин. час до конца дня);
+ * — второй в паре должен отстоять минимум на час от момента, когда
+ *   реально сделан первый звонок (attempts — уже сделанные попытки,
+ *   последняя из них и есть «первый звонок» этой пары).
+ * @param {Date} candidate выбранный дедлайн
+ * @param {Array<{result: string, at: Date|import('firebase/firestore').Timestamp}>} attempts попытки, сделанные до этого дедлайна
+ * @param {Array<{start: string, end: string}|null>|undefined} workSchedule расписание назначенного оператора
+ * @returns {string|null} текст ошибки или null, если дедлайн допустим
+ */
+export function validateCallDeadline(candidate, attempts, workSchedule) {
+  if (!isOperatorWorkingAt(workSchedule, candidate)) {
+    return 'Дедлайн должен быть в рабочее время оператора.';
+  }
+
+  const index = attempts.length;
+  if (index === 0 || index === 2) {
+    const daySchedule = workSchedule?.[candidate.getDay()];
+    const endOfDay = new Date(candidate);
+    if (daySchedule) {
+      const [endHour, endMinute] = daySchedule.end.split(':').map(Number);
+      endOfDay.setHours(endHour, endMinute, 0, 0);
+    } else {
+      endOfDay.setHours(WORKING_END_HOUR, 0, 0, 0);
+    }
+    if (endOfDay.getTime() - candidate.getTime() < MIN_GAP_BETWEEN_CALLS_MS) {
+      return 'Слишком поздно — не успеет позвонить второй раз в этот день. Оставьте минимум час до конца рабочего дня.';
+    }
+  }
+
+  if (index === 1 || index === 3) {
+    const prevAt = attempts[attempts.length - 1]?.at;
+    const prevDate = prevAt?.toDate ? prevAt.toDate() : prevAt;
+    if (prevDate && candidate.getTime() - prevDate.getTime() < MIN_GAP_BETWEEN_CALLS_MS) {
+      return 'Между звонками должен быть минимум час.';
+    }
+  }
+
+  return null;
+}
+
 /**
  * Операторы из списка, у которых сейчас рабочее время — приоритетное
  * подмножество для назначения лида (см. assignOperatorForLead).
