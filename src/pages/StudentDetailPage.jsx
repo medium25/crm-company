@@ -57,7 +57,7 @@ export function StudentDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isAdmin } = useRole();
-  const { branches } = useBranch();
+  const { branches, activeBranchId } = useBranch();
   const { showToast } = useToast();
 
   const studentRef = useMemo(() => (db ? doc(db, 'students', id) : null), [id]);
@@ -80,6 +80,15 @@ export function StudentDetailPage() {
     [id],
   );
   const { data: monthlyBalances } = useCollection(monthlyBalancesQuery);
+
+  // Для подписи «кто и когда оставил заметку» — имя резолвится с этой доски,
+  // само поле noteUpdatedBy на студенте хранит только uid.
+  const staffQuery = useMemo(
+    () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
+    [activeBranchId],
+  );
+  const { data: staffList } = useCollection(staffQuery);
+  const staffName = (uid) => staffList.find((s) => s.id === uid)?.fullName ?? null;
 
   const [tab, setTab] = useState('groups');
   const [showLeftGroups, setShowLeftGroups] = useState(false);
@@ -119,7 +128,16 @@ export function StudentDetailPage() {
   const saveNote = async () => {
     if (noteValue === student.note) return;
     try {
-      await updateDoc(doc(db, 'students', id), { note: noteValue, updatedAt: serverTimestamp(), updatedBy: user.uid });
+      // Отдельные noteUpdatedAt/noteUpdatedBy, а не общие updatedAt/updatedBy —
+      // те правятся при любом изменении студента (баланс, статус и т.д.),
+      // подписью «кто/когда оставил заметку» быть не могут.
+      await updateDoc(doc(db, 'students', id), {
+        note: noteValue,
+        noteUpdatedAt: serverTimestamp(),
+        noteUpdatedBy: user.uid,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+      });
     } catch {
       showToast('Не удалось сохранить заметку.', { type: 'error' });
     }
@@ -287,6 +305,11 @@ export function StudentDetailPage() {
               onChange={(e) => setNote(e.target.value)}
               onBlur={saveNote}
             />
+            {student.noteUpdatedAt && (
+              <p className="mt-1 text-[12px] text-muted">
+                {staffName(student.noteUpdatedBy) ?? 'Неизвестный'} · {formatDateTimeShort(student.noteUpdatedAt)}
+              </p>
+            )}
           </div>
         </Card>
 
