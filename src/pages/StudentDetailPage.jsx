@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { collection, doc, query, where, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { ArrowLeft, Pencil, Mail, Archive, History, Flag, FolderPlus, Wallet, CircleUserRound, RefreshCw, Trash2, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -55,9 +55,9 @@ function BalanceBadge({ balance }) {
 export function StudentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, staff } = useAuth();
   const { isAdmin } = useRole();
-  const { branches, activeBranchId } = useBranch();
+  const { branches } = useBranch();
   const { showToast } = useToast();
 
   const studentRef = useMemo(() => (db ? doc(db, 'students', id) : null), [id]);
@@ -81,15 +81,6 @@ export function StudentDetailPage() {
   );
   const { data: monthlyBalances } = useCollection(monthlyBalancesQuery);
 
-  // Для подписи «кто и когда оставил заметку» — имя резолвится с этой доски,
-  // само поле noteUpdatedBy на студенте хранит только uid.
-  const staffQuery = useMemo(
-    () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
-    [activeBranchId],
-  );
-  const { data: staffList } = useCollection(staffQuery);
-  const staffName = (uid) => staffList.find((s) => s.id === uid)?.fullName ?? null;
-
   const [tab, setTab] = useState('groups');
   const [showLeftGroups, setShowLeftGroups] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -101,7 +92,8 @@ export function StudentDetailPage() {
   const [unfreezeTarget, setUnfreezeTarget] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
-  const [note, setNote] = useState(null);
+  const [newNoteText, setNewNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [materialPaymentOpen, setMaterialPaymentOpen] = useState(false);
   const [manualChargeOpen, setManualChargeOpen] = useState(false);
@@ -122,27 +114,34 @@ export function StudentDetailPage() {
   if (error) return <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>;
   if (!student) return <EmptyState icon={CircleUserRound} title="Студент не найден" />;
 
-  // note !== null значит «оператор уже трогал поле в этой сессии» — || тут
-  // не годится, пустая строка (очищенная заметка) falsy и откатывалась бы
-  // обратно на student.note.
-  const noteValue = note !== null ? note : (student.note ?? '');
   const branchName = branches.find((b) => b.id === student.branchId)?.name ?? student.branchId;
 
-  const saveNote = async () => {
-    if (noteValue === student.note) return;
+  // «Заметка» — список записей, каждая со своим автором/датой (не одно
+  // перезаписываемое поле — несколько человек могут писать по очереди, и
+  // видно должно быть всех, не только последнего). Старое одиночное поле
+  // student.note (до этого изменения) показываем внизу списка как запись
+  // без автора — исторические данные не теряем.
+  const noteEntries = student.noteEntries ?? [];
+  const legacyNote = student.note;
+
+  const addNoteEntry = async () => {
+    const trimmed = newNoteText.trim();
+    if (!trimmed || savingNote) return;
+    setSavingNote(true);
     try {
-      // Отдельные noteUpdatedAt/noteUpdatedBy, а не общие updatedAt/updatedBy —
-      // те правятся при любом изменении студента (баланс, статус и т.д.),
-      // подписью «кто/когда оставил заметку» быть не могут.
+      // arrayUnion не принимает serverTimestamp() внутри элемента массива —
+      // тот же обход, что и у stageHistory в leadFunnel.js: клиентский
+      // Date() вместо серверного таймстампа именно для записей в массиве.
       await updateDoc(doc(db, 'students', id), {
-        note: noteValue,
-        noteUpdatedAt: serverTimestamp(),
-        noteUpdatedBy: user.uid,
+        noteEntries: arrayUnion({ text: trimmed, authorId: user.uid, authorName: staff?.fullName ?? '', createdAt: new Date() }),
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });
+      setNewNoteText('');
     } catch {
       showToast('Не удалось сохранить заметку.', { type: 'error' });
+    } finally {
+      setSavingNote(false);
     }
   };
 
@@ -297,22 +296,46 @@ export function StudentDetailPage() {
 
           <div className="rounded-r-field border-l-4 border-l-navy bg-surface-alt/40 py-2 pl-3 pr-2">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-[13px] text-muted">Заметка</span>
+              <span className="text-[13px] text-muted">Заметки</span>
               <button type="button" onClick={toggleFlag} aria-label="На контроле">
                 <Flag className={`h-4 w-4 ${student.isFlagged ? 'fill-orange text-orange' : 'text-muted'}`} />
               </button>
             </div>
-            <textarea
-              className="min-h-20 w-full resize-none bg-transparent text-[15px] text-text focus:outline-none"
-              value={noteValue}
-              onChange={(e) => setNote(e.target.value)}
-              onBlur={saveNote}
-            />
-            {student.noteUpdatedAt && (
-              <p className="mt-1 text-[12px] text-muted">
-                {staffName(student.noteUpdatedBy) ?? 'Неизвестный'} · {formatDateTimeShort(student.noteUpdatedAt)}
-              </p>
+
+            {(noteEntries.length > 0 || legacyNote) && (
+              <div className="mb-2 flex flex-col gap-2">
+                {[...noteEntries].reverse().map((entry, i) => (
+                  <div key={i} className="text-[14px]">
+                    <p className="whitespace-pre-wrap text-text">{entry.text}</p>
+                    <p className="text-[12px] text-muted">
+                      {entry.authorName || 'Неизвестный'} · {formatDateTimeShort(entry.createdAt)}
+                    </p>
+                  </div>
+                ))}
+                {legacyNote && (
+                  <div className="text-[14px]">
+                    <p className="whitespace-pre-wrap text-text">{legacyNote}</p>
+                    <p className="text-[12px] text-muted">Старая заметка, автор неизвестен</p>
+                  </div>
+                )}
+              </div>
             )}
+
+            <textarea
+              className="min-h-16 w-full resize-none rounded-field border border-border bg-surface p-2 text-[14px] text-text focus:border-navy focus:outline-none"
+              placeholder="Добавить заметку…"
+              value={newNoteText}
+              onChange={(e) => setNewNoteText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  addNoteEntry();
+                }
+              }}
+            />
+            <Button className="mt-1.5" onClick={addNoteEntry} loading={savingNote} disabled={!newNoteText.trim()}>
+              Добавить
+            </Button>
           </div>
         </Card>
 
