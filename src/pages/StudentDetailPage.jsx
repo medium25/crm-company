@@ -101,7 +101,7 @@ export function StudentDetailPage() {
   const [unfreezeTarget, setUnfreezeTarget] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [materialPaymentOpen, setMaterialPaymentOpen] = useState(false);
   const [manualChargeOpen, setManualChargeOpen] = useState(false);
@@ -122,7 +122,10 @@ export function StudentDetailPage() {
   if (error) return <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>;
   if (!student) return <EmptyState icon={CircleUserRound} title="Студент не найден" />;
 
-  const noteValue = note || student.note || '';
+  // note !== null значит «оператор уже трогал поле в этой сессии» — || тут
+  // не годится, пустая строка (очищенная заметка) falsy и откатывалась бы
+  // обратно на student.note.
+  const noteValue = note !== null ? note : (student.note ?? '');
   const branchName = branches.find((b) => b.id === student.branchId)?.name ?? student.branchId;
 
   const saveNote = async () => {
