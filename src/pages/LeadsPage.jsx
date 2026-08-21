@@ -225,7 +225,6 @@ export function LeadsPage() {
       title: 'Дедлайн следующего звонка',
       suggestedDate: nextCallDueAt(nextAttempts),
       onConfirm: commit,
-      lockDate: true,
       validate: (candidate) => validateCallDeadline(candidate, nextAttempts, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
@@ -253,7 +252,6 @@ export function LeadsPage() {
         title: 'Дедлайн следующего звонка',
         suggestedDate: nextCallDueAt(lead.callAttempts ?? []),
         onConfirm: (dueDate) => commit({ nextCallDueAt: dueDate }),
-        lockDate: true,
         validate: (candidate) => validateCallDeadline(candidate, lead.callAttempts ?? [], branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
