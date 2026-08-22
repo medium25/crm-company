@@ -593,7 +593,7 @@ function telegramSendMessage_(text) {
 }
 
 /** Общая отправка — используется и для отчётов, и для ответов на команды редактирования шаблона. */
-function telegramSendMessageTo_(chatId, threadId, text, parseMode) {
+function telegramSendMessageTo_(chatId, threadId, text, parseMode, replyMarkup) {
   const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
   if (!token) {
     Logger.log('Telegram не настроен — нет TELEGRAM_BOT_TOKEN в Script Properties.');
@@ -601,6 +601,7 @@ function telegramSendMessageTo_(chatId, threadId, text, parseMode) {
   }
   const payload = { chat_id: chatId, text, parse_mode: parseMode || '' };
   if (threadId) payload.message_thread_id = Number(threadId);
+  if (replyMarkup) payload.reply_markup = replyMarkup;
   const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'post',
     contentType: 'application/json',
@@ -610,6 +611,18 @@ function telegramSendMessageTo_(chatId, threadId, text, parseMode) {
   if (resp.getResponseCode() >= 400) {
     Logger.log(`Telegram sendMessage упал (${resp.getResponseCode()}): ${resp.getContentText()}`);
   }
+}
+
+/** Убирает "часики" на нажатой inline-кнопке — Telegram требует ответить на каждый callback_query. */
+function telegramAnswerCallback_(callbackQueryId, text) {
+  const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
+  if (!token) return;
+  UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ callback_query_id: callbackQueryId, text: text || undefined }),
+    muteHttpExceptions: true,
+  });
 }
 
 /**
@@ -787,37 +800,88 @@ function previewDailyOperatorReports() {
 
 // --- Редактирование шаблона отчёта прямо из Telegram ------------------------
 
-const TEMPLATE_COMMAND_HINT =
-  'Плейсхолдеры: {{name}} {{periodStart}} {{periodEnd}} {{leads}} {{taken}} {{lost}} {{target}} {{other}} {{payments}}\n\n' +
-  'Команды:\n/gettemplate — показать текущий шаблон\n/settemplate и на следующей строке новый текст\n/resettemplate — вернуть шаблон по умолчанию';
+const TEMPLATE_PLACEHOLDER_HINT =
+  'Плейсхолдеры: {{name}} {{periodStart}} {{periodEnd}} {{leads}} {{taken}} {{lost}} {{target}} {{other}} {{payments}}';
+
+const TEMPLATE_MENU_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: '👁 Показать шаблон', callback_data: 'tpl_get' },
+      { text: '✏️ Изменить шаблон', callback_data: 'tpl_set' },
+    ],
+    [{ text: '♻️ Сбросить на стандартный', callback_data: 'tpl_reset' }],
+  ],
+};
 
 /**
- * Входящий Telegram Update (только текстовые команды управления шаблоном
- * отчёта) — вызывается из doPost, когда апдейт пришёл от Telegram webhook,
- * а не от leads API. Если задан ADMIN_TELEGRAM_USER_ID — команды работают
- * только от него (сравнение с message.from.id); если свойство не задано —
- * редактировать шаблон может кто угодно, кто пишет боту (осознанно открыто
- * сейчас, можно закрыть в любой момент, просто задав это свойство).
+ * "Жду следующее сообщение как новый текст шаблона" — короткоживущее
+ * состояние на пару минут после нажатия "Изменить шаблон", отдельно на
+ * каждого пишущего (chatId:threadId:fromId), чтобы не путать разных людей
+ * в одной группе. CacheService, не Script Properties — ему и положено
+ * само-истекать, ничего убирать вручную не нужно.
+ */
+function pendingEditKey_(chatId, threadId, fromId) {
+  return `tplEditPending_${chatId}_${threadId || 0}_${fromId}`;
+}
+
+/**
+ * Входящий Telegram Update — текстовые команды и нажатия inline-кнопок
+ * меню управления шаблоном отчёта. Вызывается из doPost, когда апдейт
+ * пришёл от Telegram webhook, а не от leads API. Если задан
+ * ADMIN_TELEGRAM_USER_ID — работает только от него (сравнение с from.id);
+ * если свойство не задано — редактировать шаблон может кто угодно, кто
+ * пишет боту (осознанно открыто сейчас, можно закрыть в любой момент,
+ * просто задав это свойство).
  */
 function handleTelegramUpdate_(update) {
+  const adminId = props_().getProperty('ADMIN_TELEGRAM_USER_ID');
+
+  if (update.callback_query) {
+    const cq = update.callback_query;
+    if (adminId && String(cq.from.id) !== String(adminId)) {
+      telegramAnswerCallback_(cq.id, 'Нет доступа.');
+      return;
+    }
+    const chatId = cq.message.chat.id;
+    const threadId = cq.message.message_thread_id;
+    const cache = CacheService.getScriptCache();
+
+    if (cq.data === 'tpl_get') {
+      telegramAnswerCallback_(cq.id);
+      telegramSendMessageTo_(chatId, threadId, `Текущий шаблон:\n\n${getReportTemplate_()}\n\n${TEMPLATE_PLACEHOLDER_HINT}`, '', TEMPLATE_MENU_KEYBOARD);
+      return;
+    }
+    if (cq.data === 'tpl_reset') {
+      props_().deleteProperty('REPORT_TEMPLATE');
+      telegramAnswerCallback_(cq.id, 'Шаблон сброшен.');
+      telegramSendMessageTo_(chatId, threadId, `Шаблон сброшен на стандартный:\n\n${REPORT_TEMPLATE_DEFAULT}`, '', TEMPLATE_MENU_KEYBOARD);
+      return;
+    }
+    if (cq.data === 'tpl_set') {
+      cache.put(pendingEditKey_(chatId, threadId, cq.from.id), '1', 600); // 10 мин на ответ
+      telegramAnswerCallback_(cq.id);
+      telegramSendMessageTo_(chatId, threadId, `Пришли следующим сообщением новый текст целиком.\n\n${TEMPLATE_PLACEHOLDER_HINT}`);
+      return;
+    }
+    return;
+  }
+
   const message = update.message;
   if (!message || !message.text) return;
-
-  const adminId = props_().getProperty('ADMIN_TELEGRAM_USER_ID');
   if (adminId && String(message.from.id) !== String(adminId)) return;
 
   const chatId = message.chat.id;
   const threadId = message.message_thread_id;
   const text = message.text.trim();
 
-  if (text === '/gettemplate' || text === '/start') {
-    telegramSendMessageTo_(chatId, threadId, `Текущий шаблон:\n\n${getReportTemplate_()}\n\n${TEMPLATE_COMMAND_HINT}`);
+  if (text === '/start' || text === '/gettemplate' || text === '/menu') {
+    telegramSendMessageTo_(chatId, threadId, `Текущий шаблон:\n\n${getReportTemplate_()}\n\n${TEMPLATE_PLACEHOLDER_HINT}`, '', TEMPLATE_MENU_KEYBOARD);
     return;
   }
 
   if (text === '/resettemplate') {
     props_().deleteProperty('REPORT_TEMPLATE');
-    telegramSendMessageTo_(chatId, threadId, `Шаблон сброшен на стандартный:\n\n${REPORT_TEMPLATE_DEFAULT}`);
+    telegramSendMessageTo_(chatId, threadId, `Шаблон сброшен на стандартный:\n\n${REPORT_TEMPLATE_DEFAULT}`, '', TEMPLATE_MENU_KEYBOARD);
     return;
   }
 
@@ -828,8 +892,18 @@ function handleTelegramUpdate_(update) {
       return;
     }
     props_().setProperty('REPORT_TEMPLATE', newTemplate);
-    telegramSendMessageTo_(chatId, threadId, `Шаблон сохранён:\n\n${newTemplate}`);
+    telegramSendMessageTo_(chatId, threadId, `Шаблон сохранён:\n\n${newTemplate}`, '', TEMPLATE_MENU_KEYBOARD);
     return;
+  }
+
+  // Ждём текст шаблона после нажатия "Изменить шаблон" — принимаем как есть,
+  // без команды-префикса, и снимаем ожидание сразу, независимо от исхода.
+  const cache = CacheService.getScriptCache();
+  const pendingKey = pendingEditKey_(chatId, threadId, message.from.id);
+  if (cache.get(pendingKey)) {
+    cache.remove(pendingKey);
+    props_().setProperty('REPORT_TEMPLATE', text);
+    telegramSendMessageTo_(chatId, threadId, `Шаблон сохранён:\n\n${text}`, '', TEMPLATE_MENU_KEYBOARD);
   }
 }
 
