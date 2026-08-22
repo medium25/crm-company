@@ -140,22 +140,22 @@ Google Sheets как параметр `apiKey`. См. `API.md` за пример
 Ограничить одним человеком — задать `ADMIN_TELEGRAM_USER_ID`, тогда команды
 сработают только от него.
 
+Работает через опрос (та же схема, что у `SheetsSync.gs`), не webhook —
+Apps Script Web App всегда отвечает на первый запрос 302-редиректом
+(`script.google.com` → `script.googleusercontent.com`), а Telegram при
+доставке через webhook эту цепочку не проходит и репортит «Wrong response
+from the webhook: 302 Found», `doPost` с апдейтом при этом не выполняется
+вообще. Опрос эту проблему обходит — Apps Script сам инициирует запрос к
+Telegram по таймеру, а не наоборот.
+
 ### Разовая настройка
 
-1. Deploy → Manage deployments → карандаш у существующего деплоя → New
-   version → Deploy (иначе webhook будет стучаться в старую версию кода,
-   без обработки Telegram-команд). Убедись, что URL деплоя (тот же, что для
-   leads-api, `.../exec`) записан как Script Property `WEB_APP_URL`.
-2. Выбери `installTelegramWebhook` в списке функций → **Run** — один раз.
-   Сгенерирует секрет (`TELEGRAM_WEBHOOK_SECRET`) сам и подключит webhook
-   к `WEB_APP_URL`. Безопасно перезапускать.
-   **Не бери URL из авто-подстановки `ScriptApp.getService().getUrl()`** —
-   при ручном Run из редактора он даёт `/dev`-адрес (тестовый, требует
-   логина в Google), Telegram на него слать не может — упадёт `401
-   Unauthorized` (проверить: `.../getWebhookInfo`, поле `last_error_message`).
-3. Напиши боту `/gettemplate` (в личку или в ту же группу) — должен
-   ответить текущим шаблоном и подсказкой по плейсхолдерам.
-4. (Опционально, чтобы закрыть только собой) Узнай свой Telegram `user_id` —
+1. Выбери `installTelegramCommandPolling` в списке функций → **Run** —
+   один раз. Снимет случайно оставшийся webhook (несовместим с опросом) и
+   поставит триггер раз в минуту. Безопасно перезапускать.
+2. Напиши боту `/start` (в личку или в ту же группу) — в течение минуты
+   должен ответить меню с шаблоном и кнопками.
+3. (Опционально, чтобы закрыть только собой) Узнай свой Telegram `user_id` —
    `getUpdates`, поле `message.from.id` у твоего сообщения → добавь
    `ADMIN_TELEGRAM_USER_ID` в Script Properties.
 

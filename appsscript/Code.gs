@@ -495,30 +495,13 @@ function handle_(fn) {
 }
 
 function doPost(e) {
-  let body;
-  try {
-    body = JSON.parse(e.postData.contents);
-  } catch {
-    return jsonOutput_({ status: 400, error: 'Тело запроса должно быть валидным JSON.' });
-  }
-
-  // Апдейт от Telegram webhook (команды редактирования шаблона отчёта) —
-  // отличается от leads API формой тела (есть update_id) и приходит с
-  // секретом в query-параметре, не с apiKey. См. handleTelegramUpdate_.
-  if (body.update_id !== undefined) {
-    const secret = props_().getProperty('TELEGRAM_WEBHOOK_SECRET');
-    if (!secret || !e.parameter || e.parameter.telegram_secret !== secret) {
-      return jsonOutput_({ status: 401, error: 'Неверный секрет.' });
-    }
-    try {
-      handleTelegramUpdate_(body);
-    } catch (err) {
-      Logger.log(`[telegram-webhook] ${err.message || err}`);
-    }
-    return jsonOutput_({ status: 200, data: { ok: true } });
-  }
-
   return handle_(() => {
+    let body;
+    try {
+      body = JSON.parse(e.postData.contents);
+    } catch {
+      throw apiError_(400, 'Тело запроса должно быть валидным JSON.');
+    }
     // apiKey читаем в первую очередь из query-параметра — Apps Script Web App
     // делает редирект script.google.com → script.googleusercontent.com, и
     // некоторые HTTP-клиенты (в т.ч. fetch с redirect:'follow') на этом
@@ -627,7 +610,7 @@ function telegramAnswerCallback_(callbackQueryId, text) {
 
 /**
  * Шаблон текста отчёта — редактируется прямо из Telegram (см.
- * handleTelegramUpdate_ и installTelegramWebhook ниже), хранится в Script
+ * handleTelegramUpdate_ и installTelegramCommandPolling ниже), хранится в Script
  * Property REPORT_TEMPLATE как есть (со своими <b> и эмодзи), плейсхолдеры
  * вида {{name}} подставляются в renderReportTemplate_. Нет свойства —
  * используется REPORT_TEMPLATE_DEFAULT.
@@ -908,43 +891,59 @@ function handleTelegramUpdate_(update) {
 }
 
 /**
- * Разовая настройка — запусти один раз (Run из редактора). Ставит Telegram
- * webhook на задеплоенный Web App URL (Script Property WEB_APP_URL — тот
- * же .../exec адрес, что уже используется для leads-api, см. Deploy →
- * Manage deployments) с секретом в query-параметре — Apps Script не даёт
- * читать заголовки запроса, поэтому секрет передаётся в URL, не в
- * Authorization/X-Telegram-Bot-Api-Secret-Token. Секрет генерируется сам
- * при первом запуске и кладётся в TELEGRAM_WEBHOOK_SECRET.
- *
- * ВАЖНО: ScriptApp.getService().getUrl() сюда не годится — при ручном Run
- * из редактора возвращает /dev-адрес (тестовый, требует логина в Google),
- * Telegram на него слать не может (упадёт 401). Нужен именно /exec.
- *
+ * Опрос команд Telegram (не webhook) — Apps Script Web App всегда отдаёт
+ * первый ответ как 302-редирект (script.google.com →
+ * script.googleusercontent.com), а Telegram при доставке через webhook эту
+ * редиректную цепочку не проходит и репортит «Wrong response from the
+ * webhook: 302 Found» — сам doPost с апдейтом при этом даже не успевает
+ * выполниться. Поэтому — тот же паттерн, что и у SheetsSync.gs: Apps
+ * Script сам стучится в Telegram по таймеру (тут Apps Script — клиент,
+ * редирект ему не мешает, UrlFetchApp следует за ним сам).
+ * Оффсет — Script Property TELEGRAM_LAST_UPDATE_ID, чтобы не обрабатывать
+ * одни и те же апдейты повторно между тиками триггера.
+ */
+function checkTelegramCommands_() {
+  const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
+  if (!token) return;
+  const offset = Number(props_().getProperty('TELEGRAM_LAST_UPDATE_ID') || 0);
+  const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=0`, {
+    muteHttpExceptions: true,
+  });
+  const json = JSON.parse(resp.getContentText());
+  if (!json.ok) {
+    Logger.log(`[telegram-poll] getUpdates упал: ${resp.getContentText()}`);
+    return;
+  }
+  let maxId = offset - 1;
+  json.result.forEach((update) => {
+    try {
+      handleTelegramUpdate_(update);
+    } catch (err) {
+      Logger.log(`[telegram-poll] ${err.message || err}`);
+    }
+    if (update.update_id > maxId) maxId = update.update_id;
+  });
+  if (maxId >= offset) props_().setProperty('TELEGRAM_LAST_UPDATE_ID', String(maxId + 1));
+}
+
+/**
+ * Разовая настройка — запусти один раз (Run из редактора). Снимает webhook,
+ * если он был поставлен раньше (getUpdates и webhook несовместимы —
+ * Telegram отдаст 409, пока webhook висит), и ставит триггер опроса
+ * команд раз в минуту.
  * ADMIN_TELEGRAM_USER_ID не обязателен — без него редактировать шаблон
  * (см. handleTelegramUpdate_) сможет кто угодно, кто напишет боту; задай
  * это свойство, когда захочешь ограничить только собой.
  */
-function installTelegramWebhook() {
+function installTelegramCommandPolling() {
   const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN не задан в Script Properties.');
-  const webAppUrl = props_().getProperty('WEB_APP_URL');
-  if (!webAppUrl || !webAppUrl.endsWith('/exec')) {
-    throw new Error(
-      'Задай Script Property WEB_APP_URL — адрес вида .../exec из Deploy → Manage deployments (тот же, что уже используется для leads-api).',
-    );
-  }
-  let secret = props_().getProperty('TELEGRAM_WEBHOOK_SECRET');
-  if (!secret) {
-    secret = Utilities.getUuid().replace(/-/g, '');
-    props_().setProperty('TELEGRAM_WEBHOOK_SECRET', secret);
-  }
-  const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify({ url: `${webAppUrl}?telegram_secret=${secret}` }),
-    muteHttpExceptions: true,
-  });
-  Logger.log(resp.getContentText());
+  UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/deleteWebhook`, { muteHttpExceptions: true });
+  ScriptApp.getProjectTriggers()
+    .filter((t) => t.getHandlerFunction() === 'checkTelegramCommands_')
+    .forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('checkTelegramCommands_').timeBased().everyMinutes(1).create();
+  Logger.log('Опрос команд Telegram запущен — раз в минуту.');
 }
 
 function doGet(e) {
