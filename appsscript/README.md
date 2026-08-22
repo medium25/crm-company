@@ -142,12 +142,20 @@ Google Sheets как параметр `apiKey`. См. `API.md` за пример
 
 ### Разовая настройка
 
-1. Выбери `installTelegramWebhook` в списке функций → **Run** — один раз.
+1. Deploy → Manage deployments → карандаш у существующего деплоя → New
+   version → Deploy (иначе webhook будет стучаться в старую версию кода,
+   без обработки Telegram-команд). Убедись, что URL деплоя (тот же, что для
+   leads-api, `.../exec`) записан как Script Property `WEB_APP_URL`.
+2. Выбери `installTelegramWebhook` в списке функций → **Run** — один раз.
    Сгенерирует секрет (`TELEGRAM_WEBHOOK_SECRET`) сам и подключит webhook
-   к этому Web App. Безопасно перезапускать.
-2. Напиши боту `/gettemplate` (в личку или в ту же группу) — должен
+   к `WEB_APP_URL`. Безопасно перезапускать.
+   **Не бери URL из авто-подстановки `ScriptApp.getService().getUrl()`** —
+   при ручном Run из редактора он даёт `/dev`-адрес (тестовый, требует
+   логина в Google), Telegram на него слать не может — упадёт `401
+   Unauthorized` (проверить: `.../getWebhookInfo`, поле `last_error_message`).
+3. Напиши боту `/gettemplate` (в личку или в ту же группу) — должен
    ответить текущим шаблоном и подсказкой по плейсхолдерам.
-3. (Опционально, чтобы закрыть только собой) Узнай свой Telegram `user_id` —
+4. (Опционально, чтобы закрыть только собой) Узнай свой Telegram `user_id` —
    `getUpdates`, поле `message.from.id` у твоего сообщения → добавь
    `ADMIN_TELEGRAM_USER_ID` в Script Properties.
 

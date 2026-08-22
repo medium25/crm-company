@@ -835,10 +835,17 @@ function handleTelegramUpdate_(update) {
 
 /**
  * Разовая настройка — запусти один раз (Run из редактора). Ставит Telegram
- * webhook на текущий Web App URL с секретом в query-параметре — Apps
- * Script не даёт читать заголовки запроса, поэтому секрет передаётся в
- * URL, не в Authorization/X-Telegram-Bot-Api-Secret-Token. Секрет
- * генерируется сам при первом запуске и кладётся в TELEGRAM_WEBHOOK_SECRET.
+ * webhook на задеплоенный Web App URL (Script Property WEB_APP_URL — тот
+ * же .../exec адрес, что уже используется для leads-api, см. Deploy →
+ * Manage deployments) с секретом в query-параметре — Apps Script не даёт
+ * читать заголовки запроса, поэтому секрет передаётся в URL, не в
+ * Authorization/X-Telegram-Bot-Api-Secret-Token. Секрет генерируется сам
+ * при первом запуске и кладётся в TELEGRAM_WEBHOOK_SECRET.
+ *
+ * ВАЖНО: ScriptApp.getService().getUrl() сюда не годится — при ручном Run
+ * из редактора возвращает /dev-адрес (тестовый, требует логина в Google),
+ * Telegram на него слать не может (упадёт 401). Нужен именно /exec.
+ *
  * ADMIN_TELEGRAM_USER_ID не обязателен — без него редактировать шаблон
  * (см. handleTelegramUpdate_) сможет кто угодно, кто напишет боту; задай
  * это свойство, когда захочешь ограничить только собой.
@@ -846,12 +853,17 @@ function handleTelegramUpdate_(update) {
 function installTelegramWebhook() {
   const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN не задан в Script Properties.');
+  const webAppUrl = props_().getProperty('WEB_APP_URL');
+  if (!webAppUrl || !webAppUrl.endsWith('/exec')) {
+    throw new Error(
+      'Задай Script Property WEB_APP_URL — адрес вида .../exec из Deploy → Manage deployments (тот же, что уже используется для leads-api).',
+    );
+  }
   let secret = props_().getProperty('TELEGRAM_WEBHOOK_SECRET');
   if (!secret) {
     secret = Utilities.getUuid().replace(/-/g, '');
     props_().setProperty('TELEGRAM_WEBHOOK_SECRET', secret);
   }
-  const webAppUrl = ScriptApp.getService().getUrl();
   const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
     method: 'post',
     contentType: 'application/json',
