@@ -792,18 +792,19 @@ const TEMPLATE_COMMAND_HINT =
   'Команды:\n/gettemplate — показать текущий шаблон\n/settemplate и на следующей строке новый текст\n/resettemplate — вернуть шаблон по умолчанию';
 
 /**
- * Входящий Telegram Update (только от админа, только текстовые команды
- * управления шаблоном отчёта) — вызывается из doPost, когда апдейт пришёл
- * от Telegram webhook, а не от leads API. Молча игнорирует всё от не-админа
- * (сравнение message.from.id со Script Property ADMIN_TELEGRAM_USER_ID) —
- * без этого свойства ни одна команда не сработает (fail closed).
+ * Входящий Telegram Update (только текстовые команды управления шаблоном
+ * отчёта) — вызывается из doPost, когда апдейт пришёл от Telegram webhook,
+ * а не от leads API. Если задан ADMIN_TELEGRAM_USER_ID — команды работают
+ * только от него (сравнение с message.from.id); если свойство не задано —
+ * редактировать шаблон может кто угодно, кто пишет боту (осознанно открыто
+ * сейчас, можно закрыть в любой момент, просто задав это свойство).
  */
 function handleTelegramUpdate_(update) {
   const message = update.message;
   if (!message || !message.text) return;
 
   const adminId = props_().getProperty('ADMIN_TELEGRAM_USER_ID');
-  if (!adminId || String(message.from.id) !== String(adminId)) return;
+  if (adminId && String(message.from.id) !== String(adminId)) return;
 
   const chatId = message.chat.id;
   const threadId = message.message_thread_id;
@@ -833,22 +834,18 @@ function handleTelegramUpdate_(update) {
 }
 
 /**
- * Разовая настройка — сначала пропиши ADMIN_TELEGRAM_USER_ID в Script
- * Properties (numeric id из getUpdates → message.from.id), потом запусти
- * эту функцию один раз (Run из редактора). Ставит Telegram webhook на
- * текущий Web App URL с секретом в query-параметре — Apps Script не даёт
- * читать заголовки запроса, поэтому секрет передаётся в URL, не в
- * Authorization/X-Telegram-Bot-Api-Secret-Token. Секрет генерируется сам
- * при первом запуске и кладётся в TELEGRAM_WEBHOOK_SECRET.
+ * Разовая настройка — запусти один раз (Run из редактора). Ставит Telegram
+ * webhook на текущий Web App URL с секретом в query-параметре — Apps
+ * Script не даёт читать заголовки запроса, поэтому секрет передаётся в
+ * URL, не в Authorization/X-Telegram-Bot-Api-Secret-Token. Секрет
+ * генерируется сам при первом запуске и кладётся в TELEGRAM_WEBHOOK_SECRET.
+ * ADMIN_TELEGRAM_USER_ID не обязателен — без него редактировать шаблон
+ * (см. handleTelegramUpdate_) сможет кто угодно, кто напишет боту; задай
+ * это свойство, когда захочешь ограничить только собой.
  */
 function installTelegramWebhook() {
   const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN не задан в Script Properties.');
-  if (!props_().getProperty('ADMIN_TELEGRAM_USER_ID')) {
-    throw new Error(
-      'Сначала задай ADMIN_TELEGRAM_USER_ID в Script Properties (свой numeric id из getUpdates) — иначе команды редактирования шаблона никто не сможет использовать.',
-    );
-  }
   let secret = props_().getProperty('TELEGRAM_WEBHOOK_SECRET');
   if (!secret) {
     secret = Utilities.getUuid().replace(/-/g, '');
