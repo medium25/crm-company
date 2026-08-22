@@ -495,13 +495,30 @@ function handle_(fn) {
 }
 
 function doPost(e) {
-  return handle_(() => {
-    let body;
-    try {
-      body = JSON.parse(e.postData.contents);
-    } catch {
-      throw apiError_(400, 'Тело запроса должно быть валидным JSON.');
+  let body;
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch {
+    return jsonOutput_({ status: 400, error: 'Тело запроса должно быть валидным JSON.' });
+  }
+
+  // Апдейт от Telegram webhook (команды редактирования шаблона отчёта) —
+  // отличается от leads API формой тела (есть update_id) и приходит с
+  // секретом в query-параметре, не с apiKey. См. handleTelegramUpdate_.
+  if (body.update_id !== undefined) {
+    const secret = props_().getProperty('TELEGRAM_WEBHOOK_SECRET');
+    if (!secret || !e.parameter || e.parameter.telegram_secret !== secret) {
+      return jsonOutput_({ status: 401, error: 'Неверный секрет.' });
     }
+    try {
+      handleTelegramUpdate_(body);
+    } catch (err) {
+      Logger.log(`[telegram-webhook] ${err.message || err}`);
+    }
+    return jsonOutput_({ status: 200, data: { ok: true } });
+  }
+
+  return handle_(() => {
     // apiKey читаем в первую очередь из query-параметра — Apps Script Web App
     // делает редирект script.google.com → script.googleusercontent.com, и
     // некоторые HTTP-клиенты (в т.ч. fetch с redirect:'follow') на этом
@@ -566,14 +583,23 @@ function hhmmDdMm_(date) {
 }
 
 function telegramSendMessage_(text) {
-  const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
   const chatId = props_().getProperty('TELEGRAM_CHAT_ID');
   const threadId = props_().getProperty('TELEGRAM_REPORTS_THREAD_ID');
-  if (!token || !chatId) {
-    Logger.log('Telegram не настроен — нет TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID в Script Properties.');
+  if (!chatId) {
+    Logger.log('Telegram не настроен — нет TELEGRAM_CHAT_ID в Script Properties.');
     return;
   }
-  const payload = { chat_id: chatId, text, parse_mode: 'HTML' };
+  telegramSendMessageTo_(chatId, threadId, text, 'HTML');
+}
+
+/** Общая отправка — используется и для отчётов, и для ответов на команды редактирования шаблона. */
+function telegramSendMessageTo_(chatId, threadId, text, parseMode) {
+  const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
+  if (!token) {
+    Logger.log('Telegram не настроен — нет TELEGRAM_BOT_TOKEN в Script Properties.');
+    return;
+  }
+  const payload = { chat_id: chatId, text, parse_mode: parseMode || '' };
   if (threadId) payload.message_thread_id = Number(threadId);
   const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'post',
@@ -584,6 +610,31 @@ function telegramSendMessage_(text) {
   if (resp.getResponseCode() >= 400) {
     Logger.log(`Telegram sendMessage упал (${resp.getResponseCode()}): ${resp.getContentText()}`);
   }
+}
+
+/**
+ * Шаблон текста отчёта — редактируется прямо из Telegram (см.
+ * handleTelegramUpdate_ и installTelegramWebhook ниже), хранится в Script
+ * Property REPORT_TEMPLATE как есть (со своими <b> и эмодзи), плейсхолдеры
+ * вида {{name}} подставляются в renderReportTemplate_. Нет свойства —
+ * используется REPORT_TEMPLATE_DEFAULT.
+ */
+const REPORT_TEMPLATE_DEFAULT =
+  '📊 Отчёт за смену — <b>{{name}}</b>\n' +
+  'Период: {{periodStart}} — {{periodEnd}}\n\n' +
+  'Лидов поступило: <b>{{leads}}</b>\n' +
+  'Взято в работу: <b>{{taken}}</b>\n' +
+  'Потеряно: <b>{{lost}}</b>\n' +
+  'Посетили (таргет): <b>{{target}}</b>\n' +
+  'Посетили (другое): <b>{{other}}</b>\n' +
+  'Новых оплат: <b>{{payments}}</b>';
+
+function getReportTemplate_() {
+  return props_().getProperty('REPORT_TEMPLATE') || REPORT_TEMPLATE_DEFAULT;
+}
+
+function renderReportTemplate_(vars) {
+  return getReportTemplate_().replace(/\{\{(\w+)\}\}/g, (match, key) => (key in vars ? String(vars[key]) : match));
 }
 
 /**
@@ -635,16 +686,17 @@ function buildOperatorReportText_(op, windowStart, windowEnd) {
   const isActive = newLeadsCount || takenCount || lostCount || attendedTargetCount || attendedOtherCount || newPaymentsCount;
   if (!isActive) return null;
 
-  return (
-    `📊 Отчёт за смену — <b>${op.fullName}</b>\n` +
-    `Период: ${hhmmDdMm_(windowStart)} — ${hhmmDdMm_(windowEnd)}\n\n` +
-    `Лидов поступило: <b>${newLeadsCount}</b>\n` +
-    `Взято в работу: <b>${takenCount}</b>\n` +
-    `Потеряно: <b>${lostCount}</b>\n` +
-    `Посетили (таргет): <b>${attendedTargetCount}</b>\n` +
-    `Посетили (другое): <b>${attendedOtherCount}</b>\n` +
-    `Новых оплат: <b>${newPaymentsCount}</b>`
-  );
+  return renderReportTemplate_({
+    name: op.fullName,
+    periodStart: hhmmDdMm_(windowStart),
+    periodEnd: hhmmDdMm_(windowEnd),
+    leads: newLeadsCount,
+    taken: takenCount,
+    lost: lostCount,
+    target: attendedTargetCount,
+    other: attendedOtherCount,
+    payments: newPaymentsCount,
+  });
 }
 
 /**
@@ -731,6 +783,85 @@ function previewDailyOperatorReports() {
     const text = buildOperatorReportText_(op, windowStart, windowEnd);
     Logger.log(text ? `\n${text}` : `${op.fullName}: не активен за последние 24ч, отчёт не шлём.`);
   });
+}
+
+// --- Редактирование шаблона отчёта прямо из Telegram ------------------------
+
+const TEMPLATE_COMMAND_HINT =
+  'Плейсхолдеры: {{name}} {{periodStart}} {{periodEnd}} {{leads}} {{taken}} {{lost}} {{target}} {{other}} {{payments}}\n\n' +
+  'Команды:\n/gettemplate — показать текущий шаблон\n/settemplate и на следующей строке новый текст\n/resettemplate — вернуть шаблон по умолчанию';
+
+/**
+ * Входящий Telegram Update (только от админа, только текстовые команды
+ * управления шаблоном отчёта) — вызывается из doPost, когда апдейт пришёл
+ * от Telegram webhook, а не от leads API. Молча игнорирует всё от не-админа
+ * (сравнение message.from.id со Script Property ADMIN_TELEGRAM_USER_ID) —
+ * без этого свойства ни одна команда не сработает (fail closed).
+ */
+function handleTelegramUpdate_(update) {
+  const message = update.message;
+  if (!message || !message.text) return;
+
+  const adminId = props_().getProperty('ADMIN_TELEGRAM_USER_ID');
+  if (!adminId || String(message.from.id) !== String(adminId)) return;
+
+  const chatId = message.chat.id;
+  const threadId = message.message_thread_id;
+  const text = message.text.trim();
+
+  if (text === '/gettemplate' || text === '/start') {
+    telegramSendMessageTo_(chatId, threadId, `Текущий шаблон:\n\n${getReportTemplate_()}\n\n${TEMPLATE_COMMAND_HINT}`);
+    return;
+  }
+
+  if (text === '/resettemplate') {
+    props_().deleteProperty('REPORT_TEMPLATE');
+    telegramSendMessageTo_(chatId, threadId, `Шаблон сброшен на стандартный:\n\n${REPORT_TEMPLATE_DEFAULT}`);
+    return;
+  }
+
+  if (text.indexOf('/settemplate') === 0) {
+    const newTemplate = text.slice('/settemplate'.length).trim();
+    if (!newTemplate) {
+      telegramSendMessageTo_(chatId, threadId, 'Пусто — пришли /settemplate и на следующей строке текст шаблона.');
+      return;
+    }
+    props_().setProperty('REPORT_TEMPLATE', newTemplate);
+    telegramSendMessageTo_(chatId, threadId, `Шаблон сохранён:\n\n${newTemplate}`);
+    return;
+  }
+}
+
+/**
+ * Разовая настройка — сначала пропиши ADMIN_TELEGRAM_USER_ID в Script
+ * Properties (numeric id из getUpdates → message.from.id), потом запусти
+ * эту функцию один раз (Run из редактора). Ставит Telegram webhook на
+ * текущий Web App URL с секретом в query-параметре — Apps Script не даёт
+ * читать заголовки запроса, поэтому секрет передаётся в URL, не в
+ * Authorization/X-Telegram-Bot-Api-Secret-Token. Секрет генерируется сам
+ * при первом запуске и кладётся в TELEGRAM_WEBHOOK_SECRET.
+ */
+function installTelegramWebhook() {
+  const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
+  if (!token) throw new Error('TELEGRAM_BOT_TOKEN не задан в Script Properties.');
+  if (!props_().getProperty('ADMIN_TELEGRAM_USER_ID')) {
+    throw new Error(
+      'Сначала задай ADMIN_TELEGRAM_USER_ID в Script Properties (свой numeric id из getUpdates) — иначе команды редактирования шаблона никто не сможет использовать.',
+    );
+  }
+  let secret = props_().getProperty('TELEGRAM_WEBHOOK_SECRET');
+  if (!secret) {
+    secret = Utilities.getUuid().replace(/-/g, '');
+    props_().setProperty('TELEGRAM_WEBHOOK_SECRET', secret);
+  }
+  const webAppUrl = ScriptApp.getService().getUrl();
+  const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ url: `${webAppUrl}?telegram_secret=${secret}` }),
+    muteHttpExceptions: true,
+  });
+  Logger.log(resp.getContentText());
 }
 
 function doGet(e) {
