@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isSameMonth } from 'date-fns';
+import { Moon, Sun } from 'lucide-react';
 import { collection, doc, query, where, orderBy, onSnapshot, updateDoc, setDoc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -45,6 +46,17 @@ export function LeadsPage() {
   // доступен только ceo/manager, чтобы посмотреть доску глазами одного
   // человека без переключения аккаунта.
   const [operatorFilter, setOperatorFilter] = useState('all');
+
+  // Тёмная тема — только для этой страницы: класс dark ставится на <html>
+  // (не на локальный div), чтобы порталы (DropdownMenu/Modal — рендерятся
+  // в document.body, вне DOM-поддерева страницы) тоже подхватывали
+  // переменные палитры. Снимается при уходе со страницы или выключении —
+  // остальной CRM тёмную тему не видит вообще.
+  const [darkTheme, setDarkTheme] = useState(false);
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkTheme);
+    return () => document.documentElement.classList.remove('dark');
+  }, [darkTheme]);
 
   // Форс-перерисовка раз в минуту — иначе просроченный SLA-бейдж не
   // появится сам по себе (Firestore не «уведомляет» о течении времени).
@@ -419,6 +431,17 @@ export function LeadsPage() {
 
   return (
     <div>
+      {/* fixed слева внизу — доступно всем ролям на доске, в отличие от
+          фильтра по оператору справа (тот только для ceo/manager). */}
+      <button
+        type="button"
+        onClick={() => setDarkTheme((v) => !v)}
+        aria-label={darkTheme ? 'Светлая тема' : 'Тёмная тема'}
+        title={darkTheme ? 'Светлая тема' : 'Тёмная тема'}
+        className="fixed bottom-4 left-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-surface-alt text-muted shadow-hover hover:text-text"
+      >
+        {darkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </button>
       {canSeeAllLeads && (
         // fixed в угол экрана — не участвует в потоке страницы (колонки
         // начинаются сразу сверху) и не переезжает поверх шапок колонок

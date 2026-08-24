@@ -1,27 +1,31 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
+      // Значения — CSS-переменные (см. src/index.css :root/.dark), не хардкод,
+      // чтобы токены палитры переключались тёмной темой (сейчас — только на
+      // странице «Заявки», см. LeadsPage.jsx) без дублирования палитры здесь.
       colors: {
-        bg:            '#F4F5F7',
-        surface:       '#FFFFFF',
-        'surface-alt': '#FAFBFC',
-        border:        '#E9EBEF',
-        'border-strong': '#D6DAE1',
-        text:          '#2B3440',
-        muted:         '#8B94A3',
-        navy:          { DEFAULT: '#22406B', hover: '#1A3357', num: '#2F6FE4' },
-        orange:        { DEFAULT: '#E5842B', soft: '#FDF0E3' },
-        success:       { DEFAULT: '#34A853', bg: '#EBF7EE' },
-        danger:        { DEFAULT: '#C0392B', bg: '#B02D33' },
-        present:       '#3E8B84',
-        absent:        '#2F80D8',
-        link:          '#2563EB',
+        bg:            'var(--color-bg)',
+        surface:       'var(--color-surface)',
+        'surface-alt': 'var(--color-surface-alt)',
+        border:        'var(--color-border)',
+        'border-strong': 'var(--color-border-strong)',
+        text:          'var(--color-text)',
+        muted:         'var(--color-muted)',
+        navy:          { DEFAULT: 'var(--color-navy)', hover: 'var(--color-navy-hover)', num: 'var(--color-navy-num)' },
+        orange:        { DEFAULT: 'var(--color-orange)', soft: 'var(--color-orange-soft)' },
+        success:       { DEFAULT: 'var(--color-success)', bg: 'var(--color-success-bg)' },
+        danger:        { DEFAULT: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
+        present:       'var(--color-present)',
+        absent:        'var(--color-absent)',
+        link:          'var(--color-link)',
         freeze: {
-          blue:   '#EAF3FF',
-          yellow: '#FFF6D9',
-          red:    '#FBEAEA',
+          blue:   'var(--color-freeze-blue)',
+          yellow: 'var(--color-freeze-yellow)',
+          red:    'var(--color-freeze-red)',
         },
       },
       fontFamily: {

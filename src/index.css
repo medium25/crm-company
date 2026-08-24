@@ -4,6 +4,65 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Токены палитры — CSS-переменные, не хардкод в tailwind.config.js, чтобы
+ * их можно было переопределить внутри .dark (сейчас только на странице
+ * «Заявки», см. LeadsPage.jsx — переключатель ставит класс dark на <html>,
+ * пока открыта эта страница, и снимает при уходе с неё/выключении).
+ * .dark переопределяет только сами переменные — ни один компонент дальше
+ * по коду не знает о тёмной теме, просто продолжает использовать
+ * bg-surface/text-text/border-border и т.п.
+ */
+:root {
+  --color-bg: #F4F5F7;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #FAFBFC;
+  --color-border: #E9EBEF;
+  --color-border-strong: #D6DAE1;
+  --color-text: #2B3440;
+  --color-muted: #8B94A3;
+  --color-navy: #22406B;
+  --color-navy-hover: #1A3357;
+  --color-navy-num: #2F6FE4;
+  --color-orange: #E5842B;
+  --color-orange-soft: #FDF0E3;
+  --color-success: #34A853;
+  --color-success-bg: #EBF7EE;
+  --color-danger: #C0392B;
+  --color-danger-bg: #B02D33;
+  --color-present: #3E8B84;
+  --color-absent: #2F80D8;
+  --color-link: #2563EB;
+  --color-freeze-blue: #EAF3FF;
+  --color-freeze-yellow: #FFF6D9;
+  --color-freeze-red: #FBEAEA;
+}
+
+.dark {
+  --color-bg: #10151D;
+  --color-surface: #1B2330;
+  --color-surface-alt: #222B3A;
+  --color-border: #2E3948;
+  --color-border-strong: #3D4A5C;
+  --color-text: #E7EAEE;
+  --color-muted: #9AA3B2;
+  --color-navy: #3E6BA8;
+  --color-navy-hover: #4E7DBC;
+  --color-navy-num: #5B8FF2;
+  --color-orange: #E5842B;
+  --color-orange-soft: #3A2A17;
+  --color-success: #3EC46D;
+  --color-success-bg: #16321F;
+  --color-danger: #E0564A;
+  --color-danger-bg: #4A1E1B;
+  --color-present: #4FA69E;
+  --color-absent: #4A97E8;
+  --color-link: #6C9BFF;
+  --color-freeze-blue: #1B2A3D;
+  --color-freeze-yellow: #33301A;
+  --color-freeze-red: #3A1F20;
+}
+
 body {
   margin: 0;
   background: theme('colors.bg');
