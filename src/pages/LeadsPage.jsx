@@ -18,6 +18,7 @@ import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
+import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt, validateCallDeadline } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
@@ -39,7 +40,10 @@ export function LeadsPage() {
   // переключения на «только мои»; остальные роли (admin/teacher) всегда
   // видят только назначенные лично им — без кнопки, переключать нечего.
   const canSeeAllLeads = staff?.role === 'ceo' || staff?.role === 'manager';
-  const [showOnlyMine, setShowOnlyMine] = useState(false);
+  // 'all' | 'mine' | <operator uid> — третий режим (конкретный оператор)
+  // доступен только ceo/manager, чтобы посмотреть доску глазами одного
+  // человека без переключения аккаунта.
+  const [operatorFilter, setOperatorFilter] = useState('all');
 
   // Форс-перерисовка раз в минуту — иначе просроченный SLA-бейдж не
   // появится сам по себе (Firestore не «уведомляет» о течении времени).
@@ -108,17 +112,26 @@ export function LeadsPage() {
   // Документ никуда не девается, просто не рендерится в этом списке.
   // boardHiddenAt — то же самое, но вручную и раньше конца месяца
   // («Оплачено» — крестик на карточке, см. onDismissFromBoard).
+  // 'mine' и не-ceo/manager — свой uid; иначе конкретный uid оператора, если
+  // выбран из списка; 'all' (только для ceo/manager) — без ограничения.
+  const scopedOperatorUid = !canSeeAllLeads
+    ? user.uid
+    : operatorFilter === 'mine'
+      ? user.uid
+      : operatorFilter === 'all'
+        ? null
+        : operatorFilter;
+
   const leads = useMemo(() => {
     const now = new Date();
-    const scopedToSelf = !canSeeAllLeads || showOnlyMine;
     return allLeads.filter((l) => {
-      if (scopedToSelf && l.assignedOperator !== user.uid) return false;
+      if (scopedOperatorUid && l.assignedOperator !== scopedOperatorUid) return false;
       if (l.boardHiddenAt) return false;
       if (!TERMINAL_STAGES.includes(columnKeyOf(l))) return true;
       const at = (l.paidAt ?? l.lostAt ?? l.updatedAt)?.toDate?.();
       return at ? isSameMonth(at, now) : true;
     });
-  }, [allLeads, canSeeAllLeads, showOnlyMine, user.uid]);
+  }, [allLeads, scopedOperatorUid]);
 
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
@@ -131,6 +144,14 @@ export function LeadsPage() {
     for (const s of staffList) map.set(s.id, { color: s.color, name: s.fullName });
     return map;
   }, [staffList]);
+
+  // Операторы для выпадающего списка «Оператор» (см. панель фильтра ниже) —
+  // роль 'admin' в этом кодовой базе и есть call-center оператор (см.
+  // src/lib/roles.js), ceo/manager сами лиды не ведут.
+  const operatorOptions = useMemo(
+    () => staffList.filter((s) => s.role === 'admin').sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    [staffList],
+  );
 
   const [formLead, setFormLead] = useState(null);
   const [declineTarget, setDeclineTarget] = useState(null);
@@ -363,22 +384,40 @@ export function LeadsPage() {
         // fixed в угол экрана — не участвует в потоке страницы (колонки
         // начинаются сразу сверху) и не переезжает поверх шапок колонок
         // при горизонтальном скролле доски, в отличие от absolute сверху.
-        <div className="fixed bottom-4 right-4 z-10 flex gap-1 rounded-full bg-surface-alt p-1 shadow-hover">
+        <div className="fixed bottom-4 right-4 z-10 flex items-center gap-1 rounded-full bg-surface-alt p-1 shadow-hover">
           {[
-            { value: false, label: 'Все' },
-            { value: true, label: 'Только мои' },
+            { value: 'all', label: 'Все' },
+            { value: 'mine', label: 'Только мои' },
           ].map((t) => (
             <button
-              key={String(t.value)}
+              key={t.value}
               type="button"
-              onClick={() => setShowOnlyMine(t.value)}
+              onClick={() => setOperatorFilter(t.value)}
               className={`rounded-full px-3 py-1.5 text-[13px] ${
-                showOnlyMine === t.value ? 'bg-navy text-white' : 'text-muted'
+                operatorFilter === t.value ? 'bg-navy text-white' : 'text-muted'
               }`}
             >
               {t.label}
             </button>
           ))}
+          {operatorOptions.length > 0 && (
+            <DropdownMenu
+              items={operatorOptions.map((op) => ({ label: op.fullName, onClick: () => setOperatorFilter(op.id) }))}
+              trigger={({ ref, toggle }) => {
+                const selected = operatorOptions.find((op) => op.id === operatorFilter);
+                return (
+                  <button
+                    ref={ref}
+                    type="button"
+                    onClick={toggle}
+                    className={`rounded-full px-3 py-1.5 text-[13px] ${selected ? 'bg-navy text-white' : 'text-muted'}`}
+                  >
+                    {selected ? selected.fullName : 'Оператор ▾'}
+                  </button>
+                );
+              }}
+            />
+          )}
         </div>
       )}
       <div className="flex gap-4 overflow-x-auto pb-2">
