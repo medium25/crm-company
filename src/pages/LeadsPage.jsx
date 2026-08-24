@@ -431,57 +431,46 @@ export function LeadsPage() {
 
   return (
     <div>
-      {/* fixed слева внизу — доступно всем ролям на доске, в отличие от
-          фильтра по оператору справа (тот только для ceo/manager). */}
-      <button
-        type="button"
-        onClick={() => setDarkTheme((v) => !v)}
-        aria-label={darkTheme ? 'Светлая тема' : 'Тёмная тема'}
-        title={darkTheme ? 'Светлая тема' : 'Тёмная тема'}
-        className="fixed bottom-4 left-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-surface-alt text-muted shadow-hover hover:text-text"
-      >
-        {darkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-      </button>
-      {canSeeAllLeads && (
-        // fixed в угол экрана — не участвует в потоке страницы (колонки
-        // начинаются сразу сверху) и не переезжает поверх шапок колонок
-        // при горизонтальном скролле доски, в отличие от absolute сверху.
-        <div className="fixed bottom-4 right-4 z-10 flex items-center gap-1 rounded-full bg-surface-alt p-1 shadow-hover">
-          {[
-            { value: 'all', label: 'Все' },
-            { value: 'mine', label: 'Только мои' },
-          ].map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setOperatorFilter(t.value)}
-              className={`rounded-full px-3 py-1.5 text-[13px] ${
-                operatorFilter === t.value ? 'bg-navy text-white' : 'text-muted'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-          {operatorOptions.length > 0 && (
-            <DropdownMenu
-              items={operatorOptions.map((op) => ({ label: op.fullName, onClick: () => setOperatorFilter(op.id) }))}
-              trigger={({ ref, toggle }) => {
-                const selected = operatorOptions.find((op) => op.id === operatorFilter);
-                return (
-                  <button
-                    ref={ref}
-                    type="button"
-                    onClick={toggle}
-                    className={`rounded-full px-3 py-1.5 text-[13px] ${selected ? 'bg-navy text-white' : 'text-muted'}`}
-                  >
-                    {selected ? selected.fullName : 'Оператор ▾'}
-                  </button>
-                );
-              }}
-            />
-          )}
-        </div>
-      )}
+      {/* fixed в угол экрана — не участвует в потоке страницы (колонки
+          начинаются сразу сверху) и не переезжает поверх шапок колонок при
+          горизонтальном скролле доски, в отличие от absolute сверху. Одна
+          кнопка на весь фильтр (не 3 сегмента) — открывает меню со всеми
+          вариантами разом (Все/Только мои/каждый оператор); тема — рядом. */}
+      <div className="fixed bottom-4 right-4 z-10 flex items-center gap-1 rounded-full bg-surface-alt p-1 shadow-hover">
+        {canSeeAllLeads && (
+          <DropdownMenu
+            items={[
+              { label: 'Все', onClick: () => setOperatorFilter('all') },
+              { label: 'Только мои', onClick: () => setOperatorFilter('mine') },
+              ...operatorOptions.map((op) => ({ label: op.fullName, onClick: () => setOperatorFilter(op.id) })),
+            ]}
+            trigger={({ ref, toggle }) => (
+              <button
+                ref={ref}
+                type="button"
+                onClick={toggle}
+                className="rounded-full bg-navy px-3 py-1.5 text-[13px] text-white"
+              >
+                {operatorFilter === 'all'
+                  ? 'Все'
+                  : operatorFilter === 'mine'
+                    ? 'Только мои'
+                    : (operatorOptions.find((op) => op.id === operatorFilter)?.fullName ?? 'Все')}
+                {' ▾'}
+              </button>
+            )}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setDarkTheme((v) => !v)}
+          aria-label={darkTheme ? 'Светлая тема' : 'Тёмная тема'}
+          title={darkTheme ? 'Светлая тема' : 'Тёмная тема'}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+        >
+          {darkTheme ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+      </div>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {resolvedColumns.map((column) => (
           <LeadColumn

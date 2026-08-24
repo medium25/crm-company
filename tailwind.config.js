@@ -4,28 +4,46 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
-      // Значения — CSS-переменные (см. src/index.css :root/.dark), не хардкод,
-      // чтобы токены палитры переключались тёмной темой (сейчас — только на
-      // странице «Заявки», см. LeadsPage.jsx) без дублирования палитры здесь.
+      // Значения — CSS-переменные в rgb()-обёртке с <alpha-value> (см.
+      // src/index.css :root/.dark, значения там — «R G B» через пробел, БЕЗ
+      // rgb()) — так классы вида bg-success/10, ring-navy/40 продолжают
+      // работать (Tailwind подставляет альфу в сам rgb()); просто var(...)
+      // без этой обёртки ломает все /opacity-модификаторы во всём приложении
+      // (Tailwind не умеет резать CSS-переменную на RGB-каналы на этапе
+      // сборки). Токены палитры переключаются тёмной темой (сейчас — только
+      // на странице «Заявки», см. LeadsPage.jsx) без дублирования палитры тут.
       colors: {
-        bg:            'var(--color-bg)',
-        surface:       'var(--color-surface)',
-        'surface-alt': 'var(--color-surface-alt)',
-        border:        'var(--color-border)',
-        'border-strong': 'var(--color-border-strong)',
-        text:          'var(--color-text)',
-        muted:         'var(--color-muted)',
-        navy:          { DEFAULT: 'var(--color-navy)', hover: 'var(--color-navy-hover)', num: 'var(--color-navy-num)' },
-        orange:        { DEFAULT: 'var(--color-orange)', soft: 'var(--color-orange-soft)' },
-        success:       { DEFAULT: 'var(--color-success)', bg: 'var(--color-success-bg)' },
-        danger:        { DEFAULT: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
-        present:       'var(--color-present)',
-        absent:        'var(--color-absent)',
-        link:          'var(--color-link)',
+        bg:            'rgb(var(--color-bg) / <alpha-value>)',
+        surface:       'rgb(var(--color-surface) / <alpha-value>)',
+        'surface-alt': 'rgb(var(--color-surface-alt) / <alpha-value>)',
+        border:        'rgb(var(--color-border) / <alpha-value>)',
+        'border-strong': 'rgb(var(--color-border-strong) / <alpha-value>)',
+        text:          'rgb(var(--color-text) / <alpha-value>)',
+        muted:         'rgb(var(--color-muted) / <alpha-value>)',
+        navy: {
+          DEFAULT: 'rgb(var(--color-navy) / <alpha-value>)',
+          hover:   'rgb(var(--color-navy-hover) / <alpha-value>)',
+          num:     'rgb(var(--color-navy-num) / <alpha-value>)',
+        },
+        orange: {
+          DEFAULT: 'rgb(var(--color-orange) / <alpha-value>)',
+          soft:    'rgb(var(--color-orange-soft) / <alpha-value>)',
+        },
+        success: {
+          DEFAULT: 'rgb(var(--color-success) / <alpha-value>)',
+          bg:      'rgb(var(--color-success-bg) / <alpha-value>)',
+        },
+        danger: {
+          DEFAULT: 'rgb(var(--color-danger) / <alpha-value>)',
+          bg:      'rgb(var(--color-danger-bg) / <alpha-value>)',
+        },
+        present:       'rgb(var(--color-present) / <alpha-value>)',
+        absent:        'rgb(var(--color-absent) / <alpha-value>)',
+        link:          'rgb(var(--color-link) / <alpha-value>)',
         freeze: {
-          blue:   'var(--color-freeze-blue)',
-          yellow: 'var(--color-freeze-yellow)',
-          red:    'var(--color-freeze-red)',
+          blue:   'rgb(var(--color-freeze-blue) / <alpha-value>)',
+          yellow: 'rgb(var(--color-freeze-yellow) / <alpha-value>)',
+          red:    'rgb(var(--color-freeze-red) / <alpha-value>)',
         },
       },
       fontFamily: {
