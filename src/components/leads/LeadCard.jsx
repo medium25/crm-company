@@ -95,8 +95,13 @@ export function LeadCommentsPanel({ leadId }) {
  * действия на карточке (onMarkAttempt и т.п.), без промежуточного стейта.
  */
 function LeadChecklistPanel({ leadId, checklist }) {
+  const checked = checklistCheckedCount(checklist);
+  const percent = checklistPercent(checklist);
   return (
     <div className="mt-1.5 flex flex-col gap-1 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
+      <p className="text-[11px] font-bold text-muted">
+        Соблюдено: {checked}/{LEAD_CHECKLIST_ITEMS.length} ({percent}%)
+      </p>
       {LEAD_CHECKLIST_ITEMS.map((item) => (
         <label key={item.key} className="flex cursor-pointer items-start gap-1.5 text-[12px] leading-tight text-text">
           <input
@@ -647,7 +652,7 @@ export function LeadCard({
                 type="button"
                 onClick={() => setChecklistOpen((v) => !v)}
                 aria-label="Чек-лист"
-                className={`relative flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+                className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
                   checklistOpen
                     ? 'text-navy'
                     : checklistChecked === 0
@@ -658,11 +663,6 @@ export function LeadCard({
                 }`}
               >
                 <ListChecks className="h-4 w-4" />
-                {checklistChecked > 0 && (
-                  <span className="absolute -bottom-1 -right-1 rounded-badge bg-surface px-0.5 text-[9px] font-bold leading-tight">
-                    {checklistPct}%
-                  </span>
-                )}
               </button>
             )}
             <button
