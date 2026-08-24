@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isSameMonth } from 'date-fns';
-import { collection, doc, query, where, orderBy, onSnapshot, updateDoc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, onSnapshot, updateDoc, setDoc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -16,6 +16,7 @@ import { DismissFromBoardModal } from '../components/leads/DismissFromBoardModal
 import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
+import { CallSuccessOutcomeModal } from '../components/leads/CallSuccessOutcomeModal.jsx';
 import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
@@ -158,6 +159,7 @@ export function LeadsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
   const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
+  const [successOutcomeTarget, setSuccessOutcomeTarget] = useState(null); // { lead, suggestedDate, onThink, onTrial, onDecline }
   const [bookingTarget, setBookingTarget] = useState(null);
   const [resetTarget, setResetTarget] = useState(null);
   const [dismissTarget, setDismissTarget] = useState(null);
@@ -191,61 +193,98 @@ export function LeadsPage() {
   // автовычисленный дедлайн в фоне. Отсюда общий паттерн ниже: посчитать
   // предложенную дату, открыть DeadlineModal, а сама запись в Firestore
   // происходит только в её onConfirm.
+  /**
+   * Пишет саму попытку звонка (callLogs + students.callAttempts) — общая
+   * часть для обоих исходов (успех/неудача), опционально с комментарием
+   * (только «клиент думает» после успеха, см. CallSuccessOutcomeModal) и
+   * доп. полями стадии (переход new→calling всегда, calling→lost при 5
+   * неудачах подряд).
+   */
+  const commitCallAttempt = async (lead, nextAttempts, result, { dueDate = null, comment = '', stageFields = {} } = {}) => {
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(collection(db, 'callLogs')), {
+        studentId: lead.id,
+        direction: 'out',
+        result: result === 'success' ? 'reached' : 'no_answer',
+        comment: '',
+        durationSec: 0,
+        quickMark: true,
+        userId: user.uid,
+        userName: staff?.fullName ?? '',
+        createdAt: serverTimestamp(),
+      });
+      if (comment) {
+        batch.set(doc(collection(db, 'comments')), {
+          entityType: 'lead',
+          entityId: lead.id,
+          text: comment,
+          authorId: user.uid,
+          authorName: staff?.fullName ?? '',
+          createdAt: serverTimestamp(),
+        });
+      }
+      // serverTimestamp() внутри элемента массива не поддерживается Firestore —
+      // callAttempts.at/stageHistory.enteredAt используют клиентское время,
+      // updatedAt/lostAt документа ниже — уже верхнеуровневые поля, им можно.
+      batch.update(doc(db, 'students', lead.id), {
+        callAttempts: nextAttempts,
+        nextCallDueAt: dueDate,
+        ...(comment ? { commentsCount: increment(1) } : {}),
+        ...stageFields,
+        updatedAt: serverTimestamp(),
+      });
+      await batch.commit();
+      if (stageFields.funnelStage === 'lost') showToast(`${lead.fullName}: 5 неудачных попыток, лид отмечен как отказ.`);
+    } catch {
+      showToast('Не удалось отметить попытку.', { type: 'error' });
+    }
+  };
+
   const markAttempt = (lead, result) => {
     const attempts = lead.callAttempts ?? [];
     if (attempts.length >= 5) return;
     const nextAttempts = [...attempts, { result, at: new Date() }];
+
+    const stageFields = {};
+    if (columnKeyOf(lead) === 'new') {
+      stageFields.funnelStage = 'calling';
+      stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: new Date() }];
+    }
+
+    if (result === 'success') {
+      // Трубку взяли, разговор состоялся — дальше не «когда перезвонить»
+      // (как при неудаче), а что реально произошло: думает / записался /
+      // отказался (см. CallSuccessOutcomeModal, план из чата).
+      setSuccessOutcomeTarget({
+        lead,
+        suggestedDate: nextCallDueAt(nextAttempts) ?? unreachableCallDueAt(),
+        onThink: (comment, dueDate) => commitCallAttempt(lead, nextAttempts, result, { dueDate, comment, stageFields }),
+        onTrial: () => {
+          commitCallAttempt(lead, nextAttempts, result, { stageFields });
+          setTrialTarget({ lead, mode: 'schedule' });
+        },
+        onDecline: () => {
+          commitCallAttempt(lead, nextAttempts, result, { stageFields });
+          setDeclineTarget(lead);
+        },
+      });
+      return;
+    }
+
     const isCold = nextAttempts.length === 5 && nextAttempts.every((a) => a.result === 'fail');
-
-    const commit = async (dueDate) => {
-      try {
-        const batch = writeBatch(db);
-        batch.set(doc(collection(db, 'callLogs')), {
-          studentId: lead.id,
-          direction: 'out',
-          result: result === 'success' ? 'reached' : 'no_answer',
-          comment: '',
-          durationSec: 0,
-          quickMark: true,
-          userId: user.uid,
-          userName: staff?.fullName ?? '',
-          createdAt: serverTimestamp(),
-        });
-        const stageFields = {};
-        if (columnKeyOf(lead) === 'new') {
-          stageFields.funnelStage = 'calling';
-          stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: new Date() }];
-        } else if (isCold) {
-          stageFields.funnelStage = 'lost';
-          stageFields.lostReason = 'cold_lead';
-          stageFields.lostAt = serverTimestamp();
-          stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }];
-        }
-        // serverTimestamp() внутри элемента массива не поддерживается Firestore —
-        // callAttempts.at/stageHistory.enteredAt используют клиентское время,
-        // updatedAt/lostAt документа ниже — уже верхнеуровневые поля, им можно.
-        batch.update(doc(db, 'students', lead.id), {
-          callAttempts: nextAttempts,
-          nextCallDueAt: isCold ? null : dueDate,
-          ...stageFields,
-          updatedAt: serverTimestamp(),
-        });
-        await batch.commit();
-        if (stageFields.funnelStage === 'lost') showToast(`${lead.fullName}: 5 неудачных попыток, лид отмечен как отказ.`);
-      } catch {
-        showToast('Не удалось отметить попытку.', { type: 'error' });
-      }
-    };
-
     if (isCold) {
-      commit(null); // терминальная стадия «Отказ» — дедлайну неоткуда взяться, спрашивать нечего
+      // терминальная стадия «Отказ» — дедлайну неоткуда взяться, спрашивать нечего
+      commitCallAttempt(lead, nextAttempts, result, {
+        stageFields: { funnelStage: 'lost', lostReason: 'cold_lead', lostAt: serverTimestamp(), stageHistory: [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }] },
+      });
       return;
     }
     setDeadlineTarget({
       lead,
       title: 'Дедлайн следующего звонка',
       suggestedDate: nextCallDueAt(nextAttempts),
-      onConfirm: commit,
+      onConfirm: (dueDate) => commitCallAttempt(lead, nextAttempts, result, { dueDate, stageFields }),
       validate: (candidate) => validateCallDeadline(candidate, nextAttempts, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
@@ -446,6 +485,7 @@ export function LeadsPage() {
       <DismissFromBoardModal lead={dismissTarget} onClose={() => setDismissTarget(null)} />
       <TrialFormModal target={trialTarget} timeSlots={branchSettings?.trialTimeSlots} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
+      <CallSuccessOutcomeModal target={successOutcomeTarget} onClose={() => setSuccessOutcomeTarget(null)} />
       <GroupBookingModal lead={bookingTarget} allLeads={allLeads} onClose={() => setBookingTarget(null)} />
     </div>
   );
