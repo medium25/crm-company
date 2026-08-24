@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, Clock, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Clock, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -10,6 +10,7 @@ import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, isTrialDay, contactDueDate, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay, formatOverdueBy, formatSource } from '../../lib/format.js';
+import { LEAD_CHECKLIST_ITEMS, checklistCheckedCount, checklistPercent } from '../../lib/leadChecklist.js';
 
 /**
  * Компактная лента комментариев лида, разворачивается прямо в карточке.
@@ -83,6 +84,30 @@ export function LeadCommentsPanel({ leadId }) {
           className="min-w-0 flex-1 bg-transparent font-mono text-[13px] text-text placeholder:text-muted focus:outline-none"
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Чек-лист первого разговора — раскрывается прямо в карточке, только в
+ * «Новый лид»/«Дозвон» (см. LEAD_CHECKLIST_ITEMS). Пишет сразу в Firestore
+ * по каждому клику — тот же самооптимистичный паттерн, что и остальные
+ * действия на карточке (onMarkAttempt и т.п.), без промежуточного стейта.
+ */
+function LeadChecklistPanel({ leadId, checklist }) {
+  return (
+    <div className="mt-1.5 flex flex-col gap-1 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
+      {LEAD_CHECKLIST_ITEMS.map((item) => (
+        <label key={item.key} className="flex cursor-pointer items-start gap-1.5 text-[12px] leading-tight text-text">
+          <input
+            type="checkbox"
+            className="mt-0.5 shrink-0"
+            checked={Boolean(checklist?.[item.key])}
+            onChange={(e) => updateDoc(doc(db, 'students', leadId), { [`checklist.${item.key}`]: e.target.checked })}
+          />
+          {item.label}
+        </label>
+      ))}
     </div>
   );
 }
@@ -438,6 +463,9 @@ export function LeadCard({
   const operatorLabel = operatorInitials(operatorName);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const hasComments = (lead.commentsCount ?? 0) > 0;
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const checklistChecked = checklistCheckedCount(lead.checklist);
+  const checklistPct = checklistPercent(lead.checklist);
 
   const createdAt = lead.createdAt?.toDate?.();
   // Риск-бейдж независим от даты (в отличие от overdue) — загорается сразу
@@ -614,6 +642,29 @@ export function LeadCard({
           </button>
         ) : (
           <div className="flex shrink-0 items-center gap-0.5">
+            {(stage === 'new' || stage === 'calling') && (
+              <button
+                type="button"
+                onClick={() => setChecklistOpen((v) => !v)}
+                aria-label="Чек-лист"
+                className={`relative flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+                  checklistOpen
+                    ? 'text-navy'
+                    : checklistChecked === 0
+                      ? 'text-muted'
+                      : checklistPct === 100
+                        ? 'text-success'
+                        : 'text-orange'
+                }`}
+              >
+                <ListChecks className="h-4 w-4" />
+                {checklistChecked > 0 && (
+                  <span className="absolute -bottom-1 -right-1 rounded-badge bg-surface px-0.5 text-[9px] font-bold leading-tight">
+                    {checklistPct}%
+                  </span>
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setCommentsOpen((v) => !v)}
@@ -640,6 +691,9 @@ export function LeadCard({
         )}
       </div>
 
+      {(stage === 'new' || stage === 'calling') && checklistOpen && (
+        <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} />
+      )}
       {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
 
       <span className="-mt-1.5 text-[10px] text-muted">
