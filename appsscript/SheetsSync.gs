@@ -114,8 +114,30 @@ function sendLead_(payload) {
  * Основной проход — вызывается таймером (см. installTrigger). Обрабатывает
  * до MAX_ROWS_PER_RUN несинхронизированных строк за раз, остальные подберёт
  * следующий запуск (через минуту).
+ *
+ * LockService обязателен: при большом бэкфилле один проход (до
+ * MAX_ROWS_PER_RUN строк, каждая — блокирующий HTTP-запрос к API) может
+ * занять больше минуты, и следующий тик триггера стартует НОВЫЙ снимок
+ * листа (getDataRange), не видя строк, которые предыдущий проход ещё не
+ * дошёл обработать — оба видят их «несинхронизированными» и отправляют
+ * оба, создавая в CRM дубль лида. Воспроизведено на реальных данных
+ * (несколько лидов с одинаковым телефоном, apiSyncedAt с разницей <2 сек).
+ * Без лока — return сразу, следующий тик подхватит.
  */
 function syncNewLeadsToCrm() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    Logger.log('Предыдущий проход ещё выполняется — пропускаю этот тик.');
+    return;
+  }
+  try {
+    syncNewLeadsToCrm_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function syncNewLeadsToCrm_() {
   const sheet = getSheet_();
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) return;
