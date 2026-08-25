@@ -87,25 +87,28 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
     setForm((f) => ({ ...f, groupId: currentEnrollment?.groupId ?? '' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEnrollment?.groupId, isTrialStatus, student?.id]);
-  // Ответственного выбирает сам при любом ручном создании — ICON (пустое
-  // значение) для пришедших без ответственного лица.
+  // Ответственного выбирает сам при любом ручном создании — только из
+  // реальных операторов (role='admin', тот же фильтр, что и в
+  // src/components/settings/LeadAssignmentTab.jsx), без «безличного»
+  // варианта — лид/студент не должен оставаться без ответственного.
   const needsOperatorPick = !isEdit;
   const staffQuery = useMemo(
-    () => (db && activeBranchId && needsOperatorPick ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
+    () =>
+      db && activeBranchId && needsOperatorPick
+        ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId), where('role', '==', 'admin'))
+        : null,
     [activeBranchId, needsOperatorPick],
   );
   const { data: staffList } = useCollection(staffQuery);
-  const operatorOptions = [
-    { value: '', label: 'ICON (без ответственного)' },
-    ...[...staffList].sort((a, b) => a.fullName.localeCompare(b.fullName)).map((s) => ({ value: s.id, label: s.fullName })),
-  ];
+  const operatorOptions = [...staffList].sort((a, b) => a.fullName.localeCompare(b.fullName)).map((s) => ({ value: s.id, label: s.fullName }));
   // При создании — обязательно 2 номера, без второго лид не заводится (это
   // не про редактирование старых карточек, у которых его могло не быть).
   const missingSecondPhone = !isEdit && !form.phone2.trim();
+  const missingOperator = needsOperatorPick && !form.assignedOperator;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (missingSecondPhone) return;
+    if (missingSecondPhone || missingOperator) return;
     setDuplicateName('');
     setSaving(true);
     try {
@@ -338,12 +341,16 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
         />
         {needsOperatorPick && (
-          <Select
-            label="Ответственный"
-            options={operatorOptions}
-            value={form.assignedOperator}
-            onChange={(e) => setForm((f) => ({ ...f, assignedOperator: e.target.value }))}
-          />
+          <>
+            <Select
+              label="Ответственный"
+              options={[{ value: '', label: 'Выбрать оператора…' }, ...operatorOptions]}
+              value={form.assignedOperator}
+              onChange={(e) => setForm((f) => ({ ...f, assignedOperator: e.target.value }))}
+              error={missingOperator}
+            />
+            {missingOperator && <p className="-mt-2 text-[13px] text-danger">Выбери ответственного оператора.</p>}
+          </>
         )}
         {isTrialStatus && (
           <Select
