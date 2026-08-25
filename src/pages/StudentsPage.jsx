@@ -642,14 +642,7 @@ export function StudentsPage() {
 
     return (
       <>
-        <PageHeader
-          title="Студенты"
-          actions={
-            <Button onClick={() => setModalStudent({})}>
-              <Plus className="h-4 w-4" /> Добавить ученика
-            </Button>
-          }
-        />
+        <PageHeader title="Студенты" />
         <div className="flex flex-col gap-3">
           {SECTION_TABS.map((t) => {
             const Icon = t.icon;
