@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, getDocs, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, format, startOfMonth, subDays } from 'date-fns';
-import { Plus, CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, ShieldCheck, Pencil, CalendarDays, UserCheck, Archive } from 'lucide-react';
+import { CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, ShieldCheck, Pencil, CalendarDays, UserCheck, Archive } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -20,7 +20,6 @@ import { Table } from '../components/ui/Table.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { Skeleton, SkeletonRow } from '../components/ui/Skeleton.jsx';
-import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { EditFreezeStartModal } from '../components/students/EditFreezeStartModal.jsx';
 import { EditFreezeEndModal } from '../components/students/EditFreezeEndModal.jsx';
 import { UnfreezeEnrollmentModal } from '../components/students/UnfreezeEnrollmentModal.jsx';
@@ -59,7 +58,6 @@ export function StudentsPage() {
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [modalStudent, setModalStudent] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [smsOpen, setSmsOpen] = useState(false);
   const [editFreezeTarget, setEditFreezeTarget] = useState(null);
@@ -663,8 +661,6 @@ export function StudentsPage() {
             );
           })}
         </div>
-
-        <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} createMode="trial" />
       </>
     );
   }
@@ -691,9 +687,6 @@ export function StudentsPage() {
               )}
               <Button variant="secondary" onClick={exportSelected} disabled={filtered.length === 0}>
                 <Download className="h-4 w-4" /> Экспорт{selected.size > 0 ? ` (${selected.size})` : ''}
-              </Button>
-              <Button onClick={() => setModalStudent({})}>
-                <Plus className="h-4 w-4" /> Добавить
               </Button>
             </>
           )
@@ -780,8 +773,6 @@ export function StudentsPage() {
                 section === 'trial' ? 'Никого нет на пробном' :
                 'Пока нет ни одного студента'
               }
-              actionLabel={section === 'all' ? 'Добавить' : undefined}
-              onAction={section === 'all' ? () => setModalStudent({}) : undefined}
             />
           )}
 
@@ -822,8 +813,6 @@ export function StudentsPage() {
           )}
         </>
       )}
-
-      <StudentFormModal student={modalStudent} onClose={() => setModalStudent(null)} onCreated={(id) => navigate(`/students/${id}`)} createMode="trial" />
 
       <EditFreezeStartModal enrollment={editFreezeTarget} onClose={() => setEditFreezeTarget(null)} />
 
