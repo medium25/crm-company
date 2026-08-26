@@ -696,9 +696,10 @@ export function LeadCard({
       )}
       {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
 
-      <span className="-mt-1.5 text-[10px] text-muted">
+      <span className="-mt-2.5 text-[10px] text-muted">
         {formatDateTimeShort(lead.createdAt)}
         {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
+        {(stage === 'new' || stage === 'calling') && checklistChecked > 0 ? ` · Чек-лист ${checklistPct}%` : ''}
       </span>
     </div>
   );
