@@ -22,6 +22,7 @@ import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
+import { checklistPercent } from '../lib/leadChecklist.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt, validateCallDeadline } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
 
@@ -273,10 +274,18 @@ export function LeadsPage() {
         suggestedDate: nextCallDueAt(nextAttempts) ?? unreachableCallDueAt(),
         onThink: (comment, dueDate) => commitCallAttempt(lead, nextAttempts, result, { dueDate, comment, stageFields }),
         onTrial: () => {
+          if (checklistBlocksLeaving(lead)) {
+            showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
+            return;
+          }
           commitCallAttempt(lead, nextAttempts, result, { stageFields });
           setTrialTarget({ lead, mode: 'schedule' });
         },
         onDecline: () => {
+          if (checklistBlocksLeaving(lead)) {
+            showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
+            return;
+          }
           commitCallAttempt(lead, nextAttempts, result, { stageFields });
           setDeclineTarget(lead);
         },
@@ -301,10 +310,22 @@ export function LeadsPage() {
     });
   };
 
+  // Пока по лиду не отмечен ни один пункт чек-листа первого разговора (см.
+  // src/lib/leadChecklist.js) — некуда переносить дальше «Новый лид»/
+  // «Дозвон»: ни вручную (стрелка/меню, drag-n-drop — оба идут через
+  // moveLead), ни через исход успешного звонка (Запись/Отказ в
+  // CallSuccessOutcomeModal). «Думает» не двигает стадию — не под гейтом.
+  const checklistBlocksLeaving = (lead) =>
+    (columnKeyOf(lead) === 'new' || columnKeyOf(lead) === 'calling') && checklistPercent(lead.checklist) === 0;
+
   const moveLead = (lead, stageKey) => {
     if (columnKeyOf(lead) === stageKey) return;
     if (!isForwardAllowed(columnKeyOf(lead), stageKey)) {
       showToast('Нельзя вернуть лида на предыдущую стадию.', { type: 'error' });
+      return;
+    }
+    if (stageKey !== 'calling' && checklistBlocksLeaving(lead)) {
+      showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
       return;
     }
     if (stageKey === 'lost') {
@@ -412,10 +433,27 @@ export function LeadsPage() {
   const cardActions = {
     onOpen: (lead) => navigate(`/students/${lead.id}`),
     onEdit: (lead) => setFormLead(lead),
-    onDecline: (lead) => setDeclineTarget(lead),
+    // Гейт чек-листа — тут же, а не только в moveLead: карточка сама строит
+    // «Перенести в колонку» (moveItems в LeadCard.jsx) и для lost/
+    // trial_scheduled вызывает onDecline/onScheduleTrial напрямую, минуя
+    // moveLead целиком (см. markAttempt для того же гейта на исходе
+    // успешного звонка).
+    onDecline: (lead) => {
+      if (checklistBlocksLeaving(lead)) {
+        showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
+        return;
+      }
+      setDeclineTarget(lead);
+    },
     onDelete: (lead) => setDeleteTarget(lead),
     onResetToNew: (lead) => setResetTarget(lead),
-    onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
+    onScheduleTrial: (lead) => {
+      if (checklistBlocksLeaving(lead)) {
+        showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
+        return;
+      }
+      setTrialTarget({ lead, mode: 'schedule' });
+    },
     onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
     onOpenBooking: (lead) => setBookingTarget(lead),
     // Только «Оплачено» — убирает карточку с доски, студент остаётся в
