@@ -699,7 +699,7 @@ export function LeadCard({
       <span className="-mt-2.5 text-[10px] text-muted">
         {formatDateTimeShort(lead.createdAt)}
         {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
-        {(stage === 'new' || stage === 'calling') && checklistChecked > 0 ? ` · Чек-лист ${checklistPct}%` : ''}
+        {stage === 'new' || stage === 'calling' ? ` · Чек-лист ${checklistPct}%` : ''}
       </span>
     </div>
   );
