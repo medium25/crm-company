@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isToday, isTomorrow, isSameMonth, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronDown, ChevronRight, Info, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Info, Plus, CheckCircle2, XCircle } from 'lucide-react';
 import { LeadCard } from './LeadCard.jsx';
 import { STAGE_COLOR_SWATCHES } from './columns.js';
 import { stageDeadline, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
+import { pluralize } from '../../lib/format.js';
 
 /**
  * Значок «ⓘ» рядом с названием колонки — попап с инструкцией по работе с
@@ -158,15 +159,43 @@ function EditableStageTitle({ column, onEdit }) {
  * карточек всё равно должна быть видна, а не пропадать из списка;
  * `children` (если задан) заменяет автоматический рендер карточек —
  * нужно для вложенных групп причин внутри группы месяца.
- * @param {{title: string, subtitle?: string, leads: Array<Object>, operatorByUid: Map, cardActions: Object, defaultOpen?: boolean, children?: import('react').ReactNode}} props
+ *
+ * `closedIcon`/`closedTone`/`closedCaption` — только для верхнего уровня
+ * «Оплачено»/«Отказ» (см. вызов в LeadColumn ниже): в свёрнутом виде
+ * вместо тонкой строки-заголовка — крупная иконка в цветном круге, месяц
+ * и подпись с числом, сразу понятно won/lost без открытия. Остальные
+ * группы (Сегодня/Завтра/причины) эти пропсы не передают — используют
+ * обычный компактный вид.
+ * @param {{title: string, subtitle?: string, leads: Array<Object>, operatorByUid: Map, cardActions: Object, defaultOpen?: boolean, children?: import('react').ReactNode, closedIcon?: import('react').ComponentType, closedTone?: 'success'|'danger', closedCaption?: string}} props
  */
-function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, defaultOpen = true, children }) {
+function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, defaultOpen = true, children, closedIcon: ClosedIcon, closedTone, closedCaption }) {
   const [open, setOpen] = useState(defaultOpen);
 
-  // Свёрнутая группа — та же высота, что у LeadCard (min-h-[190px]),
-  // заголовок по центру — чтобы в колонке выглядела как карточка, а не
-  // тонкая полоска-аккордеон. Развёрнутая — высота по контенту, без
-  // навязанного min-height (иначе пустое место под коротким списком).
+  if (!open && ClosedIcon) {
+    const toneClasses =
+      closedTone === 'danger'
+        ? 'bg-[rgba(190,18,60,0.13)] text-[#BE123C] dark:bg-[rgba(253,164,175,0.15)] dark:text-[#FDA4AF]'
+        : 'bg-success/15 text-success';
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="relative flex min-h-[190px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-border bg-surface shadow-sm"
+      >
+        <ChevronRight className="absolute right-3.5 top-3.5 h-3.5 w-3.5 text-muted" />
+        <span className={`flex h-14 w-14 items-center justify-center rounded-full ${toneClasses}`}>
+          <ClosedIcon className="h-6 w-6" />
+        </span>
+        <span className="text-[17px] font-extrabold text-text">{title}</span>
+        {closedCaption && <span className="text-[13px] font-semibold text-muted">{closedCaption}</span>}
+      </button>
+    );
+  }
+
+  // Свёрнутая группа без иконки (Сегодня/Завтра/причины) — та же высота,
+  // что у LeadCard (min-h-[190px]), заголовок по центру — чтобы в
+  // колонке выглядела как карточка, а не тонкая полоска-аккордеон.
+  // Развёрнутая — высота по контенту, без навязанного min-height.
   return (
     <div
       className={`rounded-xl border border-border bg-surface shadow-sm ${!open ? 'flex min-h-[190px] flex-col justify-center' : ''}`}
@@ -391,7 +420,15 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
           <>
             {monthGroups.map((month) =>
               isLost ? (
-                <LeadGroup key={month.key} title={month.label} leads={month.leads} defaultOpen={month.isCurrent}>
+                <LeadGroup
+                  key={month.key}
+                  title={month.label}
+                  leads={month.leads}
+                  defaultOpen={month.isCurrent}
+                  closedIcon={XCircle}
+                  closedTone="danger"
+                  closedCaption={`${month.leads.length} ${pluralize(month.leads.length, ['отказ', 'отказа', 'отказов'])}`}
+                >
                   <div className="space-y-2">
                     {groupLeadsByReason(month.leads).map((reason) => (
                       <LeadGroup
@@ -414,6 +451,9 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                   operatorByUid={operatorByUid}
                   cardActions={cardActions}
                   defaultOpen={month.isCurrent}
+                  closedIcon={CheckCircle2}
+                  closedTone="success"
+                  closedCaption={`${month.leads.length} ${pluralize(month.leads.length, ['оплатил', 'оплатили', 'оплатили'])}`}
                 />
               ),
             )}
