@@ -1,7 +1,6 @@
 // src/pages/LeadsPage.jsx
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isSameMonth } from 'date-fns';
 import { Moon, Sun } from 'lucide-react';
 import { collection, doc, query, where, orderBy, onSnapshot, updateDoc, setDoc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase.js';
@@ -25,8 +24,6 @@ import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../c
 import { checklistPercent } from '../lib/leadChecklist.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt, validateCallDeadline } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
-
-const TERMINAL_STAGES = ['won', 'lost'];
 
 /**
  * Заявки — 7-стадийная воронка продаж (2026-08-13-leads-funnel-redesign.md).
@@ -120,10 +117,12 @@ export function LeadsPage() {
     );
   };
 
-  // won/lost видны только в текущем календарном месяце — сбрасываются 1-го
-  // числа, а не скользящим окном (иначе терминальные колонки бесконечно
-  // растут за месяцы работы, см. план, «Важное архитектурное решение»).
-  // Документ никуда не девается, просто не рендерится в этом списке.
+  // won/lost раньше скрывались за пределами текущего календарного месяца
+  // (чтобы терминальные колонки не росли бесконечно) — теперь вместо
+  // скрытия видны все месяцы сразу, но сгруппированы сворачиваемыми
+  // секциями по месяцам (groupLeadsByMonth в LeadColumn.jsx), открыт по
+  // умолчанию только текущий. Документ никуда не девается, просто рендер
+  // был/остаётся под контролем — раньше через фильтр, теперь через collapse.
   // boardHiddenAt — то же самое, но вручную и раньше конца месяца
   // («Оплачено» — крестик на карточке, см. onDismissFromBoard).
   // 'mine' и не-ceo/manager — свой uid; иначе конкретный uid оператора, если
@@ -137,13 +136,10 @@ export function LeadsPage() {
         : operatorFilter;
 
   const leads = useMemo(() => {
-    const now = new Date();
     return allLeads.filter((l) => {
       if (scopedOperatorUid && l.assignedOperator !== scopedOperatorUid) return false;
       if (l.boardHiddenAt) return false;
-      if (!TERMINAL_STAGES.includes(columnKeyOf(l))) return true;
-      const at = (l.paidAt ?? l.lostAt ?? l.updatedAt)?.toDate?.();
-      return at ? isSameMonth(at, now) : true;
+      return true;
     });
   }, [allLeads, scopedOperatorUid]);
 

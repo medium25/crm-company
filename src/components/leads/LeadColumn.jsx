@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isToday, isTomorrow } from 'date-fns';
+import { isToday, isTomorrow, isSameMonth, format } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { ChevronDown, ChevronRight, Info, Plus } from 'lucide-react';
 import { LeadCard } from './LeadCard.jsx';
 import { STAGE_COLOR_SWATCHES } from './columns.js';
-import { stageDeadline } from '../../lib/leadFunnel.js';
+import { stageDeadline, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 
 /**
  * Значок «ⓘ» рядом с названием колонки — попап с инструкцией по работе с
@@ -150,15 +151,17 @@ function EditableStageTitle({ column, onEdit }) {
 }
 
 /**
- * Свёрнутая/развёрнутая папка карточек внутри колонки — только для
- * «Пробный назначен» (см. groupLeadsByTrialDay ниже), где карточек может
- * скопиться много и полезно свернуть то, что не сегодня/завтра. Рендерится
- * всегда, даже пустой — «Завтра» без карточек всё равно должна быть видна,
- * а не пропадать из списка.
- * @param {{title: string, leads: Array<Object>, operatorByUid: Map, cardActions: Object}} props
+ * Свёрнутая/развёрнутая папка карточек внутри колонки — «Пробный
+ * назначен» (см. groupLeadsByTrialDay), «Оплачено»/«Отказ» по месяцам
+ * (см. groupLeadsByMonth) и внутри «Отказ» ещё по причине (см.
+ * groupLeadsByReason). Рендерится всегда, даже пустой — «Завтра» без
+ * карточек всё равно должна быть видна, а не пропадать из списка;
+ * `children` (если задан) заменяет автоматический рендер карточек —
+ * нужно для вложенных групп причин внутри группы месяца.
+ * @param {{title: string, subtitle?: string, leads: Array<Object>, operatorByUid: Map, cardActions: Object, defaultOpen?: boolean, children?: import('react').ReactNode}} props
  */
-function LeadGroup({ title, leads, operatorByUid, cardActions }) {
-  const [open, setOpen] = useState(true);
+function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
     <div className="rounded-field border border-border bg-surface">
@@ -171,18 +174,22 @@ function LeadGroup({ title, leads, operatorByUid, cardActions }) {
           {open ? <ChevronDown className="h-3.5 w-3.5 text-muted" /> : <ChevronRight className="h-3.5 w-3.5 text-muted" />}
           {title}
         </span>
-        <span className="text-[12px] font-bold text-muted">{leads.length}</span>
+        <span className="flex items-center gap-1.5 text-[12px] font-bold text-muted">
+          {subtitle && <span className="font-normal">{subtitle}</span>}
+          {leads.length}
+        </span>
       </button>
       {open && (
         <div className="space-y-2 border-t border-border p-2">
-          {leads.length === 0 ? (
-            <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
-          ) : (
-            leads.map((lead) => {
-              const op = operatorByUid.get(lead.assignedOperator);
-              return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
-            })
-          )}
+          {children ??
+            (leads.length === 0 ? (
+              <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
+            ) : (
+              leads.map((lead) => {
+                const op = operatorByUid.get(lead.assignedOperator);
+                return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
+              })
+            ))}
         </div>
       )}
     </div>
@@ -214,6 +221,87 @@ export function groupLeadsByTrialDay(leads) {
   return groups;
 }
 
+/** Первая непустая Firestore-дата лида среди перечисленных полей, как JS Date (или null). */
+function firstLeadDate(lead, fields) {
+  for (const field of fields) {
+    const d = lead[field]?.toDate?.();
+    if (d) return d;
+  }
+  return null;
+}
+
+/** «август 2026» → «Август 2026» — date-fns ru отдаёт название месяца с маленькой буквы. */
+function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Группирует лидов «Оплачено»/«Отказ» по календарному месяцу — раньше эти
+ * стадии были видны только за текущий месяц (см. комментарий в
+ * LeadsPage.jsx), теперь видны все, но свёрнуты по месяцам, открыт по
+ * умолчанию только текущий. `dateFields` — приоритет полей даты (для
+ * «Оплачено»: paidAt, для «Отказ»: lostAt, оба с фоллбэком на updatedAt —
+ * у части старых записей нужного поля могло не быть).
+ * @param {Array<Object>} leads
+ * @param {Array<string>} dateFields
+ * @returns {Array<{key: string, label: string, isCurrent: boolean, leads: Array<Object>}>} новые месяцы впереди
+ */
+export function groupLeadsByMonth(leads, dateFields) {
+  const now = new Date();
+  const buckets = new Map();
+  for (const lead of leads) {
+    const d = firstLeadDate(lead, dateFields) ?? now;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        key,
+        sortDate: new Date(d.getFullYear(), d.getMonth(), 1),
+        label: capitalize(format(d, 'LLLL yyyy', { locale: ru })),
+        isCurrent: isSameMonth(d, now),
+        leads: [],
+      });
+    }
+    buckets.get(key).leads.push(lead);
+  }
+  return Array.from(buckets.values()).sort((a, b) => b.sortDate - a.sortDate);
+}
+
+/**
+ * Группирует лидов «Отказ» внутри одного месяца по причине (lostReason) —
+ * заголовок каждой группы несёт число и процент от отказов ЭТОГО месяца
+ * (не от всех отказов за всё время — группа и так уже внутри месяца).
+ * @param {Array<Object>} leads
+ * @returns {Array<{key: string, label: string, percent: number, leads: Array<Object>}>} по убыванию числа
+ */
+export function groupLeadsByReason(leads) {
+  const total = leads.length;
+  const buckets = new Map();
+  for (const lead of leads) {
+    const key = lead.lostReason || 'unknown';
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(lead);
+  }
+  return Array.from(buckets.entries())
+    .map(([key, group]) => ({
+      key,
+      // Не входит в LOST_REASON_OPTIONS — старое значение lostReason (список
+      // причин расширяли не раз, у части лидов остались значения времён до
+      // текущей пятёрки). Раньше все они схлопывались в одну надпись «Без
+      // причины» — 4 разные причины выглядели как один повторяющийся
+      // пункт. Теперь показываем сам код (humanized), только truly-пустой
+      // lostReason — «Без причины».
+      label: LOST_REASON_OPTIONS.find((o) => o.value === key)?.label ?? (key === 'unknown' ? 'Без причины' : humanizeReasonKey(key)),
+      percent: total ? Math.round((group.length / total) * 100) : 0,
+      leads: group,
+    }))
+    .sort((a, b) => b.leads.length - a.leads.length);
+}
+
+/** «other_school» → «Other school» — сырой код причины без перевода, читаемее чем snake_case. */
+function humanizeReasonKey(key) {
+  return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+}
+
 /**
  * Одна колонка kanban-доски «Заявки» — заголовок (название/счётчик/ⓘ/+) и
  * drop-зона. Читает id перетаскиваемого лида из dataTransfer (см.
@@ -230,7 +318,16 @@ export function groupLeadsByTrialDay(leads) {
 export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, onEditColumn, ...cardActions }) {
   const [dragOver, setDragOver] = useState(false);
   const isTrialScheduled = column.key === 'trial_scheduled';
+  const isWon = column.key === 'won';
+  const isLost = column.key === 'lost';
   const groups = useMemo(() => (isTrialScheduled ? groupLeadsByTrialDay(leads) : null), [isTrialScheduled, leads]);
+  // «Оплачено»/«Отказ» сгруппированы по месяцу вместо жёсткого фильтра «только
+  // текущий месяц», который был раньше (см. комментарий у useMemo(leads) в
+  // LeadsPage.jsx) — dateFields задаёт приоритет полей даты для каждой стадии.
+  const monthGroups = useMemo(
+    () => (isWon ? groupLeadsByMonth(leads, ['paidAt', 'updatedAt']) : isLost ? groupLeadsByMonth(leads, ['lostAt', 'updatedAt']) : null),
+    [isWon, isLost, leads],
+  );
 
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
@@ -283,6 +380,37 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
             <LeadGroup title="Сегодня" leads={groups.today} operatorByUid={operatorByUid} cardActions={cardActions} />
             <LeadGroup title="Завтра" leads={groups.tomorrow} operatorByUid={operatorByUid} cardActions={cardActions} />
             <LeadGroup title="Другой день" leads={groups.other} operatorByUid={operatorByUid} cardActions={cardActions} />
+          </>
+        ) : monthGroups ? (
+          <>
+            {monthGroups.map((month) =>
+              isLost ? (
+                <LeadGroup key={month.key} title={month.label} leads={month.leads} defaultOpen={month.isCurrent}>
+                  <div className="space-y-2">
+                    {groupLeadsByReason(month.leads).map((reason) => (
+                      <LeadGroup
+                        key={reason.key}
+                        title={reason.label}
+                        subtitle={`${reason.percent}% ·`}
+                        leads={reason.leads}
+                        operatorByUid={operatorByUid}
+                        cardActions={cardActions}
+                        defaultOpen={false}
+                      />
+                    ))}
+                  </div>
+                </LeadGroup>
+              ) : (
+                <LeadGroup
+                  key={month.key}
+                  title={month.label}
+                  leads={month.leads}
+                  operatorByUid={operatorByUid}
+                  cardActions={cardActions}
+                  defaultOpen={month.isCurrent}
+                />
+              ),
+            )}
           </>
         ) : (
           leads.map((lead) => {
