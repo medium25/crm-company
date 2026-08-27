@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isToday, isTomorrow, isSameMonth, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronDown, ChevronRight, Info, Plus, CheckCircle2, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Info, Plus, CheckCircle2, XCircle, AlertTriangle, Sun, Clock, Calendar } from 'lucide-react';
 import { LeadCard } from './LeadCard.jsx';
 import { STAGE_COLOR_SWATCHES } from './columns.js';
 import { stageDeadline, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { pluralize } from '../../lib/format.js';
+
+// Цвет круга-иконки в свёрнутой LeadGroup (см. closedIconClassName) — общие
+// для won/lost («Оплачено»/«Отказ» по месяцам) и «Пробный назначен» по дню.
+// Малиновый (не стандартный danger-токен) — тот же оттенок, что уже
+// используется на LeadCard для просрочки, сознательно другой цвет.
+const TONE_SUCCESS = 'bg-success/15 text-success';
+const TONE_DANGER = 'bg-[rgba(190,18,60,0.13)] text-[#BE123C] dark:bg-[rgba(253,164,175,0.15)] dark:text-[#FDA4AF]';
+const TONE_ORANGE = 'bg-orange/15 text-orange';
+const TONE_NAVY = 'bg-navy/15 text-navy';
+const TONE_MUTED = 'bg-border text-muted';
 
 /**
  * Значок «ⓘ» рядом с названием колонки — попап с инструкцией по работе с
@@ -160,15 +170,15 @@ function EditableStageTitle({ column, onEdit }) {
  * `children` (если задан) заменяет автоматический рендер карточек —
  * нужно для вложенных групп причин внутри группы месяца.
  *
- * `closedIcon`/`closedTone`/`closedCaption` — только для верхнего уровня
- * «Оплачено»/«Отказ» (см. вызов в LeadColumn ниже): в свёрнутом виде
- * вместо тонкой строки-заголовка — крупная иконка в цветном круге, месяц
- * и подпись с числом, сразу понятно won/lost без открытия. Остальные
- * группы (Сегодня/Завтра/причины) эти пропсы не передают — используют
- * обычный компактный вид.
- * @param {{title: string, subtitle?: string, leads: Array<Object>, operatorByUid: Map, cardActions: Object, defaultOpen?: boolean, children?: import('react').ReactNode, closedIcon?: import('react').ComponentType, closedTone?: 'success'|'danger', closedCaption?: string}} props
+ * `closedIcon`/`closedIconClassName`/`closedCaption` — верхний уровень
+ * «Оплачено»/«Отказ» по месяцам и «Пробный назначен» по дню (см. вызовы в
+ * LeadColumn ниже): вместо тонкой строки-заголовка — крупная иконка в
+ * цветном круге, название и подпись с числом, сразу понятно смысл группы
+ * без открытия. Вложенные группы причин внутри «Отказ» эти пропсы не
+ * передают — используют обычный компактный вид.
+ * @param {{title: string, subtitle?: string, leads: Array<Object>, operatorByUid: Map, cardActions: Object, defaultOpen?: boolean, children?: import('react').ReactNode, closedIcon?: import('react').ComponentType, closedIconClassName?: string, closedCaption?: string}} props
  */
-function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, defaultOpen = true, children, closedIcon: ClosedIcon, closedTone, closedCaption }) {
+function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, defaultOpen = true, children, closedIcon: ClosedIcon, closedIconClassName, closedCaption }) {
   const [open, setOpen] = useState(defaultOpen);
 
   if (ClosedIcon) {
@@ -179,21 +189,17 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
     // отступа (min-h-[190px] по центру, когда нечего показать под ним,
     // vs компактный py-4, когда список карточек уже виден снизу) и
     // поворот шеврона — сам блок с иконкой остаётся тем же.
-    const toneClasses =
-      closedTone === 'danger'
-        ? 'bg-[rgba(190,18,60,0.13)] text-[#BE123C] dark:bg-[rgba(253,164,175,0.15)] dark:text-[#FDA4AF]'
-        : 'bg-success/15 text-success';
     return (
       <div className="rounded-xl border border-border bg-surface shadow-sm">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className={`relative flex w-full flex-col items-center justify-center gap-2 px-3.5 text-center ${
+          className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-xl px-3.5 text-center focus:outline-none focus:ring-2 focus:ring-navy/15 ${
             open ? 'py-4' : 'min-h-[190px]'
           }`}
         >
           <ChevronRight className={`absolute right-3.5 top-3.5 h-3.5 w-3.5 text-muted transition-transform ${open ? 'rotate-90' : ''}`} />
-          <span className={`flex h-14 w-14 items-center justify-center rounded-full ${toneClasses}`}>
+          <span className={`flex h-14 w-14 items-center justify-center rounded-full ${closedIconClassName}`}>
             <ClosedIcon className="h-6 w-6" />
           </span>
           <span className="text-[17px] font-extrabold text-text">{title}</span>
@@ -227,7 +233,7 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
+        className="flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-3 text-left focus:outline-none focus:ring-2 focus:ring-navy/15"
       >
         <span className="flex items-center gap-1.5 text-[13px] font-bold text-text">
           {open ? <ChevronDown className="h-3.5 w-3.5 text-muted" /> : <ChevronRight className="h-3.5 w-3.5 text-muted" />}
@@ -439,11 +445,43 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
         ) : groups ? (
           <>
             {groups.overdue.length > 0 && (
-              <LeadGroup title="Просроченные" leads={groups.overdue} operatorByUid={operatorByUid} cardActions={cardActions} />
+              <LeadGroup
+                title="Просроченные"
+                leads={groups.overdue}
+                operatorByUid={operatorByUid}
+                cardActions={cardActions}
+                closedIcon={AlertTriangle}
+                closedIconClassName={TONE_DANGER}
+                closedCaption={`${groups.overdue.length} ${pluralize(groups.overdue.length, ['лид', 'лида', 'лидов'])}`}
+              />
             )}
-            <LeadGroup title="Сегодня" leads={groups.today} operatorByUid={operatorByUid} cardActions={cardActions} />
-            <LeadGroup title="Завтра" leads={groups.tomorrow} operatorByUid={operatorByUid} cardActions={cardActions} />
-            <LeadGroup title="Другой день" leads={groups.other} operatorByUid={operatorByUid} cardActions={cardActions} />
+            <LeadGroup
+              title="Сегодня"
+              leads={groups.today}
+              operatorByUid={operatorByUid}
+              cardActions={cardActions}
+              closedIcon={Sun}
+              closedIconClassName={TONE_ORANGE}
+              closedCaption={`${groups.today.length} ${pluralize(groups.today.length, ['лид', 'лида', 'лидов'])}`}
+            />
+            <LeadGroup
+              title="Следующий день"
+              leads={groups.tomorrow}
+              operatorByUid={operatorByUid}
+              cardActions={cardActions}
+              closedIcon={Clock}
+              closedIconClassName={TONE_NAVY}
+              closedCaption={`${groups.tomorrow.length} ${pluralize(groups.tomorrow.length, ['лид', 'лида', 'лидов'])}`}
+            />
+            <LeadGroup
+              title="Другой день"
+              leads={groups.other}
+              operatorByUid={operatorByUid}
+              cardActions={cardActions}
+              closedIcon={Calendar}
+              closedIconClassName={TONE_MUTED}
+              closedCaption={`${groups.other.length} ${pluralize(groups.other.length, ['лид', 'лида', 'лидов'])}`}
+            />
           </>
         ) : monthGroups ? (
           <>
@@ -455,7 +493,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                   leads={month.leads}
                   defaultOpen={month.isCurrent}
                   closedIcon={XCircle}
-                  closedTone="danger"
+                  closedIconClassName={TONE_DANGER}
                   closedCaption={`${month.leads.length} ${pluralize(month.leads.length, ['отказ', 'отказа', 'отказов'])}`}
                 >
                   <div className="space-y-2">
@@ -481,7 +519,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                   cardActions={cardActions}
                   defaultOpen={month.isCurrent}
                   closedIcon={CheckCircle2}
-                  closedTone="success"
+                  closedIconClassName={TONE_SUCCESS}
                   closedCaption={`${month.leads.length} ${pluralize(month.leads.length, ['оплатил', 'оплатили', 'оплатили'])}`}
                 />
               ),
