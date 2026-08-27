@@ -215,7 +215,12 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
         </span>
       </button>
       {open && (
-        <div className="space-y-2 border-t border-border p-2.5">
+        // px-0 (не p-2.5) — раньше горизонтальный паддинг сужал карточки
+        // внутри группы относительно её собственной ширины и относительно
+        // обычных карточек в колонке, получалось «окно в окне». Теперь
+        // карточки идут вплотную к краям группы, вертикальный отступ
+        // остался (py-2.5 + space-y-2 между карточками).
+        <div className="space-y-2 border-t border-border px-0 py-2.5">
           {children ??
             (leads.length === 0 ? (
               <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
