@@ -532,19 +532,22 @@ export function LeadCard({
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
       className={`group relative flex min-h-[190px] flex-col gap-2.5 rounded-xl border bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
-      } ${!overdue && !isTerminal ? 'border-success ring-1 ring-success/40' : ''} ${
+      } ${
         priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''
       }`}
     >
-      {/* Просрочка красит только шапку (заливка + линия под ней) — не всю
-          карточку, как раньше (border-danger ring на корне). Отрицательные
-          margin/rounded-t повторяют скругление карточки, растягивая заливку
-          до самых краёв поверх её собственного p-3.5. */}
+      {/* И просрочка, и «В норме» красят только шапку (заливка + линия под
+          ней) — не всю карточку, как раньше (border-danger/border-success
+          ring на корне). Отрицательные margin/rounded-t повторяют
+          скругление карточки, растягивая заливку до самых краёв поверх её
+          собственного p-3.5. */}
       <div
         className={`flex items-center justify-between gap-2 border-b pb-2.5 ${
           overdue
             ? '-mx-3.5 -mt-3.5 rounded-t-xl border-[rgba(225,29,72,0.26)] bg-[rgba(225,29,72,0.09)] px-3.5 pt-3.5 dark:border-[rgba(251,113,133,0.30)] dark:bg-[rgba(251,113,133,0.13)]'
-            : 'border-border'
+            : !isTerminal
+              ? '-mx-3.5 -mt-3.5 rounded-t-xl border-success/30 bg-success/10 px-3.5 pt-3.5'
+              : 'border-border'
         }`}
       >
         <div className="flex min-w-0 items-center gap-1.5">
