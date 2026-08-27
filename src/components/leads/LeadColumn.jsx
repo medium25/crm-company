@@ -493,7 +493,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                   leads={month.leads}
                   defaultOpen={month.isCurrent}
                   closedIcon={XCircle}
-                  closedIconClassName={TONE_DANGER}
+                  closedIconClassName={month.isCurrent ? TONE_DANGER : TONE_MUTED}
                   closedCaption={`${month.leads.length} ${pluralize(month.leads.length, ['отказ', 'отказа', 'отказов'])}`}
                 >
                   <div className="space-y-2">
@@ -519,7 +519,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                   cardActions={cardActions}
                   defaultOpen={month.isCurrent}
                   closedIcon={CheckCircle2}
-                  closedIconClassName={TONE_SUCCESS}
+                  closedIconClassName={month.isCurrent ? TONE_SUCCESS : TONE_MUTED}
                   closedCaption={`${month.leads.length} ${pluralize(month.leads.length, ['оплатил', 'оплатили', 'оплатили'])}`}
                 />
               ),
