@@ -164,11 +164,11 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-field border border-border bg-surface">
+    <div className="rounded-xl border border-border bg-surface shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+        className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
       >
         <span className="flex items-center gap-1.5 text-[13px] font-bold text-text">
           {open ? <ChevronDown className="h-3.5 w-3.5 text-muted" /> : <ChevronRight className="h-3.5 w-3.5 text-muted" />}
@@ -180,7 +180,7 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
         </span>
       </button>
       {open && (
-        <div className="space-y-2 border-t border-border p-2">
+        <div className="space-y-2 border-t border-border p-2.5">
           {children ??
             (leads.length === 0 ? (
               <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
