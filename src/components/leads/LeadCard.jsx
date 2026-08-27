@@ -271,7 +271,7 @@ function OverdueBadge({ reason, deadline, overdueBy }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Причина просрочки"
-        className="rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger"
+        className="rounded-badge bg-[rgba(225,29,72,0.13)] px-1.5 py-0.5 text-[10px] font-bold text-[#BE123C] dark:bg-[rgba(251,113,133,0.18)] dark:text-[#FDA4AF]"
       >
         {overdueBy || 'Просрочено'}
       </button>
@@ -542,7 +542,9 @@ export function LeadCard({
           до самых краёв поверх её собственного p-3.5. */}
       <div
         className={`flex items-center justify-between gap-2 border-b pb-2.5 ${
-          overdue ? '-mx-3.5 -mt-3.5 rounded-t-xl border-danger/30 bg-danger/10 px-3.5 pt-3.5' : 'border-border'
+          overdue
+            ? '-mx-3.5 -mt-3.5 rounded-t-xl border-[rgba(225,29,72,0.26)] bg-[rgba(225,29,72,0.09)] px-3.5 pt-3.5 dark:border-[rgba(251,113,133,0.30)] dark:bg-[rgba(251,113,133,0.13)]'
+            : 'border-border'
         }`}
       >
         <div className="flex min-w-0 items-center gap-1.5">
