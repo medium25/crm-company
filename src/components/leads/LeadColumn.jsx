@@ -163,8 +163,14 @@ function EditableStageTitle({ column, onEdit }) {
 function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, defaultOpen = true, children }) {
   const [open, setOpen] = useState(defaultOpen);
 
+  // Свёрнутая группа — та же высота, что у LeadCard (min-h-[190px]),
+  // заголовок по центру — чтобы в колонке выглядела как карточка, а не
+  // тонкая полоска-аккордеон. Развёрнутая — высота по контенту, без
+  // навязанного min-height (иначе пустое место под коротким списком).
   return (
-    <div className="rounded-xl border border-border bg-surface shadow-sm">
+    <div
+      className={`rounded-xl border border-border bg-surface shadow-sm ${!open ? 'flex min-h-[190px] flex-col justify-center' : ''}`}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
