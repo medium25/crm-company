@@ -171,24 +171,48 @@ function EditableStageTitle({ column, onEdit }) {
 function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, defaultOpen = true, children, closedIcon: ClosedIcon, closedTone, closedCaption }) {
   const [open, setOpen] = useState(defaultOpen);
 
-  if (!open && ClosedIcon) {
+  if (ClosedIcon) {
+    // Заголовок (иконка + название + подпись) выглядит ОДИНАКОВО что
+    // свёрнуто, что развёрнуто — раньше при клике он мгновенно сжимался в
+    // тонкую строку слева направо, читалось как «карточка сузилась»,
+    // хотя ширина на деле не менялась. Теперь меняется только высота
+    // отступа (min-h-[190px] по центру, когда нечего показать под ним,
+    // vs компактный py-4, когда список карточек уже виден снизу) и
+    // поворот шеврона — сам блок с иконкой остаётся тем же.
     const toneClasses =
       closedTone === 'danger'
         ? 'bg-[rgba(190,18,60,0.13)] text-[#BE123C] dark:bg-[rgba(253,164,175,0.15)] dark:text-[#FDA4AF]'
         : 'bg-success/15 text-success';
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="relative flex min-h-[190px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-border bg-surface shadow-sm"
-      >
-        <ChevronRight className="absolute right-3.5 top-3.5 h-3.5 w-3.5 text-muted" />
-        <span className={`flex h-14 w-14 items-center justify-center rounded-full ${toneClasses}`}>
-          <ClosedIcon className="h-6 w-6" />
-        </span>
-        <span className="text-[17px] font-extrabold text-text">{title}</span>
-        {closedCaption && <span className="text-[13px] font-semibold text-muted">{closedCaption}</span>}
-      </button>
+      <div className="rounded-xl border border-border bg-surface shadow-sm">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className={`relative flex w-full flex-col items-center justify-center gap-2 px-3.5 text-center ${
+            open ? 'py-4' : 'min-h-[190px]'
+          }`}
+        >
+          <ChevronRight className={`absolute right-3.5 top-3.5 h-3.5 w-3.5 text-muted transition-transform ${open ? 'rotate-90' : ''}`} />
+          <span className={`flex h-14 w-14 items-center justify-center rounded-full ${toneClasses}`}>
+            <ClosedIcon className="h-6 w-6" />
+          </span>
+          <span className="text-[17px] font-extrabold text-text">{title}</span>
+          {closedCaption && <span className="text-[13px] font-semibold text-muted">{closedCaption}</span>}
+        </button>
+        {open && (
+          <div className="space-y-2 border-t border-border px-0 py-2.5">
+            {children ??
+              (leads.length === 0 ? (
+                <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
+              ) : (
+                leads.map((lead) => {
+                  const op = operatorByUid.get(lead.assignedOperator);
+                  return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
+                })
+              ))}
+          </div>
+        )}
+      </div>
     );
   }
 
