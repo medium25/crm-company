@@ -185,7 +185,7 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
     // Заголовок (иконка + название + подпись) выглядит ОДИНАКОВО что
     // свёрнуто, что развёрнуто — раньше при клике он мгновенно сжимался в
     // тонкую строку слева направо, читалось как «карточка сузилась»,
-    // хотя ширина на деле не менялась. Высота (min-h-[190px], по центру)
+    // хотя ширина на деле не менялась. Высота (min-h-[215px], по центру)
     // теперь одна и та же в обоих состояниях — раньше открытое состояние
     // переключалось на компактный py-4 и заголовок «уменьшался» при
     // раскрытии, что тоже читалось как баг.
@@ -194,7 +194,7 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="relative flex min-h-[190px] w-full flex-col items-center justify-center gap-2 rounded-xl px-3.5 py-4 text-center focus:outline-none focus:ring-2 focus:ring-navy/15"
+          className="relative flex min-h-[215px] w-full flex-col items-center justify-center gap-2 rounded-xl px-3.5 py-4 text-center focus:outline-none focus:ring-2 focus:ring-navy/15"
         >
           <ChevronRight className={`absolute right-3.5 top-3.5 h-3.5 w-3.5 text-muted transition-transform ${open ? 'rotate-90' : ''}`} />
           <span className={`flex h-14 w-14 items-center justify-center rounded-full ${closedIconClassName}`}>
@@ -226,12 +226,12 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
   }
 
   // Свёрнутая группа без иконки (Сегодня/Завтра/причины) — та же высота,
-  // что у LeadCard (min-h-[190px]), заголовок по центру — чтобы в
+  // что у LeadCard (min-h-[215px]), заголовок по центру — чтобы в
   // колонке выглядела как карточка, а не тонкая полоска-аккордеон.
   // Развёрнутая — высота по контенту, без навязанного min-height.
   return (
     <div
-      className={`rounded-xl border border-border bg-surface shadow-sm ${!open ? 'flex min-h-[190px] flex-col justify-center' : ''}`}
+      className={`rounded-xl border border-border bg-surface shadow-sm ${!open ? 'flex min-h-[215px] flex-col justify-center' : ''}`}
     >
       <button
         type="button"
