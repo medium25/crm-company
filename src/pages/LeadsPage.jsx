@@ -253,7 +253,13 @@ export function LeadsPage() {
   const markAttempt = (lead, result) => {
     const attempts = lead.callAttempts ?? [];
     if (attempts.length >= 5) return;
-    const nextAttempts = [...attempts, { result, at: new Date() }];
+    // expectedBy — дедлайн, действовавший НА МОМЕНТ этой попытки (тот, что
+    // уже лежал на лиде до неё) — нужен для разбора отклонений при отказе
+    // (см. src/lib/leadDeviationAnalysis.js): «просрочка при звонке N»
+    // сравнивает факт (at) с этим дедлайном, а не с тем, что назначается
+    // следующим шагом. null у старых лидов без этого поля — разбор тогда
+    // приблизительно восстанавливает дедлайн по стандартной сетке.
+    const nextAttempts = [...attempts, { result, at: new Date(), expectedBy: lead.nextCallDueAt ?? null }];
 
     const stageFields = {};
     if (columnKeyOf(lead) === 'new') {
@@ -350,7 +356,7 @@ export function LeadsPage() {
         lead,
         title: 'Дедлайн первого касания в «Дожиме»',
         suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
-        onConfirm: (dueDate) => commit({ closingTouchNumber: 0, nextTouchAt: dueDate, unreachableAttempts: [] }),
+        onConfirm: (dueDate) => commit({ closingTouchNumber: 0, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: [] }),
         lockDate: true,
       });
       return;
@@ -369,10 +375,14 @@ export function LeadsPage() {
   const markTouch = (lead) => {
     const nextNumber = (lead.closingTouchNumber ?? 0) + 1;
     const isFinal = nextNumber >= 2;
+    // closingTouchLog — параллельно counter'у closingTouchNumber, только
+    // для разбора отклонений при отказе (leadDeviationAnalysis.js): сам
+    // счётчик не хранит, КОГДА было касание и был ли дедлайн, лог хранит.
+    const nextLog = [...(lead.closingTouchLog ?? []), { at: new Date(), expectedBy: lead.nextTouchAt ?? null }];
     const commit = (dueDate) =>
       patch(
         lead,
-        { closingTouchNumber: nextNumber, nextTouchAt: isFinal ? null : dueDate, unreachableAttempts: [] },
+        { closingTouchNumber: nextNumber, nextTouchAt: isFinal ? null : dueDate, unreachableAttempts: [], closingTouchLog: nextLog },
         `Касание ${nextNumber} отмечено.`,
       );
 
@@ -397,7 +407,11 @@ export function LeadsPage() {
   // «Перенос», и «Неуспешно» одинаково просят новый дедлайн касания
   // (то же поле nextTouchAt, что и у markTouch).
   const markUnreachable = (lead, result) => {
-    const attempts = [...(lead.unreachableAttempts ?? []), { result, at: new Date() }];
+    // expectedBy — тот же смысл, что у markAttempt: дедлайн, действовавший
+    // до этой попытки (для «Дожима» — nextTouchAt, на «Пробном» —
+    // unreachableNextCallDueAt), нужен разбору отклонений при отказе.
+    const expectedBy = (lead.funnelStage === 'closing' ? lead.nextTouchAt : lead.unreachableNextCallDueAt) ?? null;
+    const attempts = [...(lead.unreachableAttempts ?? []), { result, at: new Date(), expectedBy }];
     const attemptsExhausted = attempts.length >= 3;
 
     if (lead.funnelStage === 'closing') {

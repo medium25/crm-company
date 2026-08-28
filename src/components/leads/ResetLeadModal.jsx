@@ -66,6 +66,7 @@ export function ResetLeadModal({ lead, onClose }) {
         rescheduleCount: 0,
         closingTouchNumber: 0,
         nextTouchAt: null,
+        closingTouchLog: [],
         lostReason: null,
         lostReasonDetail: null,
         lostAt: null,
