@@ -212,7 +212,7 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
           <div className="space-y-2 border-t border-border px-0 pb-2.5 pt-[7px]">
             {children ??
               (leads.length === 0 ? (
-                <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
+                <p className="flex min-h-[215px] items-center justify-center text-[13px] text-muted">Пусто</p>
               ) : (
                 leads.map((lead) => {
                   const op = operatorByUid.get(lead.assignedOperator);
@@ -256,7 +256,7 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
         <div className="space-y-2 border-t border-border px-0 py-2.5">
           {children ??
             (leads.length === 0 ? (
-              <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
+              <p className="flex min-h-[215px] items-center justify-center text-[13px] text-muted">Пусто</p>
             ) : (
               leads.map((lead) => {
                 const op = operatorByUid.get(lead.assignedOperator);
