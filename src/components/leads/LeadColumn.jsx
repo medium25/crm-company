@@ -207,9 +207,13 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
           // pt-[7px] а не py-2.5: border-t (1px) + отступ должны в сумме
           // давать те же 8px, что и space-y-2 между обычными карточками
           // колонки — иначе первая карточка внутри группы съезжает на
-          // пару px ниже второй карточки соседней колонки, хотя обе
-          // визуально должны быть на одном уровне.
-          <div className="space-y-2 border-t border-border px-0 pb-2.5 pt-[7px]">
+          // пару px ниже второй карточки соседней колонки. pb-0 по той же
+          // причине: снизу отступа быть не должно — иначе высота всей
+          // раскрытой группы больше суммы такого же числа обычных карточек
+          // (header + N карточек = «N+1 карточек»), и следующая группа
+          // ниже съезжает относительно соседней колонки, накапливая сдвиг
+          // с каждой картой внутри.
+          <div className="space-y-2 border-t border-border px-0 pb-0 pt-[7px]">
             {children ??
               (leads.length === 0 ? (
                 <p className="flex min-h-[215px] items-center justify-center text-[13px] text-muted">Пусто</p>
