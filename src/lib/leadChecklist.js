@@ -19,6 +19,7 @@ export const LEAD_CHECKLIST_ITEMS = [
   { key: 'item_11', label: 'Pul qaytarilishi haqida' },
   { key: 'item_12', label: 'Narx va lokatsiyani aytish' },
   { key: 'item_13', label: 'Telegramga o’tkazish ma’lumot va eslatmalar yuborish' },
+  { key: 'item_14', label: 'Mijozning kontaktidan joy olish (Ism + rus tili deb saqlab qo’yishi shart)' },
 ];
 
 export function checklistCheckedCount(checklist) {
