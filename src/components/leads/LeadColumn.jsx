@@ -204,7 +204,12 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
           {closedCaption && <span className="text-[13px] font-semibold text-muted">{closedCaption}</span>}
         </button>
         {open && (
-          <div className="space-y-2 border-t border-border px-0 py-2.5">
+          // pt-[7px] а не py-2.5: border-t (1px) + отступ должны в сумме
+          // давать те же 8px, что и space-y-2 между обычными карточками
+          // колонки — иначе первая карточка внутри группы съезжает на
+          // пару px ниже второй карточки соседней колонки, хотя обе
+          // визуально должны быть на одном уровне.
+          <div className="space-y-2 border-t border-border px-0 pb-2.5 pt-[7px]">
             {children ??
               (leads.length === 0 ? (
                 <p className="py-2 text-center text-[13px] text-muted">Пусто</p>
