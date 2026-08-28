@@ -450,6 +450,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                 leads={groups.overdue}
                 operatorByUid={operatorByUid}
                 cardActions={cardActions}
+                defaultOpen={false}
                 closedIcon={AlertTriangle}
                 closedIconClassName={TONE_DANGER}
                 closedCaption={`${groups.overdue.length} ${pluralize(groups.overdue.length, ['лид', 'лида', 'лидов'])}`}
@@ -460,6 +461,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
               leads={groups.today}
               operatorByUid={operatorByUid}
               cardActions={cardActions}
+              defaultOpen={false}
               closedIcon={Sun}
               closedIconClassName={TONE_ORANGE}
               closedCaption={`${groups.today.length} ${pluralize(groups.today.length, ['лид', 'лида', 'лидов'])}`}
@@ -469,6 +471,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
               leads={groups.tomorrow}
               operatorByUid={operatorByUid}
               cardActions={cardActions}
+              defaultOpen={false}
               closedIcon={Clock}
               closedIconClassName={TONE_NAVY}
               closedCaption={`${groups.tomorrow.length} ${pluralize(groups.tomorrow.length, ['лид', 'лида', 'лидов'])}`}
@@ -478,6 +481,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
               leads={groups.other}
               operatorByUid={operatorByUid}
               cardActions={cardActions}
+              defaultOpen={false}
               closedIcon={Calendar}
               closedIconClassName={TONE_MUTED}
               closedCaption={`${groups.other.length} ${pluralize(groups.other.length, ['лид', 'лида', 'лидов'])}`}
@@ -491,7 +495,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                   key={month.key}
                   title={month.label}
                   leads={month.leads}
-                  defaultOpen={month.isCurrent}
+                  defaultOpen={false}
                   closedIcon={XCircle}
                   closedIconClassName={month.isCurrent ? TONE_DANGER : TONE_MUTED}
                   closedCaption={`${month.leads.length} ${pluralize(month.leads.length, ['отказ', 'отказа', 'отказов'])}`}
@@ -517,7 +521,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                   leads={month.leads}
                   operatorByUid={operatorByUid}
                   cardActions={cardActions}
-                  defaultOpen={month.isCurrent}
+                  defaultOpen={false}
                   closedIcon={CheckCircle2}
                   closedIconClassName={month.isCurrent ? TONE_SUCCESS : TONE_MUTED}
                   closedCaption={`${month.leads.length} ${pluralize(month.leads.length, ['оплатил', 'оплатили', 'оплатили'])}`}
