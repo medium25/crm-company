@@ -209,10 +209,14 @@ export function StudentsPage() {
   // «Заявки». studentsQuery (effectiveStatus==='all') не фильтрует по
   // status вообще, так что без этого лиды попадали бы и в таблицу, и в счётчик,
   // и в разбивку по учителям (искусственно раздувая «Всего учеников»).
-  const rawStudents = useMemo(
-    () => (section === 'left' ? leftStudents : statusStudents.filter((st) => st.status !== 'lead')),
-    [section, leftStudents, statusStudents],
-  );
+  // Замороженных (status:'paused') та же логика исключает при effectiveStatus
+  // 'all' — у них своя плитка «Замороженные», а плитка «Все ученики»
+  // (summaryCounts.all) их тоже не считает (см. ниже); без этого клик по
+  // плитке открывал таблицу БОЛЬШЕ, чем показанное на ней число.
+  const rawStudents = useMemo(() => {
+    if (section === 'left') return leftStudents;
+    return statusStudents.filter((st) => st.status !== 'lead' && !(effectiveStatus === 'all' && st.status === 'paused'));
+  }, [section, leftStudents, statusStudents, effectiveStatus]);
   const loading = section === 'left' ? leftEnrollmentsLoading || allStudentsLoading : statusLoading;
 
   // Плитки лендинга «Студенты» — свой запрос без фильтров таблицы (`status`/`q`
