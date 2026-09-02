@@ -66,6 +66,8 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
           comment,
           groupId: enrollment?.groupId ?? null,
           groupCode: enrollment?.groupCode ?? null,
+          teacherId: enrollment?.teacherId ?? null,
+          teacherName: enrollment?.teacherName ?? null,
         },
         { uid: user.uid, fullName: staff?.fullName ?? '' },
       );

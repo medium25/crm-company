@@ -277,13 +277,17 @@ export async function chargeMonthly(db, { student, enrollment, group, month, hol
 }
 
 /**
- * Оплата — «Добавить оплату» в карточке студента.
+ * Оплата — «Добавить оплату» в карточке студента. `teacherId`/`teacherName`
+ * приходят с самой записи (enrollment.teacherId/teacherName, см.
+ * AddToGroupModal) — раньше тут всегда писался null, из-за чего фильтр
+ * «Учитель» и отчёт «По учителям» не находили реальные оплаты (находили
+ * только type:'charge' — служебные ежемесячные списания, не сами деньги).
  * @param {import('firebase/firestore').Firestore} db
- * @param {{student: Object, branchId: string, amount: number, method: string, date: Date, comment?: string, groupId?: string, groupCode?: string}} ctx
+ * @param {{student: Object, branchId: string, amount: number, method: string, date: Date, comment?: string, groupId?: string, groupCode?: string, teacherId?: string|null, teacherName?: string|null}} ctx
  * @param {{uid: string, fullName: string}} user
  * @returns {Promise<string>}
  */
-export async function recordPayment(db, { student, branchId, amount, method, date, comment, groupId, groupCode }, user) {
+export async function recordPayment(db, { student, branchId, amount, method, date, comment, groupId, groupCode, teacherId, teacherName }, user) {
   const txId = await writeTransaction(db, {
     branchId,
     studentId: student.id,
@@ -291,8 +295,8 @@ export async function recordPayment(db, { student, branchId, amount, method, dat
     enrollmentId: null,
     groupId: groupId ?? null,
     groupCode: groupCode ?? null,
-    teacherId: null,
-    teacherName: null,
+    teacherId: teacherId ?? null,
+    teacherName: teacherName ?? null,
     type: 'payment',
     amount: Math.abs(amount),
     method,
