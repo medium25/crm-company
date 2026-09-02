@@ -49,12 +49,21 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
   const amountNum = Number(amount) || 0;
   const balanceAfter = (student?.balance ?? 0) + amountNum;
   const activeEnrollments = enrollments.filter((e) => e.status !== 'left' && e.status !== 'archived');
+  // Ровно 1 активная запись — привязываем к ней без выбора (см. ниже,
+  // селектор при этом скрыт). 2+ — оператор обязан выбрать явно (иначе
+  // непонятно, к какой из групп относится оплата); "без группы" больше не
+  // предлагаем как вариант — раньше это давало ~40% оплат в месяц без
+  // учителя, потому что при РОВНО ОДНОЙ группе селектор не показывался
+  // вообще и groupId так и оставался пустым, хотя выбирать было не из чего.
+  const singleEnrollment = activeEnrollments.length === 1 ? activeEnrollments[0] : null;
+  const groupRequired = activeEnrollments.length > 1;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (groupRequired && !groupId) return;
     setSaving(true);
     try {
-      const enrollment = activeEnrollments.find((en) => en.groupId === groupId);
+      const enrollment = singleEnrollment ?? activeEnrollments.find((en) => en.groupId === groupId);
       await recordPayment(
         db,
         {
@@ -81,7 +90,7 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
     }
   };
 
-  const selectedEnrollment = activeEnrollments.find((en) => en.groupId === groupId);
+  const selectedEnrollment = singleEnrollment ?? activeEnrollments.find((en) => en.groupId === groupId);
   const confirmMessage =
     `${student?.fullName ?? ''}: оплата ${formatMoney(amountNum)} (${formatMethod(method)}), ` +
     `дата ${format(new Date(`${date}T00:00:00`), 'dd.MM.yyyy')}` +
@@ -100,7 +109,7 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
             <Button variant="secondary" onClick={onClose}>
               Отмена
             </Button>
-            <Button onClick={() => setConfirming(true)} disabled={!amountNum}>
+            <Button onClick={() => setConfirming(true)} disabled={!amountNum || (groupRequired && !groupId)}>
               Сохранить
             </Button>
           </>
@@ -109,10 +118,11 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
         <form onSubmit={(e) => { e.preventDefault(); setConfirming(true); }} className="flex flex-col gap-4">
           <MoneyInput label="Сумма" required value={amount} onChange={(e) => setAmount(e.target.value)} />
           <Select label="Метод оплаты" options={PAYMENT_METHOD_OPTIONS} value={method} onChange={(e) => setMethod(e.target.value)} />
-          {activeEnrollments.length > 1 && (
+          {groupRequired && (
             <Select
               label="Группа"
-              options={[{ value: '', label: 'Не привязана' }, ...activeEnrollments.map((en) => ({ value: en.groupId, label: en.groupCode }))]}
+              required
+              options={[{ value: '', label: 'Выберите группу' }, ...activeEnrollments.map((en) => ({ value: en.groupId, label: en.groupCode }))]}
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
             />
