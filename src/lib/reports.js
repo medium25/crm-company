@@ -33,7 +33,13 @@ export async function revenueByCourse(db, branchId, from, to) {
   return [...map.entries()].map(([courseName, amount]) => ({ courseName, amount })).sort((a, b) => b.amount - a.amount);
 }
 
-/** Выручка по учителям за период — teacherName уже денормализовано на transactions. */
+/**
+ * Выручка по учителям за период — teacherName уже денормализовано на
+ * transactions. Оплаты за материалы (category:'materials', см.
+ * lib/billing.js recordMaterialPayment — книги и т.п.) сюда не входят:
+ * это деньги учебного центра, не курса, с них учителю процент не
+ * положен.
+ */
 export async function revenueByTeacher(db, branchId, from, to) {
   const snap = await getDocs(
     query(
@@ -47,6 +53,7 @@ export async function revenueByTeacher(db, branchId, from, to) {
   const map = new Map();
   for (const d of snap.docs) {
     const t = d.data();
+    if (t.category === 'materials') continue;
     const name = t.teacherName ?? 'Без учителя';
     map.set(name, (map.get(name) ?? 0) + t.amount);
   }

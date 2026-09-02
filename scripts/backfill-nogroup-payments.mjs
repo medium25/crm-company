@@ -21,8 +21,14 @@ await signInWithEmailAndPassword(auth, process.env.SEED_ADMIN_EMAIL, process.env
 // зачислении"). Однозначно восстановить можно только когда у студента
 // СЕЙЧАС ровно одно активное зачисление — иначе неясно, к какой группе
 // относился платёж, пропускаем.
+// category:'materials' (книги и т.п., см. billing.recordMaterialPayment) —
+// деньги учебного центра, не курса, учителю с них процент не положен,
+// поэтому им group/teacher не положены никогда — сюда не попадают.
+// Отсутствие этого фильтра в первом прогоне этого скрипта ошибочно
+// приписало 8 material-оплат учителям — исправлено отдельно, см.
+// scripts/fix-materials-teacher-leak.mjs.
 const paymentsSnap = await getDocs(query(collection(db, 'transactions'), where('type', '==', 'payment')));
-const targets = paymentsSnap.docs.filter((d) => !d.data().groupId);
+const targets = paymentsSnap.docs.filter((d) => !d.data().groupId && d.data().category !== 'materials');
 console.log(`Оплат без groupId: ${targets.length}`);
 
 const studentIds = [...new Set(targets.map((d) => d.data().studentId))];
