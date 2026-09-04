@@ -12,19 +12,33 @@
  * лист был реально привязан к Google-форме). Опрос по таймеру срабатывает
  * всегда, независимо от способа, которым строка появилась.
  *
+ * Один запуск обрабатывает НЕСКОЛЬКО листов одной таблицы (SHEET_NAMES) —
+ * у всех листов должны быть одинаковые заголовки колонок (один COLUMN_MAP
+ * на все). Если структура колонок отличается между листами — этот файл не
+ * подходит, нужен свой COLUMN_MAP на лист (не реализовано, не было нужно).
+ *
  * Настройка:
  *   1. В таблице: Extensions → Apps Script.
  *   2. Вставь этот файл как Code.gs (или отдельным .gs-файлом в этом проекте).
  *   3. Project Settings → Script Properties:
- *        LEADS_API_URL — Web App URL из appsscript/Code.gs (см. API.md)
- *        LEADS_API_KEY — ключ с scope write (scripts/manage-api-keys.mjs)
- *        SHEET_NAME    — имя листа с лидами (если один лист — можно не задавать)
- *        START_ROW     — номер строки листа, с которой начинать (1 = заголовки,
- *                         2 = первая строка данных); всё раньше игнорируется
- *                         молча. Не задан — обрабатываются все строки.
+ *        LEADS_API_URL   — Web App URL из appsscript/Code.gs (см. API.md)
+ *        LEADS_API_KEY   — ключ с scope write (scripts/manage-api-keys.mjs)
+ *        SHEET_NAMES     — имена листов с лидами через запятую, например
+ *                           "Meta 1, Meta 2, Meta 3". Не задан — берётся
+ *                           SHEET_NAME (один лист, для обратной
+ *                           совместимости), а если и его нет — активный лист.
+ *        SPREADSHEET_ID  — id ДРУГОЙ таблицы (из её URL), если синк должен
+ *                           читать не ту таблицу, к которой скрипт
+ *                           привязан. Не задан — используется таблица-
+ *                           контейнер (обычный случай).
+ *        START_ROW       — номер строки листа, с которой начинать (1 =
+ *                           заголовки, 2 = первая строка данных); всё
+ *                           раньше игнорируется молча. Общий для всех
+ *                           листов. Не задан — обрабатываются все строки.
  *   4. Выбери testSyncOneRow в выпадающем списке функций → Run — проверит
- *      первую несинхронизированную строку и покажет результат в Execution
- *      log, не трогая остальные строки и не ставя триггер.
+ *      первую несинхронизированную строку первого листа из SHEET_NAMES и
+ *      покажет результат в Execution log, не трогая остальные строки и не
+ *      ставя триггер.
  *   5. Когда testSyncOneRow отработал без ошибок — запусти installTrigger
  *      один раз (тоже через Run) — поставит опрос каждую минуту.
  */
@@ -33,7 +47,8 @@
 // точный текст заголовка колонки в таблице. Только 4 поля, по заданию:
 // имя (C), один телефон (D), доп. информация под «i» на карточке (F),
 // время прихода лида (H). 2-raqami (E) и Joylashuvi (G) сознательно не
-// синкаем — не нужны на карточке.
+// синкаем — не нужны на карточке. Один и тот же COLUMN_MAP применяется ко
+// ВСЕМ листам из SHEET_NAMES — заголовки должны совпадать дословно.
 const COLUMN_MAP = {
   fullName: 'Ismi',
   phone: '1-raqami',
@@ -44,16 +59,28 @@ const COLUMN_MAP = {
 const SYNCED_AT_HEADER = 'CRM synced';
 const SYNCED_ID_HEADER = 'CRM lead id';
 const SYNCED_ERROR_HEADER = 'CRM error';
-const MAX_ROWS_PER_RUN = 25; // не бьём rate limit (60/мин на ключ) при большом бэкфилле
+const MAX_ROWS_PER_RUN = 25; // общий бюджет на ВСЕ листы за один тик — не бьём rate limit (60/мин на ключ)
 
 function props_() {
   return PropertiesService.getScriptProperties();
 }
 
-function getSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const name = props_().getProperty('SHEET_NAME');
-  return name ? ss.getSheetByName(name) : ss.getActiveSheet();
+/** Таблица-источник — контейнер по умолчанию, либо SPREADSHEET_ID, если задан. */
+function getSpreadsheet_() {
+  const id = props_().getProperty('SPREADSHEET_ID');
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+}
+
+/** Список имён листов для синка — SHEET_NAMES (через запятую) → SHEET_NAME → активный лист. */
+function getSheetNames_(ss) {
+  const multi = props_().getProperty('SHEET_NAMES');
+  if (multi) {
+    const names = multi.split(',').map((s) => s.trim()).filter(Boolean);
+    if (names.length) return names;
+  }
+  const single = props_().getProperty('SHEET_NAME');
+  if (single) return [single];
+  return [ss.getActiveSheet().getName()];
 }
 
 /** Находит/создаёт служебные колонки (CRM synced/lead id/error), если их ещё нет. */
@@ -89,7 +116,7 @@ function buildPayload_(row, idx) {
     phone: (get('phone') || '').toString().trim(),
     russianLevel: (get('russianLevel') || '').toString().trim() || undefined,
     leadReceivedAt: toIsoDate_(get('leadReceivedAt')) || undefined,
-    source: 'meta_target', // из этой таблицы приходят все с таргета в Meta
+    source: 'meta_target', // из этих таблиц приходят все с таргета в Meta
   };
 }
 
@@ -111,9 +138,54 @@ function sendLead_(payload) {
 }
 
 /**
- * Основной проход — вызывается таймером (см. installTrigger). Обрабатывает
- * до MAX_ROWS_PER_RUN несинхронизированных строк за раз, остальные подберёт
- * следующий запуск (через минуту).
+ * Синкает один лист, обрабатывая не больше budget строк. Возвращает
+ * фактически обработанное количество (списывается с общего бюджета в
+ * syncNewLeadsToCrm_, чтобы три листа вместе не превысили MAX_ROWS_PER_RUN
+ * за один тик).
+ */
+function syncSheet_(sheet, budget) {
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return 0;
+
+  const headers = data[0];
+  const idx = ensureTrackingColumns_(sheet, headers);
+  const syncedCol = idx[SYNCED_AT_HEADER];
+  const idCol = idx[SYNCED_ID_HEADER];
+  const errorCol = idx[SYNCED_ERROR_HEADER];
+
+  const startRowProp = Number(props_().getProperty('START_ROW'));
+  const startIndex = startRowProp && startRowProp > 1 ? startRowProp - 1 : 1;
+
+  let processed = 0;
+  for (let r = startIndex; r < data.length && processed < budget; r++) {
+    const row = data[r];
+    if (row[syncedCol]) continue; // уже отправлена
+
+    const payload = buildPayload_(row, idx);
+    if (!payload.fullName || !payload.phone) {
+      sheet.getRange(r + 1, errorCol + 1).setValue('Нет имени или телефона — пропущена');
+      continue;
+    }
+
+    try {
+      const result = sendLead_(payload);
+      sheet.getRange(r + 1, syncedCol + 1).setValue(new Date());
+      sheet.getRange(r + 1, idCol + 1).setValue(result.id);
+      sheet.getRange(r + 1, errorCol + 1).setValue(result.merged ? 'merged' : '');
+    } catch (err) {
+      sheet.getRange(r + 1, errorCol + 1).setValue(String(err.message || err));
+      Logger.log(`${sheet.getName()}, строка ${r + 1}: ${err.message || err}`);
+    }
+    processed += 1;
+  }
+  return processed;
+}
+
+/**
+ * Основной проход — вызывается таймером (см. installTrigger). Проходит по
+ * всем листам из SHEET_NAMES по очереди, суммарно обрабатывая до
+ * MAX_ROWS_PER_RUN несинхронизированных строк за раз (не на лист, а на все
+ * листы вместе) — остальные подберёт следующий запуск (через минуту).
  *
  * LockService обязателен: при большом бэкфилле один проход (до
  * MAX_ROWS_PER_RUN строк, каждая — блокирующий HTTP-запрос к API) может
@@ -138,57 +210,43 @@ function syncNewLeadsToCrm() {
 }
 
 function syncNewLeadsToCrm_() {
-  const sheet = getSheet_();
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return;
+  const ss = getSpreadsheet_();
+  const sheetNames = getSheetNames_(ss);
+  let budget = MAX_ROWS_PER_RUN;
+  let totalProcessed = 0;
 
-  const headers = data[0];
-  const idx = ensureTrackingColumns_(sheet, headers);
-  const syncedCol = idx[SYNCED_AT_HEADER];
-  const idCol = idx[SYNCED_ID_HEADER];
-  const errorCol = idx[SYNCED_ERROR_HEADER];
-
-  // START_ROW — номер строки листа (как в адресной строке, 1 = заголовки,
-  // 2 = первая строка данных), с которой начинать. Всё раньше — игнорируем
-  // молча, не помечаем synced (не трогаем эти строки вообще). Не задан —
-  // обрабатываются все строки с данными, как раньше.
-  const startRowProp = Number(props_().getProperty('START_ROW'));
-  const startIndex = startRowProp && startRowProp > 1 ? startRowProp - 1 : 1;
-
-  let processed = 0;
-  for (let r = startIndex; r < data.length && processed < MAX_ROWS_PER_RUN; r++) {
-    const row = data[r];
-    if (row[syncedCol]) continue; // уже отправлена
-
-    const payload = buildPayload_(row, idx);
-    if (!payload.fullName || !payload.phone) {
-      sheet.getRange(r + 1, errorCol + 1).setValue('Нет имени или телефона — пропущена');
+  for (const name of sheetNames) {
+    if (budget <= 0) break;
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      Logger.log(`Лист "${name}" не найден в таблице — пропускаю.`);
       continue;
     }
-
-    try {
-      const result = sendLead_(payload);
-      sheet.getRange(r + 1, syncedCol + 1).setValue(new Date());
-      sheet.getRange(r + 1, idCol + 1).setValue(result.id);
-      sheet.getRange(r + 1, errorCol + 1).setValue(result.merged ? 'merged' : '');
-    } catch (err) {
-      sheet.getRange(r + 1, errorCol + 1).setValue(String(err.message || err));
-      Logger.log(`Строка ${r + 1}: ${err.message || err}`);
-    }
-    processed += 1;
+    const processed = syncSheet_(sheet, budget);
+    budget -= processed;
+    totalProcessed += processed;
   }
-  Logger.log(`Обработано строк: ${processed}`);
+  Logger.log(`Обработано строк всего: ${totalProcessed} (листы: ${sheetNames.join(', ')})`);
 }
 
 /**
- * Ручная проверка ОДНОЙ строки — запусти через Run, прежде чем ставить
- * триггер. Ничего не помечает в таблице, только печатает в Execution log,
- * что было бы отправлено и что ответил API. Берёт ту же строку, с которой
- * реально начнёт syncNewLeadsToCrm — учитывает START_ROW, а не всегда
- * первую строку данных.
+ * Ручная проверка ОДНОЙ строки первого листа из SHEET_NAMES — запусти через
+ * Run, прежде чем ставить триггер. Ничего не помечает в таблице, только
+ * печатает в Execution log, что было бы отправлено и что ответил API.
+ * Берёт ту же строку, с которой реально начнёт syncNewLeadsToCrm — учитывает
+ * START_ROW, а не всегда первую строку данных.
  */
 function testSyncOneRow() {
-  const sheet = getSheet_();
+  const ss = getSpreadsheet_();
+  const sheetNames = getSheetNames_(ss);
+  const sheetName = sheetNames[0];
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    Logger.log(`Лист "${sheetName}" не найден в таблице.`);
+    return;
+  }
+  Logger.log(`Проверяю лист: "${sheetName}" (всего в SHEET_NAMES: ${sheetNames.join(', ')})`);
+
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) {
     Logger.log('В листе нет строк с данными.');
