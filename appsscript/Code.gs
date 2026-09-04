@@ -394,6 +394,8 @@ function createLead_(body) {
   const branchId = body.branchId || defaultBranchId_();
   const russianLevel = body.russianLevel ? body.russianLevel.toString().trim() : null;
   const location = body.location ? body.location.toString().trim() : null;
+  const livesInTashkent = body.livesInTashkent ? body.livesInTashkent.toString().trim() : null;
+  const russianLearningReason = body.russianLearningReason ? body.russianLearningReason.toString().trim() : null;
   // Реальное время прихода лида (из Google Sheets) — если передано, кладём
   // как createdAt, чтобы SLA/приоритет считались от него, а не от момента,
   // когда Apps Script дозаписал строку в CRM (может быть позже).
@@ -408,6 +410,8 @@ function createLead_(body) {
       source: body.source || dup.source || null,
       russianLevel: russianLevel || dup.russianLevel || null,
       location: location || dup.location || null,
+      livesInTashkent: livesInTashkent || dup.livesInTashkent || null,
+      russianLearningReason: russianLearningReason || dup.russianLearningReason || null,
       updatedAt: new Date(),
     };
     fsRequest_(
@@ -426,6 +430,8 @@ function createLead_(body) {
     source: body.source || null,
     russianLevel,
     location,
+    livesInTashkent,
+    russianLearningReason,
     branchId,
     publicId: Math.floor(1000000 + Math.random() * 9000000),
     birthDate: null,

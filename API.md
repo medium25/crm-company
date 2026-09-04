@@ -81,6 +81,8 @@ Rate limit: 60 запросов/мин на ключ (Apps Script `CacheService`
   "source": "instagram",
   "russianLevel": "Noldan boshlamoqchiman",
   "location": "Toshkent",
+  "livesInTashkent": "Ha",
+  "russianLearningReason": "Ish uchun kerak",
   "leadReceivedAt": "2026-08-14T08:10:00+05:00"
 }
 ```
@@ -88,12 +90,17 @@ Rate limit: 60 запросов/мин на ключ (Apps Script `CacheService`
 Поля лида — как в `StudentFormModal`: `fullName` (обязательно),
 `phone`/`email` (нужен хотя бы один), `phone2` (опционально),
 `source` — один из `instagram`/`telegram`/`friends`/`outdoor`/`other`.
-Плюс два новых поля под лиды из Google Sheets, хранятся как есть, без
-списка допустимых значений: `russianLevel` (текст ответа на "Rus tilida
-qanday darajadasiz?"), `location` (текст из "Joylashuvi"). `leadReceivedAt`
-(ISO-дата) — необязательный: если передан, именно он идёт в `createdAt`
-лида (а не момент вызова API), чтобы SLA-дедлайны на доске считались от
-реального времени прихода лида, а не от задержки скрипта в Google Sheets.
+Плюс поля под лиды из Google Sheets, хранятся как есть, без списка
+допустимых значений, каждое независимо опционально: `russianLevel` (текст
+ответа на "Rus tilida qanday darajadasiz?", прошлая таблица), `location`
+(текст из "Joylashuvi", прошлая таблица), `livesInTashkent` (ответ на
+"toshkentda_yashaysizmi?"), `russianLearningReason` (ответ на
+"rus_tilini_nima_sababdan_o'rganmoqchisiz?"). Все показываются на карточке
+лида под иконкой «i» (LeadCard → LeadInfoPopover), если заполнены.
+`leadReceivedAt` (ISO-дата) — необязательный: если передан, именно он идёт
+в `createdAt` лида (а не момент вызова API), чтобы SLA-дедлайны на доске
+считались от реального времени прихода лида, а не от задержки скрипта в
+Google Sheets.
 
 Успех:
 

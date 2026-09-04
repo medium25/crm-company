@@ -44,16 +44,17 @@
  */
 
 // Соответствие: ключ — как называется поле в API (см. API.md), значение —
-// точный текст заголовка колонки в таблице. Только 4 поля, по заданию:
-// имя (C), один телефон (D), доп. информация под «i» на карточке (F),
-// время прихода лида (H). 2-raqami (E) и Joylashuvi (G) сознательно не
-// синкаем — не нужны на карточке. Один и тот же COLUMN_MAP применяется ко
-// ВСЕМ листам из SHEET_NAMES — заголовки должны совпадать дословно.
+// точный текст заголовка колонки в таблице. russianLevel/location — с
+// прошлой таблицы, тут не приходят (оставлены в COLUMN_MAP как есть, но
+// buildPayload_ их не шлёт — эта таблица про них не знает). Один и тот же
+// COLUMN_MAP применяется ко ВСЕМ листам из SHEET_NAMES — заголовки должны
+// совпадать дословно.
 const COLUMN_MAP = {
-  fullName: 'Ismi',
-  phone: '1-raqami',
-  russianLevel: 'Rus tilida qanday darajadasiz?',
-  leadReceivedAt: 'Lead tushgan vaqti',
+  fullName: 'ismingiz:',
+  phone: "bog'lanish_uchun_raqam_qoldiring:",
+  leadReceivedAt: 'created_time',
+  livesInTashkent: 'toshkentda_yashaysizmi?',
+  russianLearningReason: "rus_tilini_nima_sababdan_o'rganmoqchisiz?",
 };
 
 const SYNCED_AT_HEADER = 'CRM synced';
@@ -114,8 +115,9 @@ function buildPayload_(row, idx) {
   return {
     fullName: (get('fullName') || '').toString().trim(),
     phone: (get('phone') || '').toString().trim(),
-    russianLevel: (get('russianLevel') || '').toString().trim() || undefined,
     leadReceivedAt: toIsoDate_(get('leadReceivedAt')) || undefined,
+    livesInTashkent: (get('livesInTashkent') || '').toString().trim() || undefined,
+    russianLearningReason: (get('russianLearningReason') || '').toString().trim() || undefined,
     source: 'meta_target', // из этих таблиц приходят все с таргета в Meta
   };
 }

@@ -286,12 +286,13 @@ function OverdueBadge({ reason, deadline, overdueBy }) {
 }
 
 /**
- * Иконка «i» — доп. информация о лиде (напр. russianLevel из синка Google
- * Sheets, см. appsscript/SheetsSync.gs), скрытая с карточки по умолчанию,
- * чтобы не загромождать компактный вид. Рендерится только если есть что
- * показывать.
+ * Иконка «i» — доп. информация о лиде (ответы на вопросы из синка Google
+ * Sheets, см. appsscript/SheetsSync.gs — russianLevel/livesInTashkent/
+ * russianLearningReason), скрытая с карточки по умолчанию, чтобы не
+ * загромождать компактный вид. Рендерится только если есть что показывать.
+ * @param {Array<{question: string, answer: string}>} items
  */
-function LeadInfoPopover({ question, answer }) {
+function LeadInfoPopover({ items }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -320,9 +321,13 @@ function LeadInfoPopover({ question, answer }) {
         <Info className="h-3.5 w-3.5" />
       </button>
       {open && (
-        <div className="absolute inset-x-2.5 top-7 z-20 rounded-field border border-border bg-surface p-3 shadow-hover">
-          <p className="text-[11px] leading-snug text-muted">{question}</p>
-          <p className="mt-1 text-[13px] font-bold leading-snug text-text">{answer}</p>
+        <div className="absolute inset-x-2.5 top-7 z-20 flex flex-col gap-2 rounded-field border border-border bg-surface p-3 shadow-hover">
+          {items.map((item, i) => (
+            <div key={i}>
+              <p className="text-[11px] leading-snug text-muted">{item.question}</p>
+              <p className="mt-0.5 text-[13px] font-bold leading-snug text-text">{item.answer}</p>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -487,6 +492,15 @@ export function LeadCard({
   // не отработан первый SLA на стадии 'new'; дальше по воронке не показываем.
   const priority = stage === 'new' && createdAt ? isPriorityLead(createdAt) : false;
 
+  // Ответы на вопросы из синка Google Sheets (appsscript/SheetsSync.gs) —
+  // russianLevel с прошлой таблицы, остальные два с текущей. Каждое поле
+  // независимо опционально, в попап «i» попадают только заполненные.
+  const infoItems = [
+    lead.russianLevel && { question: 'Rus tilida qanday darajadasiz?', answer: lead.russianLevel },
+    lead.russianLearningReason && { question: "Rus tilini nima sababdan o'rganmoqchisiz?", answer: lead.russianLearningReason },
+    lead.livesInTashkent && { question: 'Toshkentda yashaysizmi?', answer: lead.livesInTashkent },
+  ].filter(Boolean);
+
   const menuItems = [
     // «Пришёл» перенесён на отдельную страницу «Пробные» (там же создаётся
     // сам студент, см. TrialLeadCard) — тут остаётся только «Не пришёл».
@@ -566,9 +580,7 @@ export function LeadCard({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {trialConfirmAtRisk && <PhoneOff className="h-3.5 w-3.5 text-orange" aria-label="Не берёт трубку — подтверждение пробного" />}
-          {lead.russianLevel && (
-            <LeadInfoPopover question="Rus tilida qanday darajadasiz?" answer={lead.russianLevel} />
-          )}
+          {infoItems.length > 0 && <LeadInfoPopover items={infoItems} />}
           <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="truncate text-[12px] text-link">
             {formatPhone(lead.phone)}
           </a>
