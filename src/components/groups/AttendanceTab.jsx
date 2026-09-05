@@ -35,6 +35,16 @@ const todayStart = () => {
 const eligibleFrom = (enrollment) => (enrollment.activatedAt ?? enrollment.addedAt).toDate();
 
 /**
+ * Симметрично eligibleFrom, но с конца: у status=='left' запись остаётся в
+ * enrollments (isArchived не трогается) — без этой отсечки уроки ПОСЛЕ
+ * ухода студента оставались кликабельными, и его можно было по ошибке
+ * отметить в группе, которую он уже покинул (studentIsArchived==false и
+ * status=='left' одновременно с активным enrollment в новой группе —
+ * штатная ситуация при переводе, не баг данных).
+ */
+const eligibleUntil = (enrollment) => (enrollment.status === 'left' && enrollment.leftAt ? enrollment.leftAt.toDate() : null);
+
+/**
  * Вкладка «Посещаемость» карточки группы — 03 · Бизнес-логика §4.
  * @param {Object} props
  * @param {Object} props.group документ группы (Timestamp-поля как из Firestore)
@@ -185,7 +195,10 @@ export function AttendanceTab({ group }) {
       showToast('Нет прав отмечать этот урок.', { type: 'error' });
       return;
     }
-    const eligible = enrollments.filter((en) => lessonDate >= eligibleFrom(en));
+    const eligible = enrollments.filter((en) => {
+      const until = eligibleUntil(en);
+      return lessonDate >= eligibleFrom(en) && !(until && lessonDate > until);
+    });
     setOverrides((prev) => {
       const next = new Map(prev);
       for (const en of eligible) next.set(`${lesson.id}_${en.studentId}`, 'present');
@@ -280,7 +293,8 @@ export function AttendanceTab({ group }) {
                 {enrollments.map((enrollment) =>
                   lessons.map((lesson) => {
                     const lessonDate = lesson.date.toDate();
-                    if (lessonDate < eligibleFrom(enrollment)) {
+                    const until = eligibleUntil(enrollment);
+                    if (lessonDate < eligibleFrom(enrollment) || (until && lessonDate > until)) {
                       return <div key={`${enrollment.id}_${lesson.id}`} className="h-11" />;
                     }
                     const status = getStatus(lesson.id, enrollment.studentId);
