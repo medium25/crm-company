@@ -3,6 +3,7 @@ import {
   collection,
   collectionGroup,
   doc,
+  documentId,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -74,6 +75,18 @@ export function AttendanceTab({ group }) {
     [group.id],
   );
   const { data: enrollments, loading: enrollmentsLoading } = useCollection(enrollmentsQuery);
+
+  // Студент мог быть архивирован напрямую с его карточки — тогда его
+  // enrollment иногда остаётся неархивированным (см. тот же комментарий в
+  // GroupDetailPage.sortedEnrollments). Без этой подстраховки такой студент
+  // пропадал из состава группы, но оставался в сетке посещаемости.
+  const studentIds = useMemo(() => enrollments.map((e) => e.studentId).slice(0, 30), [enrollments]);
+  const studentsQuery = useMemo(
+    () => (db && studentIds.length > 0 ? query(collection(db, 'students'), where(documentId(), 'in', studentIds)) : null),
+    [studentIds],
+  );
+  const { data: rosterStudents } = useCollection(studentsQuery);
+  const studentsById = useMemo(() => new Map(rosterStudents.map((s) => [s.id, s])), [rosterStudents]);
 
   const attendanceQuery = useMemo(
     () => (db ? query(collectionGroup(db, 'attendance'), where('groupId', '==', group.id), where('month', '==', monthStr)) : null),
@@ -196,6 +209,7 @@ export function AttendanceTab({ group }) {
       return;
     }
     const eligible = enrollments.filter((en) => {
+      if (studentsById.get(en.studentId)?.isArchived) return false;
       const until = eligibleUntil(en);
       return lessonDate >= eligibleFrom(en) && !(until && lessonDate > until);
     });
@@ -221,6 +235,7 @@ export function AttendanceTab({ group }) {
   // вовсе, не только ячейки: иначе висит пустая строка с именем, которую
   // невозможно отличить от «просто пока никто не отметил».
   const visibleEnrollments = enrollments.filter((en) => {
+    if (studentsById.get(en.studentId)?.isArchived) return false;
     const until = eligibleUntil(en);
     return lessons.some((l) => {
       const d = l.date.toDate();
