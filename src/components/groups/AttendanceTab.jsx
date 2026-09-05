@@ -216,7 +216,19 @@ export function AttendanceTab({ group }) {
     return <Skeleton className="h-64 w-full" />;
   }
 
-  if (enrollments.length === 0) {
+  // Студент без ЕДИНОГО урока в своём периоде этого месяца (пришёл после
+  // последнего урока месяца, или ушёл до первого) — строку не показываем
+  // вовсе, не только ячейки: иначе висит пустая строка с именем, которую
+  // невозможно отличить от «просто пока никто не отметил».
+  const visibleEnrollments = enrollments.filter((en) => {
+    const until = eligibleUntil(en);
+    return lessons.some((l) => {
+      const d = l.date.toDate();
+      return d >= eligibleFrom(en) && !(until && d > until);
+    });
+  });
+
+  if (visibleEnrollments.length === 0) {
     return <EmptyState icon={Users} title="Пока нет студентов в группе" />;
   }
 
@@ -263,7 +275,7 @@ export function AttendanceTab({ group }) {
           <div className="flex">
             <div className="w-[160px] shrink-0 border-r border-border sm:w-[200px]">
               <div className="flex h-11 items-center bg-surface px-3 text-[15px] font-bold text-text">Имя</div>
-              {enrollments.map((enrollment) => (
+              {visibleEnrollments.map((enrollment) => (
                 <div key={enrollment.id} className="flex h-11 items-center gap-2 bg-surface px-3 text-[15px] text-text">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-alt text-[12px] font-bold text-muted">
                     {enrollment.studentName[0]}
@@ -290,7 +302,7 @@ export function AttendanceTab({ group }) {
                   </button>
                 ))}
 
-                {enrollments.map((enrollment) =>
+                {visibleEnrollments.map((enrollment) =>
                   lessons.map((lesson) => {
                     const lessonDate = lesson.date.toDate();
                     const until = eligibleUntil(enrollment);
@@ -316,7 +328,7 @@ export function AttendanceTab({ group }) {
           </div>
 
           <div className="mt-4 flex flex-col gap-1">
-            {enrollments.map((enrollment) => {
+            {visibleEnrollments.map((enrollment) => {
               // Знаменатель — все уроки группы в месяце (сколько всего будет),
               // не только прошедшие/доступные студенту — по просьбе.
               const presentCount = lessons.filter((l) => getStatus(l.id, enrollment.studentId) === 'present').length;
