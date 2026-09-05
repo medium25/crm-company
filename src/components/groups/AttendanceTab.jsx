@@ -210,6 +210,7 @@ export function AttendanceTab({ group }) {
     }
     const eligible = enrollments.filter((en) => {
       if (studentsById.get(en.studentId)?.isArchived) return false;
+      if (en.status === 'paused') return false;
       const until = eligibleUntil(en);
       return lessonDate >= eligibleFrom(en) && !(until && lessonDate > until);
     });
@@ -236,6 +237,7 @@ export function AttendanceTab({ group }) {
   // невозможно отличить от «просто пока никто не отметил».
   const visibleEnrollments = enrollments.filter((en) => {
     if (studentsById.get(en.studentId)?.isArchived) return false;
+    if (en.status === 'paused') return false;
     const until = eligibleUntil(en);
     return lessons.some((l) => {
       const d = l.date.toDate();
