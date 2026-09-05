@@ -235,15 +235,20 @@ export function AttendanceTab({ group }) {
   // последнего урока месяца, или ушёл до первого) — строку не показываем
   // вовсе, не только ячейки: иначе висит пустая строка с именем, которую
   // невозможно отличить от «просто пока никто не отметил».
-  const visibleEnrollments = enrollments.filter((en) => {
-    if (studentsById.get(en.studentId)?.isArchived) return false;
-    if (en.status === 'paused') return false;
-    const until = eligibleUntil(en);
-    return lessons.some((l) => {
-      const d = l.date.toDate();
-      return d >= eligibleFrom(en) && !(until && d > until);
-    });
-  });
+  const visibleEnrollments = enrollments
+    .filter((en) => {
+      if (studentsById.get(en.studentId)?.isArchived) return false;
+      if (en.status === 'paused') return false;
+      const until = eligibleUntil(en);
+      return lessons.some((l) => {
+        const d = l.date.toDate();
+        return d >= eligibleFrom(en) && !(until && d > until);
+      });
+    })
+    // Тот же порядок, что состав группы (GroupDetailPage, сортировка «По
+    // А-Я» по умолчанию) — иначе строки идут в порядке ответа Firestore,
+    // который не совпадает с тем, что видно в составе.
+    .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ru'));
 
   if (visibleEnrollments.length === 0) {
     return <EmptyState icon={Users} title="Пока нет студентов в группе" />;
