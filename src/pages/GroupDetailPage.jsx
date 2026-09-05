@@ -75,8 +75,14 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
         </span>
       ) : (
         <>
-          {/* balance >= 0 — зелёный: 0 не долг, красным должен гореть только реальный минус. */}
-          <span className={`h-2 w-2 shrink-0 rounded-full ${balance >= 0 ? 'bg-success' : 'bg-danger'}`} title={formatMoney(balance)} />
+          {/* balance >= 0 — зелёный: 0 не долг, красным должен гореть только реальный минус.
+              Учитель (isTeacher) не может читать students (Firestore rules) — rosterStudents
+              для него всегда пуст, student==undefined. Без этой проверки balance тихо
+              становился 0 (?? 0) и кружок ВСЕГДА горел зелёным, даже при реальном долге —
+              показывать неверный статус хуже, чем не показывать никакой. */}
+          {student && (
+            <span className={`h-2 w-2 shrink-0 rounded-full ${balance >= 0 ? 'bg-success' : 'bg-danger'}`} title={formatMoney(balance)} />
+          )}
           <button
             type="button"
             onClick={() => navigate(`/students/${enrollment.studentId}`)}
