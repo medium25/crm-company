@@ -396,6 +396,12 @@ function createLead_(body) {
   const location = body.location ? body.location.toString().trim() : null;
   const livesInTashkent = body.livesInTashkent ? body.livesInTashkent.toString().trim() : null;
   const russianLearningReason = body.russianLearningReason ? body.russianLearningReason.toString().trim() : null;
+  // Полный снимок строки исходной Google-таблицы (все колонки как есть,
+  // включая то, что CRM сама не использует: ad_id, campaign_name,
+  // lead_status и т.п.) — не показывается на карточке, только в её меню
+  // «⋮» (LeadCard → LeadFormDataModal), нужен чтобы сверять/заполнять
+  // ДРУГУЮ таблицу отчётности по выигранным/проигранным лидам.
+  const rawColumns = body.rawColumns && typeof body.rawColumns === 'object' ? body.rawColumns : null;
   // Реальное время прихода лида (из Google Sheets) — если передано, кладём
   // как createdAt, чтобы SLA/приоритет считались от него, а не от момента,
   // когда Apps Script дозаписал строку в CRM (может быть позже).
@@ -412,6 +418,7 @@ function createLead_(body) {
       location: location || dup.location || null,
       livesInTashkent: livesInTashkent || dup.livesInTashkent || null,
       russianLearningReason: russianLearningReason || dup.russianLearningReason || null,
+      rawColumns: rawColumns || dup.rawColumns || null,
       updatedAt: new Date(),
     };
     fsRequest_(
@@ -432,6 +439,7 @@ function createLead_(body) {
     location,
     livesInTashkent,
     russianLearningReason,
+    rawColumns,
     branchId,
     publicId: Math.floor(1000000 + Math.random() * 9000000),
     birthDate: null,

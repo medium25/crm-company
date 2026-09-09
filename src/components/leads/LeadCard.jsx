@@ -7,6 +7,7 @@ import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
+import { LeadFormDataModal } from './LeadFormDataModal.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, isTrialDay, contactDueDate, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay, formatOverdueBy, formatSource } from '../../lib/format.js';
@@ -474,6 +475,7 @@ export function LeadCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const hasComments = (lead.commentsCount ?? 0) > 0;
   const [checklistOpen, setChecklistOpen] = useState(false);
+  const [formDataOpen, setFormDataOpen] = useState(false);
   const checklistChecked = checklistCheckedCount(lead.checklist);
   const checklistPct = checklistPercent(lead.checklist);
 
@@ -506,6 +508,9 @@ export function LeadCard({
     // сам студент, см. TrialLeadCard) — тут остаётся только «Не пришёл».
     ...(stage === 'trial_scheduled' ? [{ label: 'Не пришёл', onClick: () => onRescheduleTrial(lead) }] : []),
     { label: 'Редактировать', onClick: () => onEdit(lead) },
+    // Полный дамп строки Google Sheets (все колонки, не только 3 в
+    // LeadInfoPopover) — только для лидов из синка (rawColumns заполнен).
+    ...(lead.rawColumns ? [{ label: 'Данные из формы', onClick: () => setFormDataOpen(true) }] : []),
     // Пункт виден на любой нетерминальной стадии — реально удаляет только
     // status=='lead' (правило Firestore), для остальных DeleteLeadModal
     // покажет понятную ошибку («есть записи в группу»), не молча блокирует
@@ -720,6 +725,14 @@ export function LeadCard({
         <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} />
       )}
       {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
+
+      {/* Modal рендерится в document.body через портал, но события всплывают
+          по React-дереву, не DOM — без stopPropagation клик внутри модалки
+          (например, «Закрыть») доходил бы до onClick корня карточки и
+          открывал бы её (onOpen). */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <LeadFormDataModal target={formDataOpen ? { lead } : null} onClose={() => setFormDataOpen(false)} />
+      </div>
 
       <span className="-mt-1 text-[10px] text-muted">
         {formatDateTimeShort(lead.createdAt)}

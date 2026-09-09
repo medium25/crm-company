@@ -13,9 +13,13 @@
  * всегда, независимо от способа, которым строка появилась.
  *
  * Один запуск обрабатывает НЕСКОЛЬКО листов одной таблицы (SHEET_NAMES) —
- * у всех листов должны быть одинаковые заголовки колонок (один COLUMN_MAP
+ * у всех листов должны быть одинаковые заголовки колонок (один FIELD_HEADERS
  * на все). Если структура колонок отличается между листами — этот файл не
- * подходит, нужен свой COLUMN_MAP на лист (не реализовано, не было нужно).
+ * подходит, нужен свой FIELD_HEADERS на лист (не реализовано, не было нужно).
+ * Кроме отдельных полей (fullName/phone/...), КАЖДАЯ колонка строки целиком
+ * дублируется на лида в rawColumns — карточка хранит форму как есть, даже
+ * то, что CRM сама не использует (ad_id/campaign_name/lead_status и т.п.),
+ * чтобы потом можно было сверять/заполнять другую таблицу по любому полю.
  *
  * Настройка:
  *   1. В таблице: Extensions → Apps Script.
@@ -44,17 +48,17 @@
  */
 
 // Соответствие: ключ — как называется поле в API (см. API.md), значение —
-// точный текст заголовка колонки в таблице. russianLevel/location — с
-// прошлой таблицы, тут не приходят (оставлены в COLUMN_MAP как есть, но
-// buildPayload_ их не шлёт — эта таблица про них не знает). Один и тот же
-// COLUMN_MAP применяется ко ВСЕМ листам из SHEET_NAMES — заголовки должны
-// совпадать дословно.
-const COLUMN_MAP = {
-  fullName: 'ismingiz:',
-  phone: "bog'lanish_uchun_raqam_qoldiring:",
-  leadReceivedAt: 'created_time',
-  livesInTashkent: 'toshkentda_yashaysizmi?',
-  russianLearningReason: "rus_tilini_nima_sababdan_o'rganmoqchisiz?",
+// список возможных заголовков колонки в таблице (первый найденный
+// выигрывает) — разные формы/кампании в ОДНОЙ таблице подписывают одно и
+// то же поле по-разному (напр. "ismingiz:" на узбекском и "полное_имя" на
+// русском для имени), это не опечатка и не два разных поля. Один и тот же
+// FIELD_HEADERS применяется ко ВСЕМ листам из SHEET_NAMES.
+const FIELD_HEADERS = {
+  fullName: ['ismingiz:', 'полное_имя'],
+  phone: ["bog'lanish_uchun_raqam_qoldiring:", 'номер_телефона'],
+  leadReceivedAt: ['created_time'],
+  livesInTashkent: ['toshkentda_yashaysizmi?'],
+  russianLearningReason: ["rus_tilini_nima_sababdan_o'rganmoqchisiz?"],
 };
 
 const SYNCED_AT_HEADER = 'CRM synced';
@@ -106,18 +110,39 @@ function toIsoDate_(value) {
   return isNaN(parsed) ? null : parsed.toISOString();
 }
 
-function buildPayload_(row, idx) {
-  const get = (apiField) => {
-    const header = COLUMN_MAP[apiField];
+/** Первое непустое значение среди возможных заголовков поля (см. FIELD_HEADERS). */
+function getField_(row, idx, apiField) {
+  for (const header of FIELD_HEADERS[apiField]) {
     const col = idx[header];
-    return col === undefined ? null : row[col];
-  };
+    if (col !== undefined && row[col] !== '' && row[col] != null) return row[col];
+  }
+  return null;
+}
+
+/**
+ * Дамп ВСЕХ колонок строки как есть (кроме служебных CRM synced/lead id/
+ * error) — идёт в rawColumns на лиде, чтобы потом сверять/заполнять другую
+ * таблицу (кто оплатил/отказался) по любому полю формы (ad_id, campaign_name,
+ * form_name, lead_status и т.п.), даже тем, что CRM сама не использует.
+ */
+function dumpRow_(row, headers, trackingCols) {
+  const out = {};
+  headers.forEach((header, i) => {
+    if (trackingCols.has(i) || !header) return;
+    const value = row[i];
+    out[header] = value instanceof Date ? value.toISOString() : value === '' ? null : value;
+  });
+  return out;
+}
+
+function buildPayload_(row, idx, headers, trackingCols) {
   return {
-    fullName: (get('fullName') || '').toString().trim(),
-    phone: (get('phone') || '').toString().trim(),
-    leadReceivedAt: toIsoDate_(get('leadReceivedAt')) || undefined,
-    livesInTashkent: (get('livesInTashkent') || '').toString().trim() || undefined,
-    russianLearningReason: (get('russianLearningReason') || '').toString().trim() || undefined,
+    fullName: (getField_(row, idx, 'fullName') || '').toString().trim(),
+    phone: (getField_(row, idx, 'phone') || '').toString().trim(),
+    leadReceivedAt: toIsoDate_(getField_(row, idx, 'leadReceivedAt')) || undefined,
+    livesInTashkent: (getField_(row, idx, 'livesInTashkent') || '').toString().trim() || undefined,
+    russianLearningReason: (getField_(row, idx, 'russianLearningReason') || '').toString().trim() || undefined,
+    rawColumns: dumpRow_(row, headers, trackingCols),
     source: 'meta_target', // из этих таблиц приходят все с таргета в Meta
   };
 }
@@ -154,6 +179,7 @@ function syncSheet_(sheet, budget) {
   const syncedCol = idx[SYNCED_AT_HEADER];
   const idCol = idx[SYNCED_ID_HEADER];
   const errorCol = idx[SYNCED_ERROR_HEADER];
+  const trackingCols = new Set([syncedCol, idCol, errorCol]);
 
   const startRowProp = Number(props_().getProperty('START_ROW'));
   const startIndex = startRowProp && startRowProp > 1 ? startRowProp - 1 : 1;
@@ -163,7 +189,7 @@ function syncSheet_(sheet, budget) {
     const row = data[r];
     if (row[syncedCol]) continue; // уже отправлена
 
-    const payload = buildPayload_(row, idx);
+    const payload = buildPayload_(row, idx, headers, trackingCols);
     if (!payload.fullName || !payload.phone) {
       sheet.getRange(r + 1, errorCol + 1).setValue('Нет имени или телефона — пропущена');
       continue;
@@ -268,11 +294,12 @@ function testSyncOneRow() {
   Logger.log('Заголовки листа: ' + JSON.stringify(headers));
   Logger.log('START_ROW: ' + (startRowProp || '(не задан, тестируем первую строку данных)'));
   Logger.log(`Проверяю строку листа №${startIndex + 1}`);
-  Logger.log('Сопоставление колонок (COLUMN_MAP → индекс): ' + JSON.stringify(
-    Object.keys(COLUMN_MAP).reduce((acc, k) => ((acc[k] = idx[COLUMN_MAP[k]]), acc), {}),
+  Logger.log('Сопоставление колонок (FIELD_HEADERS → индекс): ' + JSON.stringify(
+    Object.keys(FIELD_HEADERS).reduce((acc, k) => ((acc[k] = FIELD_HEADERS[k].map((h) => idx[h])), acc), {}),
   ));
 
-  const payload = buildPayload_(data[startIndex], idx);
+  const trackingCols = new Set([idx[SYNCED_AT_HEADER], idx[SYNCED_ID_HEADER], idx[SYNCED_ERROR_HEADER]]);
+  const payload = buildPayload_(data[startIndex], idx, headers, trackingCols);
   Logger.log('Payload строки: ' + JSON.stringify(payload));
 
   if (!payload.fullName || !payload.phone) {

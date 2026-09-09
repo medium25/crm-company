@@ -83,6 +83,7 @@ Rate limit: 60 запросов/мин на ключ (Apps Script `CacheService`
   "location": "Toshkent",
   "livesInTashkent": "Ha",
   "russianLearningReason": "Ish uchun kerak",
+  "rawColumns": { "ad_id": "12345", "campaign_name": "...", "lead_status": "" },
   "leadReceivedAt": "2026-08-14T08:10:00+05:00"
 }
 ```
@@ -95,8 +96,16 @@ Rate limit: 60 запросов/мин на ключ (Apps Script `CacheService`
 ответа на "Rus tilida qanday darajadasiz?", прошлая таблица), `location`
 (текст из "Joylashuvi", прошлая таблица), `livesInTashkent` (ответ на
 "toshkentda_yashaysizmi?"), `russianLearningReason` (ответ на
-"rus_tilini_nima_sababdan_o'rganmoqchisiz?"). Все показываются на карточке
+"rus_tilini_nima_sababdan_o'rganmoqchisiz?"). Эти показываются на карточке
 лида под иконкой «i» (LeadCard → LeadInfoPopover), если заполнены.
+
+`rawColumns` — объект `{заголовок_колонки: значение}`, дамп ВСЕХ колонок
+строки таблицы как есть (см. `appsscript/SheetsSync.gs → dumpRow_`), даже
+тех, что CRM не использует ни для чего другого (ad_id/campaign_name/
+form_name/lead_status и т.п.). На карточке НЕ показывается — только в меню
+«⋮» (LeadCard → LeadFormDataModal). Нужен, чтобы позже сверять/заполнять
+отдельную таблицу отчётности (кто оплатил/отказался) по любому полю формы,
+не только тем 4, что CRM хранит отдельными полями.
 `leadReceivedAt` (ISO-дата) — необязательный: если передан, именно он идёт
 в `createdAt` лида (а не момент вызова API), чтобы SLA-дедлайны на доске
 считались от реального времени прихода лида, а не от задержки скрипта в
