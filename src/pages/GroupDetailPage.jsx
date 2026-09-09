@@ -4,6 +4,7 @@ import { collection, doc, documentId, query, where, writeBatch, increment, serve
 import { ArrowLeft, Pencil, Archive, Mail, UserPlus, History, Download, Users } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { useRole } from '../hooks/useRole.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { useCollection } from '../hooks/useCollection.js';
 import { useToast } from '../components/ui/Toast.jsx';
@@ -48,6 +49,7 @@ const SORT_OPTIONS = [
 ];
 
 function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, onActivate, onTransfer }) {
+  const { isTeacher } = useRole();
   const balance = student?.balance ?? 0;
   const isTrial = enrollment.status === 'trial';
   const isPaused = enrollment.status === 'paused';
@@ -76,12 +78,15 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
       ) : (
         <>
           {/* balance >= 0 — зелёный: 0 не долг, красным должен гореть только реальный минус.
-              Учитель (isTeacher) не может читать students (Firestore rules) — rosterStudents
-              для него всегда пуст, student==undefined. Без этой проверки balance тихо
-              становился 0 (?? 0) и кружок ВСЕГДА горел зелёным, даже при реальном долге —
-              показывать неверный статус хуже, чем не показывать никакой. */}
+              students читают все авторизованные (см. firestore.rules) — учитель
+              видит настоящий цвет, но не сумму: title (точный баланс) только
+              не-учителю, кружок сам по себе суммы не раскрывает. Без student
+              (сеть/гонка загрузки) кружок не рисуем вовсе — не гадаем цвет. */}
           {student && (
-            <span className={`h-2 w-2 shrink-0 rounded-full ${balance >= 0 ? 'bg-success' : 'bg-danger'}`} title={formatMoney(balance)} />
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${balance >= 0 ? 'bg-success' : 'bg-danger'}`}
+              title={isTeacher ? undefined : formatMoney(balance)}
+            />
           )}
           <button
             type="button"

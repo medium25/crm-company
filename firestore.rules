@@ -46,9 +46,12 @@ service cloud.firestore {
     }
 
     match /students/{id} {
-      // read без isTeacher() — учитель не должен листать всю базу студентов,
-      // ростер своей группы он видит через enrollments (широкое read ниже).
-      allow read:   if isAdmin();
+      // Раньше read был только isAdmin() — учителю индикатор баланса в
+      // составе группы (GroupDetailPage) молча показывал 0/зелёный вместо
+      // реального цвета, т.к. запрос students падал целиком. Открыто как у
+      // остальных коллекций (groups/lessons/enrollments) сознательно —
+      // сумму баланса от учителя прячет UI (title у кружка), не правила.
+      allow read:   if request.auth != null;
       allow create: if isAdmin() && inBranch(request.resource.data.branchId);
       allow update: if isAdmin() && inBranch(resource.data.branchId);
       // Жёсткое удаление — только для настоящих лидов (status=='lead',
