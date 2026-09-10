@@ -13,7 +13,7 @@ import {
   orderBy,
   serverTimestamp,
 } from 'firebase/firestore';
-import { format, addMonths, subMonths, startOfMonth } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Users } from 'lucide-react';
 import { db } from '../../firebase.js';
@@ -32,8 +32,14 @@ const todayStart = () => {
   return d;
 };
 
-/** activatedAt приходит только у активных записей — у пробных берём addedAt. */
-const eligibleFrom = (enrollment) => (enrollment.activatedAt ?? enrollment.addedAt).toDate();
+/**
+ * activatedAt приходит только у активных записей — у пробных берём addedAt.
+ * startOfDay: сверяем по КАЛЕНДАРНОМУ дню, не по точному времени. Пробного
+ * часто заводят в CRM в день урока, но ПОСЛЕ занятия (или урок записан на
+ * начало дня) — без округления до дня ячейка того же дня пропадала, хотя
+ * студент реально был на пробном (за который берём плату).
+ */
+const eligibleFrom = (enrollment) => startOfDay((enrollment.activatedAt ?? enrollment.addedAt).toDate());
 
 /**
  * Симметрично eligibleFrom, но с конца: у status=='left' запись остаётся в
@@ -43,7 +49,8 @@ const eligibleFrom = (enrollment) => (enrollment.activatedAt ?? enrollment.added
  * status=='left' одновременно с активным enrollment в новой группе —
  * штатная ситуация при переводе, не баг данных).
  */
-const eligibleUntil = (enrollment) => (enrollment.status === 'left' && enrollment.leftAt ? enrollment.leftAt.toDate() : null);
+const eligibleUntil = (enrollment) =>
+  enrollment.status === 'left' && enrollment.leftAt ? startOfDay(enrollment.leftAt.toDate()) : null;
 
 /**
  * Вкладка «Посещаемость» карточки группы — 03 · Бизнес-логика §4.
@@ -208,11 +215,12 @@ export function AttendanceTab({ group }) {
       showToast('Нет прав отмечать этот урок.', { type: 'error' });
       return;
     }
+    const lessonDay = startOfDay(lessonDate);
     const eligible = enrollments.filter((en) => {
       if (studentsById.get(en.studentId)?.isArchived) return false;
       if (en.status === 'paused') return false;
       const until = eligibleUntil(en);
-      return lessonDate >= eligibleFrom(en) && !(until && lessonDate > until);
+      return lessonDay >= eligibleFrom(en) && !(until && lessonDay > until);
     });
     setOverrides((prev) => {
       const next = new Map(prev);
@@ -241,7 +249,7 @@ export function AttendanceTab({ group }) {
       if (en.status === 'paused') return false;
       const until = eligibleUntil(en);
       return lessons.some((l) => {
-        const d = l.date.toDate();
+        const d = startOfDay(l.date.toDate());
         return d >= eligibleFrom(en) && !(until && d > until);
       });
     })
@@ -327,8 +335,9 @@ export function AttendanceTab({ group }) {
                 {visibleEnrollments.map((enrollment) =>
                   lessons.map((lesson) => {
                     const lessonDate = lesson.date.toDate();
+                    const lessonDay = startOfDay(lessonDate);
                     const until = eligibleUntil(enrollment);
-                    if (lessonDate < eligibleFrom(enrollment) || (until && lessonDate > until)) {
+                    if (lessonDay < eligibleFrom(enrollment) || (until && lessonDay > until)) {
                       return <div key={`${enrollment.id}_${lesson.id}`} className="h-11" />;
                     }
                     const status = getStatus(lesson.id, enrollment.studentId);
