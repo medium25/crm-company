@@ -26,11 +26,35 @@ import { SalesStatsPage } from './pages/SalesStatsPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { UiKitShowcasePage } from './pages/UiKitShowcasePage.jsx';
 
+// section → путь первого экрана этого раздела — для редиректа теста на
+// разрешённый экран (Sidebar.ITEMS держит то же самое для пунктов меню,
+// тут своя копия — секций мало и они не меняются часто).
+const SECTION_PATHS = {
+  leads: '/leads',
+  trials: '/trials',
+  students: '/students',
+  teachersGroups: '/teachers-groups',
+  payments: '/payments',
+  reports: '/reports',
+};
+
 // Учитель в меню не видит «Дашборд» — прямой заход на '/' уводит его сразу
-// в «Учителя и группы», чтобы не показывать общий дашборд по URL в обход меню.
+// в «Учителя и группы», чтобы не показывать общий дашборд по URL в обход
+// меню. Тест — так же, на первый разрешённый ему раздел (staff.allowedSections);
+// если у него вообще нет разрешённых разделов — понятное сообщение, не пустой дашборд.
 function HomeRoute() {
-  const { isTeacher } = useRole();
-  return isTeacher ? <Navigate to="/teachers-groups" replace /> : <DashboardPage />;
+  const { isTeacher, isTest, allowedSections } = useRole();
+  if (isTeacher) return <Navigate to="/teachers-groups" replace />;
+  if (isTest) {
+    const firstPath = allowedSections.map((key) => SECTION_PATHS[key]).find(Boolean);
+    if (firstPath) return <Navigate to={firstPath} replace />;
+    return (
+      <div className="flex h-full items-center justify-center p-10 text-center text-[15px] text-muted">
+        Нет доступных разделов — обратитесь к администратору.
+      </div>
+    );
+  }
+  return <DashboardPage />;
 }
 
 function App() {
@@ -50,15 +74,78 @@ function App() {
                 }
               >
                 <Route index element={<HomeRoute />} />
-                <Route path="leads" element={<LeadsPage />} />
-                <Route path="trials" element={<TrialsPage />} />
-                <Route path="students" element={<StudentsPage />} />
-                <Route path="students/:id" element={<StudentDetailPage />} />
-                <Route path="teachers-groups" element={<TeachersAndGroupsPage />} />
-                <Route path="groups" element={<GroupsPage />} />
-                <Route path="groups/:id" element={<GroupDetailPage />} />
-                <Route path="teachers" element={<TeachersPage />} />
-                <Route path="teachers/:id" element={<TeacherDetailPage />} />
+                <Route
+                  path="leads"
+                  element={
+                    <ProtectedRoute section="leads">
+                      <LeadsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="trials"
+                  element={
+                    <ProtectedRoute section="trials">
+                      <TrialsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="students"
+                  element={
+                    <ProtectedRoute section="students">
+                      <StudentsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="students/:id"
+                  element={
+                    <ProtectedRoute section="students">
+                      <StudentDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="teachers-groups"
+                  element={
+                    <ProtectedRoute section="teachersGroups">
+                      <TeachersAndGroupsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="groups"
+                  element={
+                    <ProtectedRoute section="teachersGroups">
+                      <GroupsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="groups/:id"
+                  element={
+                    <ProtectedRoute section="teachersGroups">
+                      <GroupDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="teachers"
+                  element={
+                    <ProtectedRoute section="teachersGroups">
+                      <TeachersPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="teachers/:id"
+                  element={
+                    <ProtectedRoute section="teachersGroups">
+                      <TeacherDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="courses"
                   element={
@@ -75,11 +162,46 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route path="payments" element={<PaymentsPage />} />
-                <Route path="reports" element={<ReportsLandingPage />} />
-                <Route path="reports/list" element={<ReportsPage />} />
-                <Route path="reports/stats" element={<StatsDepartmentsPage />} />
-                <Route path="reports/stats/sales" element={<SalesStatsPage />} />
+                <Route
+                  path="payments"
+                  element={
+                    <ProtectedRoute section="payments">
+                      <PaymentsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="reports"
+                  element={
+                    <ProtectedRoute section="reports">
+                      <ReportsLandingPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="reports/list"
+                  element={
+                    <ProtectedRoute section="reports">
+                      <ReportsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="reports/stats"
+                  element={
+                    <ProtectedRoute section="reports">
+                      <StatsDepartmentsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="reports/stats/sales"
+                  element={
+                    <ProtectedRoute section="reports">
+                      <SalesStatsPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="settings"
                   element={

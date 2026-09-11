@@ -6,9 +6,18 @@ service cloud.firestore {
     function role()       { return staff().role; }
     function branches()   { return staff().branchIds; }
     function inBranch(b)  { return b in branches(); }
-    // ceo/manager/admin — равнозначные должности полного доступа.
-    function isAdmin()    { return role() in ['ceo', 'manager', 'admin']; }
+    // ceo/manager/admin — равнозначные должности полного доступа. test —
+    // тестовый сотрудник (UI показывает ему только выбранные разделы,
+    // staff.allowedSections), но на бэкенде по правам приравнен к admin —
+    // это осознанный компромисс: без этого «Заявки»/«Студенты» физически
+    // не открылись бы (students/transactions читаются только isAdmin()),
+    // а точечное разграничение по разделам внутри одной коллекции students
+    // (лиды и студенты — одна и та же коллекция) для правил не стоило
+    // усложнения. Ограничен так же, как admin — см. match /staff ниже.
+    function isAdmin()    { return role() in ['ceo', 'manager', 'admin', 'test']; }
     function isTeacher()  { return role() == 'teacher'; }
+    // admin/test — не полноправные, ограничены ниже (staff/branches/courses и т.п.).
+    function isCapped()   { return role() in ['admin', 'test']; }
     function teachesGroup(gid) {
       return isTeacher() &&
         get(/databases/$(db)/documents/groups/$(gid)).data.teacherId == staff().teacherId;
@@ -16,13 +25,13 @@ service cloud.firestore {
 
     match /staff/{uid} {
       allow read: if request.auth.uid == uid || isAdmin();
-      // admin (в отличие от ceo/manager) может заводить и трогать только
-      // учителей — не должен уметь назначать роль ceo/manager/admin себе
-      // или кому-либо ещё. UI это же прячет (lib/roles.js), это отдельная,
-      // непробиваемая через devtools проверка.
-      allow create: if isAdmin() && (role() != 'admin' || request.resource.data.role == 'teacher');
-      allow update: if isAdmin() && (role() != 'admin' || (resource.data.role == 'teacher' && request.resource.data.role == 'teacher'));
-      allow delete: if isAdmin() && (role() != 'admin' || resource.data.role == 'teacher');
+      // admin/test (в отличие от ceo/manager) может заводить и трогать
+      // только учителей — не должен уметь назначать роль ceo/manager/
+      // admin/test себе или кому-либо ещё. UI это же прячет (lib/roles.js),
+      // это отдельная, непробиваемая через devtools проверка.
+      allow create: if isAdmin() && (!isCapped() || request.resource.data.role == 'teacher');
+      allow update: if isAdmin() && (!isCapped() || (resource.data.role == 'teacher' && request.resource.data.role == 'teacher'));
+      allow delete: if isAdmin() && (!isCapped() || resource.data.role == 'teacher');
     }
 
     match /branches/{id} {

@@ -5,10 +5,11 @@ import { useRole } from '../../hooks/useRole.js';
 import { GlobalSearch } from './GlobalSearch.jsx';
 
 const ROLE_LABELS = {
-  owner: 'Владелец',
+  ceo: 'CEO',
+  manager: 'Менеджер',
   admin: 'Администратор',
   teacher: 'Учитель',
-  accountant: 'Бухгалтер',
+  test: 'Тестовый сотрудник',
 };
 
 /**

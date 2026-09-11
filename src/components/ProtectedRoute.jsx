@@ -9,11 +9,14 @@ import { Skeleton } from './ui/Skeleton.jsx';
  * показывает точную причину блокировки.
  * @param {Object} props
  * @param {import('../types.js').Role[]} [props.allow] если указан — доступ только этим ролям
+ * @param {string} [props.section] ключ раздела (Sidebar.ITEMS) — для role === 'test' доступ только если
+ *   раздел есть в staff.allowedSections; для остальных ролей не проверяется (у них доступ по allow/роли).
+ *   Прячет доступ только с прямого захода по URL — та же UI-защита, что и остальные роли (не Firestore rules).
  * @param {import('react').ReactNode} props.children
  */
-export function ProtectedRoute({ allow, children }) {
+export function ProtectedRoute({ allow, section, children }) {
   const { user, staff, loading } = useAuth();
-  const { role } = useRole();
+  const { role, isTest, allowedSections } = useRole();
 
   if (loading) {
     return (
@@ -29,6 +32,10 @@ export function ProtectedRoute({ allow, children }) {
   }
 
   if (allow && !allow.includes(role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (isTest && section && !allowedSections.includes(section)) {
     return <Navigate to="/" replace />;
   }
 

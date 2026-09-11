@@ -37,7 +37,12 @@ const ITEMS = [
   { key: 'settings', to: '/settings', label: 'Настройки', icon: Settings },
 ];
 
-/** ceo/manager/admin — полный доступ, teacher — только «Учителя и группы» (те же группы, что раньше). */
+/**
+ * ceo/manager/admin — полный доступ, teacher — только «Учителя и группы»
+ * (те же группы, что раньше). test — набор не фиксирован тут, у каждого
+ * сотрудника свой (см. staff.allowedSections, ручная настройка в
+ * AddStaffModal) — см. использование ниже.
+ */
 const ROLE_ITEM_KEYS = {
   ceo: ['dashboard', 'leads', 'trials', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
   manager: ['dashboard', 'leads', 'trials', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
@@ -52,7 +57,7 @@ const ROLE_ITEM_KEYS = {
  * @param {() => void} [props.onMobileClose]
  */
 export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
-  const { role } = useRole();
+  const { role, isTest, allowedSections } = useRole();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(STORAGE_KEY) === '1');
 
   const toggle = () => {
@@ -63,7 +68,7 @@ export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
     });
   };
 
-  const visibleKeys = ROLE_ITEM_KEYS[role] ?? [];
+  const visibleKeys = isTest ? allowedSections : (ROLE_ITEM_KEYS[role] ?? []);
   const items = ITEMS.filter((item) => visibleKeys.includes(item.key));
 
   return (

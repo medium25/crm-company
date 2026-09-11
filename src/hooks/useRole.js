@@ -9,6 +9,8 @@ import { useAuth } from './useAuth.js';
  *   branchIds: string[],
  *   isAdmin: boolean,
  *   isTeacher: boolean,
+ *   isTest: boolean,
+ *   allowedSections: string[],
  *   hasRole: (...roles: import('../types.js').Role[]) => boolean,
  * }}
  */
@@ -22,6 +24,11 @@ export function useRole() {
     branchIds,
     isAdmin: role === 'ceo' || role === 'manager' || role === 'admin',
     isTeacher: role === 'teacher',
+    isTest: role === 'test',
+    // Только для role === 'test' — какие разделы меню ему вручную открыли
+    // (см. AddStaffModal, Sidebar.ROLE_ITEM_KEYS). У остальных ролей пусто,
+    // у них список разделов фиксирован по роли, не по сотруднику.
+    allowedSections: staff?.allowedSections ?? [],
     hasRole: (...roles) => roles.includes(role),
   };
 }

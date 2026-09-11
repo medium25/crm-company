@@ -13,7 +13,7 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
-import { ROLE_OPTIONS, assignableRoleOptions } from '../../lib/roles.js';
+import { ROLE_OPTIONS, TEST_SECTION_OPTIONS, assignableRoleOptions } from '../../lib/roles.js';
 
 const teachersQuery = db ? query(collection(db, 'teachers'), where('isArchived', '==', false), orderBy('displayName')) : null;
 
@@ -48,6 +48,7 @@ export function AddStaffModal({ member, onClose }) {
   const [passwordEdited, setPasswordEdited] = useState(false);
   const [role, setRole] = useState('teacher');
   const [teacherId, setTeacherId] = useState('');
+  const [allowedSections, setAllowedSections] = useState([]);
   const [saving, setSaving] = useState(false);
 
   const isEdit = Boolean(member?.id);
@@ -64,6 +65,7 @@ export function AddStaffModal({ member, onClose }) {
     setPasswordEdited(false);
     setRole(member.role ?? 'teacher');
     setTeacherId(member.teacherId ?? '');
+    setAllowedSections(member.allowedSections ?? []);
   }, [member]);
 
   const reset = () => {
@@ -73,6 +75,11 @@ export function AddStaffModal({ member, onClose }) {
     setPasswordEdited(false);
     setRole('teacher');
     setTeacherId('');
+    setAllowedSections([]);
+  };
+
+  const toggleSection = (key) => {
+    setAllowedSections((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
   const handleClose = () => {
@@ -95,6 +102,7 @@ export function AddStaffModal({ member, onClose }) {
           fullName,
           role,
           teacherId: role === 'teacher' ? teacherId || null : null,
+          allowedSections: role === 'test' ? allowedSections : [],
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
         });
@@ -118,6 +126,7 @@ export function AddStaffModal({ member, onClose }) {
             role,
             branchIds: activeBranchId ? [activeBranchId] : [],
             teacherId: role === 'teacher' ? teacherId || null : null,
+            allowedSections: role === 'test' ? allowedSections : [],
             isActive: true,
             createdAt: serverTimestamp(),
             createdBy: user.uid,
@@ -223,6 +232,27 @@ export function AddStaffModal({ member, onClose }) {
             value={teacherId}
             onChange={(e) => setTeacherId(e.target.value)}
           />
+        )}
+
+        {role === 'test' && (
+          <div>
+            <span className="mb-1 block text-[13px] text-muted">Доступные разделы</span>
+            <div className="flex flex-col gap-1.5 rounded-field border border-border-strong p-3">
+              {TEST_SECTION_OPTIONS.map((opt) => (
+                <label key={opt.value} className="flex items-center gap-2 text-[14px] text-text">
+                  <input
+                    type="checkbox"
+                    checked={allowedSections.includes(opt.value)}
+                    onChange={() => toggleSection(opt.value)}
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+            {allowedSections.length === 0 && (
+              <p className="mt-1 text-[12px] text-danger">Не выбрано ни одного раздела — сотрудник не увидит меню совсем.</p>
+            )}
+          </div>
         )}
 
         {!isEdit && (

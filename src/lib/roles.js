@@ -3,6 +3,17 @@ export const ROLE_OPTIONS = [
   { value: 'manager', label: 'Менеджер' },
   { value: 'admin', label: 'Администратор' },
   { value: 'teacher', label: 'Учитель' },
+  { value: 'test', label: 'Тестовый сотрудник' },
+];
+
+/** Ключи разделов меню, доступные для ручного выбора у роли test — см. Sidebar.ITEMS. */
+export const TEST_SECTION_OPTIONS = [
+  { value: 'leads', label: 'Заявки' },
+  { value: 'trials', label: 'Пробные' },
+  { value: 'students', label: 'Студенты' },
+  { value: 'teachersGroups', label: 'Учителя и группы' },
+  { value: 'payments', label: 'Финансы' },
+  { value: 'reports', label: 'Отчёты и статистика' },
 ];
 
 /**
