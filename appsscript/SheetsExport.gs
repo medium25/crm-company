@@ -132,12 +132,14 @@ const FALLBACK_FIELDS = {
   created_time: (lead) => lead.createdAt || '',
 };
 
+const NO_DATA = 'нет данных';
+
 function leadRow_(lead) {
   const raw = lead.rawColumns || {};
   const hasRaw = Boolean(lead.rawColumns);
   const key = leadKey_(lead);
   return HEADER.map((h) => {
-    if (h === 'Ответственный') return lead.assignedOperatorName || '';
+    if (h === 'Ответственный') return lead.assignedOperatorName || NO_DATA;
     // 'id' — всегда ключ сопоставления (leadKey_), не raw['id'] напрямую:
     // у лидов без rawColumns (заведены до этой фичи, или вручную) raw
     // пустой, и колонка id молча оставалась пустой — readSheetIndex_ такую
@@ -145,8 +147,12 @@ function leadRow_(lead) {
     // она плодилась заново дублем вместо апдейта на месте.
     if (h === 'id') return key;
     const v = raw[h];
-    if (v !== undefined && v !== null) return v;
-    return !hasRaw && FALLBACK_FIELDS[h] ? FALLBACK_FIELDS[h](lead) : '';
+    if (v !== undefined && v !== null && v !== '') return v;
+    const fallback = !hasRaw && FALLBACK_FIELDS[h] ? FALLBACK_FIELDS[h](lead) : '';
+    // Ни одна ячейка не должна оставаться пустой — вместо этого честно
+    // пишем «нет данных», чтобы визуально не путать с «строка сломана»
+    // (пустой id/дубль) или «поле реально пустое в форме».
+    return fallback || NO_DATA;
   });
 }
 
