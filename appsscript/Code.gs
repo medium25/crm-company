@@ -960,6 +960,30 @@ function installTelegramCommandPolling() {
   Logger.log('Опрос команд Telegram запущен — раз в минуту.');
 }
 
+/**
+ * uid assignedOperator → staff.fullName, с кэшем на один вызов doGet — в
+ * list-ответе одни и те же операторы повторяются на десятках лидов, не
+ * должны читаться из Firestore заново на каждую строку.
+ */
+function resolveOperatorName_(uid, cache) {
+  if (!uid) return null;
+  if (Object.prototype.hasOwnProperty.call(cache, uid)) return cache[uid];
+  const doc = fsGetOptional_(`/staff/${uid}`);
+  const name = doc ? fromFsDoc_(doc).fullName || null : null;
+  cache[uid] = name;
+  return name;
+}
+
+/** Добавляет assignedOperatorName к одному лиду или массиву — мутирует на месте. */
+function enrichOperatorNames_(leadOrList) {
+  const cache = {};
+  const list = Array.isArray(leadOrList) ? leadOrList : [leadOrList];
+  list.forEach((l) => {
+    l.assignedOperatorName = resolveOperatorName_(l.assignedOperator, cache);
+  });
+  return leadOrList;
+}
+
 function doGet(e) {
   return handle_(() => {
     const params = e.parameter || {};
@@ -970,10 +994,12 @@ function doGet(e) {
       if (!params.id) throw apiError_(400, 'Параметр id обязателен.');
       const doc = fsGetOptional_(`/students/${params.id}`);
       if (!doc) throw apiError_(404, 'Лид не найден.');
-      return { status: 200, data: fromFsDoc_(doc) };
+      return { status: 200, data: enrichOperatorNames_(fromFsDoc_(doc)) };
     }
 
     authenticate_(params.apiKey, 'read');
-    return { status: 200, ...listLeads_(params) };
+    const result = listLeads_(params);
+    enrichOperatorNames_(result.data);
+    return { status: 200, ...result };
   });
 }

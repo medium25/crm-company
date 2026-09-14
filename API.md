@@ -162,6 +162,12 @@ curl -G '<WEB_APP_URL>' \
 { "status": 200, "data": [ { "id": "...", "fullName": "...", "funnelStage": "new", ... } ], "page": 1, "per_page": 50, "total": 3 }
 ```
 
+Каждый элемент `data` (и ответ `action=get`) дополнительно несёт
+`assignedOperatorName` — имя оператора, резолвится сервером из
+`assignedOperator` (uid) в `staff/{uid}.fullName`, чтобы клиенту (напр.
+`appsscript/SheetsExport.gs`) не нужно было делать отдельный запрос на
+каждого оператора.
+
 ## `GET <WEB_APP_URL>?action=get&id=...` — один лид
 
 ```bash
