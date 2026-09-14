@@ -120,8 +120,21 @@ function leadKey_(lead) {
   return lead.rawColumns && lead.rawColumns.id ? String(lead.rawColumns.id) : 'crm:' + lead.id;
 }
 
+/**
+ * Запасные значения из самой карточки CRM (не из формы) — используются
+ * только когда rawColumns нет вообще (лид заведён вручную — target_manual,
+ * или создан до появления дампа формы). Без этого такие строки были
+ * пустыми везде, кроме id — не за что зацепиться глазами, кто это.
+ */
+const FALLBACK_FIELDS = {
+  'полное_имя': (lead) => lead.fullName || '',
+  'номер_телефона': (lead) => lead.phone || '',
+  created_time: (lead) => lead.createdAt || '',
+};
+
 function leadRow_(lead) {
   const raw = lead.rawColumns || {};
+  const hasRaw = Boolean(lead.rawColumns);
   const key = leadKey_(lead);
   return HEADER.map((h) => {
     if (h === 'Ответственный') return lead.assignedOperatorName || '';
@@ -132,7 +145,8 @@ function leadRow_(lead) {
     // она плодилась заново дублем вместо апдейта на месте.
     if (h === 'id') return key;
     const v = raw[h];
-    return v === undefined || v === null ? '' : v;
+    if (v !== undefined && v !== null) return v;
+    return !hasRaw && FALLBACK_FIELDS[h] ? FALLBACK_FIELDS[h](lead) : '';
   });
 }
 
