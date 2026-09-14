@@ -79,8 +79,18 @@ function apiGet_(action, params) {
   const query = Object.keys(qs)
     .map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(qs[k]))
     .join('&');
-  const resp = UrlFetchApp.fetch(apiUrl + '?' + query, { muteHttpExceptions: true });
-  const json = JSON.parse(resp.getContentText());
+  const resp = UrlFetchApp.fetch(apiUrl + '?' + query, { muteHttpExceptions: true, followRedirects: true });
+  const text = resp.getContentText();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (err) {
+    // Не JSON — обычно HTML-страница авторизации/ошибки Google вместо
+    // ответа скрипта. Логируем начало тела и HTTP-код целиком, чтобы не
+    // гадать вслепую при повторном сбое.
+    Logger.log('apiGet_ (' + action + ', ' + JSON.stringify(params) + '): HTTP ' + resp.getResponseCode() + ', тело не JSON: ' + text.slice(0, 300));
+    throw new Error('Ответ API не JSON (HTTP ' + resp.getResponseCode() + ') — см. лог выше.');
+  }
   if (json.status >= 400) throw new Error(json.error || 'API вернул статус ' + json.status);
   return json;
 }
