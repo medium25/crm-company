@@ -122,8 +122,15 @@ function leadKey_(lead) {
 
 function leadRow_(lead) {
   const raw = lead.rawColumns || {};
+  const key = leadKey_(lead);
   return HEADER.map((h) => {
     if (h === 'Ответственный') return lead.assignedOperatorName || '';
+    // 'id' — всегда ключ сопоставления (leadKey_), не raw['id'] напрямую:
+    // у лидов без rawColumns (заведены до этой фичи, или вручную) raw
+    // пустой, и колонка id молча оставалась пустой — readSheetIndex_ такую
+    // строку не индексирует (пустой id пропускается), и при каждом прогоне
+    // она плодилась заново дублем вместо апдейта на месте.
+    if (h === 'id') return key;
     const v = raw[h];
     return v === undefined || v === null ? '' : v;
   });
