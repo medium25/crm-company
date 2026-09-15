@@ -1,25 +1,28 @@
 /**
  * Экспорт лидов из CRM в Google Sheets — ОДИН лист, один ряд на лида,
- * статус в отдельной колонке (обновляется на месте при смене стадии в
- * CRM — никакого переноса строк между листами). Обратная сторона
- * SheetsSync.gs (тот льёт лидов ИЗ таблицы В CRM, этот — наоборот). Живёт
- * в ОТДЕЛЬНОЙ таблице, своим container-bound Apps Script проектом —
- * читает CRM только через GET (appsscript/Code.gs, action=list), в CRM
- * ничего не пишет.
+ * статус в отдельной колонке, порядок строк — по времени попадания лида в
+ * CRM (created_time, новые сверху). Обратная сторона SheetsSync.gs (тот
+ * льёт лидов ИЗ таблицы В CRM, этот — наоборот). Живёт в ОТДЕЛЬНОЙ
+ * таблице, своим container-bound Apps Script проектом — читает CRM только
+ * через GET (appsscript/Code.gs, action=list), в CRM ничего не пишет.
  *
  * Только source in [meta_target, target_manual] («Таргет»/«Таргет (р)») —
  * instagram/street/word_of_mouth/... в лист не попадают вовсе.
  *
- * Статус — 4 значения (STATUS_LABEL ниже), маппинг с funnelStage CRM
- * (см. src/components/leads/columns.js — 7 стадий воронки):
+ * Статус — 4 значения, маппинг с funnelStage CRM (см.
+ * src/components/leads/columns.js — 7 стадий воронки):
  *   in process — new, calling
  *   qual       — trial_scheduled, trial_completed, closing
  *   won        — won
  *   lost       — lost
  * won/lost — финальные фактически (funnelStage не меняется задним числом
- * даже если студент потом ушёл/архивировался), но технически строка
- * продолжает обновляться каждый тик как и любая другая — просто её
- * funnelStage больше не меняется само по себе.
+ * даже если студент потом ушёл/архивировался).
+ *
+ * КАЖДЫЙ ПРОГОН ПОЛНОСТЬЮ ПЕРЕЗАПИСЫВАЕТ данные (не апдейт по индексу
+ * строки) — так порядок по времени гарантирован, и любой мусор от
+ * предыдущих версий скрипта/ручных правок самовосстанавливается за один
+ * тик, а не накапливается. Строка полностью определяется текущим
+ * состоянием CRM, вручную в неё лучше не писать — перезапишет.
  *
  * Настройка:
  *   1. В целевой таблице: Extensions → Apps Script.
@@ -175,33 +178,15 @@ function leadRow_(lead) {
   return HEADER.map((h) => {
     if (h === 'Статус') return statusLabel_(lead.funnelStage);
     if (h === 'Ответственный') return lead.assignedOperatorName || NO_DATA;
-    // 'id' — всегда ключ сопоставления (leadKey_), не raw['id'] напрямую:
-    // у лидов без rawColumns (заведены до этой фичи, или вручную) raw
-    // пустой, и колонка id молча оставалась пустой — readSheetIndex_ такую
-    // строку не индексирует (пустой id пропускается), и при каждом прогоне
-    // она плодилась заново дублем вместо апдейта на месте.
     if (h === 'id') return key;
     const v = raw[h];
     if (v !== undefined && v !== null && v !== '') return v;
     const fallback = !hasRaw && FALLBACK_FIELDS[h] ? FALLBACK_FIELDS[h](lead) : '';
     // Ни одна ячейка не должна оставаться пустой — вместо этого честно
     // пишем «нет данных», чтобы визуально не путать с «строка сломана»
-    // (пустой id/дубль) или «поле реально пустое в форме».
+    // или «поле реально пустое в форме».
     return fallback || NO_DATA;
   });
-}
-
-/** Map(key → номер строки листа, 1-based) по колонке A, без учёта заголовка. */
-function readSheetIndex_(sheet) {
-  const map = new Map();
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return map;
-  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  ids.forEach((row, i) => {
-    const id = row[0];
-    if (id) map.set(String(id), i + 2);
-  });
-  return map;
 }
 
 function ensureHeader_(sheet) {
@@ -230,27 +215,26 @@ function exportOnce_() {
   const sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) throw new Error('Лист "' + SHEET_NAME + '" не найден в таблице.');
   ensureHeader_(sheet);
-  const index = readSheetIndex_(sheet);
 
   const leads = STAGES.reduce((acc, s) => acc.concat(fetchStage_(s)), []);
+  // По времени попадания в CRM, новые сверху — иначе порядок шёл блоками
+  // по статусу (сперва все in process, потом qual...), не по факту прихода.
+  leads.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const rows = leads.map(leadRow_);
 
-  let created = 0;
-  let updated = 0;
+  // Полная перезапись данных (без шапки), не апдейт по индексу строки —
+  // так порядок по времени гарантирован при каждом прогоне, и любой мусор
+  // от предыдущих версий/ручных правок сам исчезает за один тик, вместо
+  // накопления дыр и висящих строк между перезапусками.
+  const allocatedDataRows = sheet.getMaxRows() - 1;
+  if (allocatedDataRows > 0) {
+    sheet.getRange(2, 1, allocatedDataRows, HEADER.length).clearContent();
+  }
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, HEADER.length).setValues(rows);
+  }
 
-  leads.forEach((lead) => {
-    const key = leadKey_(lead);
-    const row = leadRow_(lead);
-    if (index.has(key)) {
-      sheet.getRange(index.get(key), 1, 1, HEADER.length).setValues([row]);
-      updated += 1;
-    } else {
-      sheet.appendRow(row);
-      index.set(key, sheet.getLastRow());
-      created += 1;
-    }
-  });
-
-  Logger.log('Готово: новых строк ' + created + ', обновлено на месте ' + updated + ' (всего лидов: ' + leads.length + ').');
+  Logger.log('Готово: строк записано ' + rows.length + '.');
 }
 
 /** Запусти один раз вручную — ставит опрос каждую минуту. */
