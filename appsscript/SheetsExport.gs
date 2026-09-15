@@ -1,51 +1,67 @@
 /**
- * Экспорт лидов из CRM в Google Sheets — 3 листа по исходу воронки: in
- * process / won / lost. Обратная сторона SheetsSync.gs (тот льёт лидов ИЗ
- * таблицы В CRM, этот — наоборот). Живёт в ОТДЕЛЬНОЙ таблице, своим
- * container-bound Apps Script проектом — читает CRM только через GET
- * (appsscript/Code.gs, action=list), в CRM ничего не пишет.
+ * Экспорт лидов из CRM в Google Sheets — ОДИН лист, один ряд на лида,
+ * статус в отдельной колонке (обновляется на месте при смене стадии в
+ * CRM — никакого переноса строк между листами). Обратная сторона
+ * SheetsSync.gs (тот льёт лидов ИЗ таблицы В CRM, этот — наоборот). Живёт
+ * в ОТДЕЛЬНОЙ таблице, своим container-bound Apps Script проектом —
+ * читает CRM только через GET (appsscript/Code.gs, action=list), в CRM
+ * ничего не пишет.
  *
  * Только source in [meta_target, target_manual] («Таргет»/«Таргет (р)») —
- * instagram/street/word_of_mouth/... в эти листы не попадают вовсе.
+ * instagram/street/word_of_mouth/... в лист не попадают вовсе.
  *
- * won/lost — финальные: лид остаётся там навсегда, даже если студент потом
- * ушёл/архивировался (funnelStage не меняется задним числом).
+ * Статус — 4 значения (STATUS_LABEL ниже), маппинг с funnelStage CRM
+ * (см. src/components/leads/columns.js — 7 стадий воронки):
+ *   in process — new, calling
+ *   qual       — trial_scheduled, trial_completed, closing
+ *   won        — won
+ *   lost       — lost
+ * won/lost — финальные фактически (funnelStage не меняется задним числом
+ * даже если студент потом ушёл/архивировался), но технически строка
+ * продолжает обновляться каждый тик как и любая другая — просто её
+ * funnelStage больше не меняется само по себе.
  *
  * Настройка:
- *   1. В целевой таблице (той, что с листами in process/won/lost):
- *      Extensions → Apps Script.
+ *   1. В целевой таблице: Extensions → Apps Script.
  *   2. Вставь этот файл целиком.
  *   3. Project Settings → Script Properties:
  *        LEADS_API_URL — тот же Web App URL, что в SheetsSync.gs (см. API.md)
  *        LEADS_API_KEY — ключ scope read (write тоже подойдёт, но этот
  *                         скрипт только читает — safer дать read-only)
- *   4. Названия листов должны БУКВАЛЬНО совпадать с SHEETS ниже: "in
- *      process", "won", "lost". Другие имена — поправь SHEETS в коде.
- *   5. Run → exportOnce — разовый прогон, глянь Execution log и сами листы.
+ *   4. Название листа должно БУКВАЛЬНО совпадать с SHEET_NAME ниже.
+ *   5. Run → exportOnce — разовый прогон, глянь Execution log и сам лист.
  *   6. Когда ок — Run → installExportTrigger — раз в минуту.
  *
- * Важно про частоту: раз в минуту — это N Firestore-чтений на каждый тик
- * (по одному GET на каждую стадию воронки + резолв имени оператора на
- * лида), при большом объёме лидов может заметно нагружать API/квоты. Если
- * станет тяжело — просто переустанови триггер на editable интервал
- * (everyMinutes(5) и т.п. в installExportTrigger).
+ * Важно про частоту: раз в минуту — это несколько Firestore-чтений на
+ * каждый тик (по одному GET на каждую стадию воронки + резолв имени
+ * оператора на лида), при большом объёме лидов может заметно нагружать
+ * API/квоты. Если станет тяжело — просто переустанови триггер на editable
+ * интервал (everyMinutes(5) и т.п. в installExportTrigger).
  */
 
-const SHEETS = {
-  in_process: 'in process',
-  won: 'won',
-  lost: 'lost',
-};
+const SHEET_NAME = 'in process';
 
 // Порядок и ключи — см. src/components/leads/columns.js в репозитории CRM,
 // это единственное место правды по стадиям воронки.
-const IN_PROCESS_STAGES = ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing'];
+const STAGES = ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing', 'won', 'lost'];
 const ALLOWED_SOURCES = ['meta_target', 'target_manual'];
 
-// Порядок колонок = порядок в исходной таблице лидов (той, что льётся в
-// CRM через SheetsSync.gs) + один новый столбец в конце.
+const QUAL_STAGES = ['trial_scheduled', 'trial_completed', 'closing'];
+
+/** funnelStage CRM → один из 4 статусов в таблице. */
+function statusLabel_(funnelStage) {
+  if (funnelStage === 'won') return 'won';
+  if (funnelStage === 'lost') return 'lost';
+  if (QUAL_STAGES.indexOf(funnelStage) !== -1) return 'qual';
+  return 'in process';
+}
+
+// Порядок колонок = Статус сразу после id (видно без скролла) + порядок в
+// исходной таблице лидов (той, что льётся в CRM через SheetsSync.gs) +
+// один новый столбец в конце.
 const HEADER = [
   'id',
+  'Статус',
   'created_time',
   'ad_id',
   'ad_name',
@@ -139,6 +155,7 @@ function leadRow_(lead) {
   const hasRaw = Boolean(lead.rawColumns);
   const key = leadKey_(lead);
   return HEADER.map((h) => {
+    if (h === 'Статус') return statusLabel_(lead.funnelStage);
     if (h === 'Ответственный') return lead.assignedOperatorName || NO_DATA;
     // 'id' — всегда ключ сопоставления (leadKey_), не raw['id'] напрямую:
     // у лидов без rawColumns (заведены до этой фичи, или вручную) raw
@@ -172,7 +189,7 @@ function readSheetIndex_(sheet) {
 function ensureHeader_(sheet) {
   const width = Math.max(sheet.getLastColumn(), HEADER.length);
   const first = sheet.getRange(1, 1, 1, width).getValues()[0].slice(0, HEADER.length);
-  if (first.join('') !== HEADER.join('')) {
+  if (first.join('') !== HEADER.join('')) {
     sheet.getRange(1, 1, 1, HEADER.length).setValues([HEADER]);
   }
 }
@@ -192,55 +209,30 @@ function exportOnce() {
 
 function exportOnce_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetByBucket = {};
-  const indexByBucket = {};
-  Object.keys(SHEETS).forEach((bucket) => {
-    const sheet = ss.getSheetByName(SHEETS[bucket]);
-    if (!sheet) throw new Error('Лист "' + SHEETS[bucket] + '" не найден в таблице.');
-    ensureHeader_(sheet);
-    sheetByBucket[bucket] = sheet;
-    indexByBucket[bucket] = readSheetIndex_(sheet);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error('Лист "' + SHEET_NAME + '" не найден в таблице.');
+  ensureHeader_(sheet);
+  const index = readSheetIndex_(sheet);
+
+  const leads = STAGES.reduce((acc, s) => acc.concat(fetchStage_(s)), []);
+
+  let created = 0;
+  let updated = 0;
+
+  leads.forEach((lead) => {
+    const key = leadKey_(lead);
+    const row = leadRow_(lead);
+    if (index.has(key)) {
+      sheet.getRange(index.get(key), 1, 1, HEADER.length).setValues([row]);
+      updated += 1;
+    } else {
+      sheet.appendRow(row);
+      index.set(key, sheet.getLastRow());
+      created += 1;
+    }
   });
 
-  const buckets = {
-    in_process: IN_PROCESS_STAGES.reduce((acc, s) => acc.concat(fetchStage_(s)), []),
-    won: fetchStage_('won'),
-    lost: fetchStage_('lost'),
-  };
-
-  let written = 0;
-
-  Object.keys(buckets).forEach((bucket) => {
-    buckets[bucket].forEach((lead) => {
-      const key = leadKey_(lead);
-      const row = leadRow_(lead);
-
-      // Убрать из ДРУГИХ листов, если лид туда раньше попал (переехал по воронке).
-      Object.keys(SHEETS).forEach((otherBucket) => {
-        if (otherBucket === bucket) return;
-        const idx = indexByBucket[otherBucket];
-        if (idx.has(key)) {
-          const rowToDelete = idx.get(key);
-          sheetByBucket[otherBucket].deleteRow(rowToDelete);
-          idx.delete(key);
-          idx.forEach((r, k) => {
-            if (r > rowToDelete) idx.set(k, r - 1);
-          });
-        }
-      });
-
-      const ownIdx = indexByBucket[bucket];
-      if (ownIdx.has(key)) {
-        sheetByBucket[bucket].getRange(ownIdx.get(key), 1, 1, HEADER.length).setValues([row]);
-      } else {
-        sheetByBucket[bucket].appendRow(row);
-        ownIdx.set(key, sheetByBucket[bucket].getLastRow());
-      }
-      written += 1;
-    });
-  });
-
-  Logger.log('Экспортировано/обновлено строк: ' + written);
+  Logger.log('Готово: новых строк ' + created + ', обновлено на месте ' + updated + ' (всего лидов: ' + leads.length + ').');
 }
 
 /** Запусти один раз вручную — ставит опрос каждую минуту. */
