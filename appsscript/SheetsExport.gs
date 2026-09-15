@@ -42,7 +42,7 @@
  * интервал (everyMinutes(5) и т.п. в installExportTrigger).
  */
 
-const SHEET_NAME = 'in process';
+const SHEET_NAME = 'leads 15 sept';
 
 // Порядок и ключи — см. src/components/leads/columns.js в репозитории CRM,
 // это единственное место правды по стадиям воронки.
