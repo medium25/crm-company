@@ -87,6 +87,16 @@ function props_() {
   return PropertiesService.getScriptProperties();
 }
 
+const MAX_RETRIES = 3;
+
+/**
+ * До 3 попыток с паузой — время от времени UrlFetchApp получает от
+ * инфраструктуры Google (не от нашего Code.gs — тот всегда отвечает
+ * валидным JSON, даже на свою собственную ошибку 429) HTML-страницу
+ * вместо ответа скрипта, похоже на кратковременный сбой между двумя Apps
+ * Script проектами. Без ретрая один такой сбой на любой из десятков
+ * запросов за прогон валил весь exportOnce_ целиком.
+ */
 function apiGet_(action, params) {
   const apiUrl = props_().getProperty('LEADS_API_URL');
   const apiKey = props_().getProperty('LEADS_API_KEY');
@@ -95,20 +105,28 @@ function apiGet_(action, params) {
   const query = Object.keys(qs)
     .map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(qs[k]))
     .join('&');
-  const resp = UrlFetchApp.fetch(apiUrl + '?' + query, { muteHttpExceptions: true, followRedirects: true });
-  const text = resp.getContentText();
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch (err) {
-    // Не JSON — обычно HTML-страница авторизации/ошибки Google вместо
-    // ответа скрипта. Логируем начало тела и HTTP-код целиком, чтобы не
-    // гадать вслепую при повторном сбое.
-    Logger.log('apiGet_ (' + action + ', ' + JSON.stringify(params) + '): HTTP ' + resp.getResponseCode() + ', тело не JSON: ' + text.slice(0, 300));
-    throw new Error('Ответ API не JSON (HTTP ' + resp.getResponseCode() + ') — см. лог выше.');
+  const url = apiUrl + '?' + query;
+
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    const text = resp.getContentText();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (err) {
+      Logger.log(
+        'apiGet_ (' + action + ', ' + JSON.stringify(params) + '), попытка ' + attempt + '/' + MAX_RETRIES +
+          ': HTTP ' + resp.getResponseCode() + ', тело не JSON: ' + text.slice(0, 300),
+      );
+      lastErr = new Error('Ответ API не JSON (HTTP ' + resp.getResponseCode() + ') — см. лог выше.');
+      if (attempt < MAX_RETRIES) Utilities.sleep(1000 * attempt);
+      continue;
+    }
+    if (json.status >= 400) throw new Error(json.error || 'API вернул статус ' + json.status);
+    return json;
   }
-  if (json.status >= 400) throw new Error(json.error || 'API вернул статус ' + json.status);
-  return json;
+  throw lastErr;
 }
 
 /** Все лиды данной стадии (все страницы), уже отфильтрованные по ALLOWED_SOURCES. */
