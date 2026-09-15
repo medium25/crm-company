@@ -59,13 +59,14 @@ function statusLabel_(funnelStage) {
   return 'in process';
 }
 
-// Порядок колонок = Статус сразу после id (видно без скролла) + порядок в
-// исходной таблице лидов (той, что льётся в CRM через SheetsSync.gs) +
-// один новый столбец в конце.
+// Порядок колонок: время попадания лида первым столбцом (дд.мм.гг чч:мм,
+// см. formatLeadTime_), дальше id + Статус, дальше порядок в исходной
+// таблице лидов (той, что льётся в CRM через SheetsSync.gs) + один новый
+// столбец в конце.
 const HEADER = [
+  'created_time',
   'id',
   'Статус',
-  'created_time',
   'ad_id',
   'ad_name',
   'adset_id',
@@ -171,11 +172,24 @@ const FALLBACK_FIELDS = {
 
 const NO_DATA = 'нет данных';
 
+/** ISO-строка/Date → «дд.мм.гг чч:мм» в часовом поясе скрипта, либо null если не распарсилось. */
+function formatLeadTime_(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd.MM.yy HH:mm');
+}
+
 function leadRow_(lead) {
   const raw = lead.rawColumns || {};
   const hasRaw = Boolean(lead.rawColumns);
   const key = leadKey_(lead);
   return HEADER.map((h) => {
+    if (h === 'created_time') {
+      const rawVal = raw['created_time'];
+      const source = rawVal !== undefined && rawVal !== null && rawVal !== '' ? rawVal : !hasRaw ? FALLBACK_FIELDS.created_time(lead) : '';
+      return formatLeadTime_(source) || NO_DATA;
+    }
     if (h === 'Статус') return statusLabel_(lead.funnelStage);
     if (h === 'Ответственный') return lead.assignedOperatorName || NO_DATA;
     if (h === 'id') return key;
@@ -296,8 +310,9 @@ function updateStatusInPlace_(leadId, rawId, funnelStage) {
   if (lastRow < 2) return;
 
   const key = rawId ? String(rawId) : 'crm:' + leadId;
+  const idCol = HEADER.indexOf('id') + 1;
   const statusCol = HEADER.indexOf('Статус') + 1;
-  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  const ids = sheet.getRange(2, idCol, lastRow - 1, 1).getValues();
   for (let i = 0; i < ids.length; i++) {
     if (String(ids[i][0]) === key) {
       sheet.getRange(i + 2, statusCol).setValue(statusLabel_(funnelStage));
