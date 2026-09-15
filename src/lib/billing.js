@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { format, endOfMonth, startOfMonth, addDays, subDays } from 'date-fns';
 import { lessonsInRange } from './schedule.js';
+import { notifySheetsExport } from './sheetsExportHook.js';
 
 /** Минимальный положительный баланс студента, при котором разрешена заморозка записи. */
 export const MIN_FREEZE_BALANCE = 140000;
@@ -321,6 +322,7 @@ export async function recordPayment(db, { student, branchId, amount, method, dat
         }
       : {};
     await updateDoc(doc(db, 'students', student.id), { firstPaymentAt: serverTimestamp(), updatedAt: serverTimestamp(), ...wonFields });
+    if (wonFields.funnelStage) notifySheetsExport(student.id, wonFields.funnelStage, student.rawColumns);
   }
   return txId;
 }

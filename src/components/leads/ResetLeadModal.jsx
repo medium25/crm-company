@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { notifySheetsExport } from '../../lib/sheetsExportHook.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -74,6 +75,7 @@ export function ResetLeadModal({ lead, onClose }) {
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });
+      notifySheetsExport(lead.id, 'new', lead.rawColumns);
       showToast(`${lead.fullName}: возвращён в «Новый лид».`);
       onClose();
     } catch {

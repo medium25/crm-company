@@ -1,5 +1,6 @@
 import { collection, doc, getDocs, query, updateDoc, where, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 import { NON_TERMINAL_STAGES } from './leadFunnel.js';
+import { notifySheetsExport } from './sheetsExportHook.js';
 
 /**
  * «Статус студента = максимальный по активности статус среди его enrollments»
@@ -91,4 +92,5 @@ export async function archiveStudent(db, student, user) {
     batch.update(doc(db, 'groups', groupId), { studentsCount: increment(-1) });
   }
   await batch.commit();
+  if (stillInFunnel) notifySheetsExport(student.id, 'lost', student.rawColumns);
 }

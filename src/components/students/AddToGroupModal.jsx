@@ -10,6 +10,7 @@ import { recomputeStudentAggregates } from '../../lib/students.js';
 import { chargePartialMonth } from '../../lib/billing.js';
 import { logActivity } from '../../lib/activityLog.js';
 import { NON_TERMINAL_STAGES } from '../../lib/leadFunnel.js';
+import { notifySheetsExport } from '../../lib/sheetsExportHook.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Select.jsx';
@@ -127,6 +128,7 @@ export function AddToGroupModal({ open, student, onClose }) {
             updatedAt: now,
             updatedBy: user.uid,
           });
+          notifySheetsExport(student.id, nextStage, student.rawColumns);
         }
       }
 

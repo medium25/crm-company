@@ -1,6 +1,7 @@
 // src/lib/leadFunnel.js
 import { doc, getDoc, updateDoc, collection, query, where, getCountFromServer, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore';
 import { differenceInCalendarDays, addDays, startOfDay } from 'date-fns';
+import { notifySheetsExport } from './sheetsExportHook.js';
 
 /**
  * Причины отказа — фиксированный список (см. спек §7). `requiresDetail` —
@@ -34,6 +35,7 @@ export async function advanceStage(db, lead, newStage, extraFields, user) {
     updatedAt: serverTimestamp(),
     updatedBy: user.uid,
   });
+  notifySheetsExport(lead.id, newStage, lead.rawColumns);
 }
 
 const WORKING_START_HOUR = 9;

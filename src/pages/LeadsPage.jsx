@@ -8,6 +8,7 @@ import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { notifySheetsExport } from '../lib/sheetsExportHook.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
@@ -247,6 +248,7 @@ export function LeadsPage() {
         updatedAt: serverTimestamp(),
       });
       await batch.commit();
+      if (stageFields.funnelStage) notifySheetsExport(lead.id, stageFields.funnelStage, lead.rawColumns);
       if (stageFields.funnelStage === 'lost') showToast(`${lead.fullName}: 5 неудачных попыток, лид отмечен как отказ.`);
     } catch {
       showToast('Не удалось отметить попытку.', { type: 'error' });

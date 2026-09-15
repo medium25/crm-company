@@ -237,11 +237,72 @@ function exportOnce_() {
   Logger.log('Готово: строк записано ' + rows.length + '.');
 }
 
-/** Запусти один раз вручную — ставит опрос каждую минуту. */
+/** Запусти один раз вручную — ставит опрос каждую минуту (страховка, см. doPost ниже). */
 function installExportTrigger() {
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'exportOnce')
     .forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('exportOnce').timeBased().everyMinutes(1).create();
   Logger.log('Триггер поставлен: exportOnce каждую минуту.');
+}
+
+/**
+ * Мгновенное обновление одной строки — вызывается фронтендом CRM сразу
+ * после смены funnelStage лида (см. src/lib/sheetsExportHook.js), чтобы
+ * колонка «Статус» не ждала минутного триггера (нужно для CAPI в
+ * Facebook — конверсия должна попасть в таблицу как можно быстрее).
+ * Обновляет ТОЛЬКО колонку «Статус» найденной строки, остальные поля не
+ * трогает — их досчитает ближайший exportOnce. Если строки ещё нет (лид
+ * только что создан и не попал ни в один exportOnce) — молча выходит,
+ * следующий exportOnce (раз в минуту) добавит её сам.
+ *
+ * Требует отдельный Web App деплой ЭТОГО файла (Deploy → New deployment →
+ * Web app, Execute as: me, Who has access: Anyone) — отдельный от
+ * appsscript/Code.gs. Script Properties: EXPORT_HOOK_SECRET — произвольная
+ * строка, должна совпадать с VITE_SHEETS_EXPORT_HOOK_SECRET в .env
+ * фронтенда.
+ */
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents);
+    const secret = props_().getProperty('EXPORT_HOOK_SECRET');
+    if (!secret || body.secret !== secret) {
+      return jsonOutput_({ status: 401, error: 'unauthorized' });
+    }
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(5000)) {
+      return jsonOutput_({ status: 429, error: 'busy, следующий exportOnce досчитает' });
+    }
+    try {
+      updateStatusInPlace_(body.id, body.rawId, body.funnelStage);
+    } finally {
+      lock.releaseLock();
+    }
+    return jsonOutput_({ status: 200 });
+  } catch (err) {
+    return jsonOutput_({ status: 500, error: String(err) });
+  }
+}
+
+function jsonOutput_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function updateStatusInPlace_(leadId, rawId, funnelStage) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) return;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  const key = rawId ? String(rawId) : 'crm:' + leadId;
+  const statusCol = HEADER.indexOf('Статус') + 1;
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === key) {
+      sheet.getRange(i + 2, statusCol).setValue(statusLabel_(funnelStage));
+      return;
+    }
+  }
+  Logger.log('updateStatusInPlace_: строка для ' + key + ' ещё не найдена, ждём exportOnce.');
 }
