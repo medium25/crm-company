@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, CircleDashed, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -148,133 +148,151 @@ export function trialScheduleLabel(lead) {
 const MAX_ATTEMPTS = 5;
 const UNREACHABLE_MAX_ATTEMPTS = 3;
 
-/** Триггер-точка попытки — общий для CallAttemptDots/TouchDots/UnreachableBlock, пока попытка ещё не отмечена. */
-function AttemptDot({ ref, toggle, ariaLabel }) {
+/**
+ * Строка тайм-лайна касаний — фиксированная высота (h-[18px]) что для уже
+ * сделанного шага, что для предстоящего/кликабельного, поэтому весь блок
+ * (см. TouchTimeline) не «плавает» в зависимости от текста.
+ */
+function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabel, muted }) {
+  const content = (
+    <>
+      <Icon className={`h-3.5 w-3.5 shrink-0 ${iconClass}`} />
+      <span className={`min-w-0 flex-1 truncate text-left text-[11.5px] ${muted ? 'text-muted' : 'text-text'}`}>{text}</span>
+      {time && <span className="shrink-0 text-[10px] text-muted">{time}</span>}
+    </>
+  );
+  if (!onClick) {
+    return <div className="flex h-[18px] items-center gap-1.5">{content}</div>;
+  }
   return (
     <button
       ref={ref}
       type="button"
-      onClick={toggle}
+      onClick={onClick}
       aria-label={ariaLabel}
-      className="flex h-4 w-4 items-center justify-center text-border hover:text-navy"
+      className="flex h-[18px] w-full items-center gap-1.5 hover:opacity-80"
     >
-      <Circle className="h-4 w-4" />
+      {content}
     </button>
   );
 }
 
-const CHIP_TONE_CLASSES = {
-  success: 'bg-success/15 text-success',
-  danger: 'bg-danger/15 text-danger',
-  warn: 'bg-orange/15 text-orange',
-};
-
 /**
- * Чип уже отмеченного касания — короткий обрезанный текст задачи вместо
- * голой иконки исхода (см. LeadsPage.jsx: задача теперь обязательна на
- * каждом касании во всех трёх трекерах ниже). Цвет чипа — тот же смысл,
- * что раньше нёс Icon (успех/неудача/перенос). Клик — точное время и
- * полный текст задачи, для тех случаев, когда обрезанный не влезает.
+ * Общий тайм-лайн касаний — одна и та же форма для Дозвона/Дожима/«Не
+ * выходит на связь»: РОВНО 2 строки (последний факт + следующий шаг),
+ * независимо от того, сколько попыток уже накоплено (1 из 5 vs 5 из 5) —
+ * иначе карточка «плавала» бы по высоте между лидами и между стадиями
+ * (Дозвон до 5 попыток, Дожим ровно 2). Вся история, кроме последней
+ * записи — по клику «+N», во всплывающем списке, высоту не трогает.
+ * `pendingRow` — второй ряд, содержимое зависит от трекера (передаётся
+ * вызывающей стороной), но обязано быть, а не null — иначе 2-я строка
+ * схлопывается и высота блока у разных лидов снова расходится.
+ * @param {Array<{at: Date, task: string}>} entries
+ * @param {import('react').ReactNode} pendingRow
  */
-function TouchChip({ task, at, tone, ariaLabel }) {
+function TouchTimeline({ entries, pendingRow }) {
+  const last = entries[entries.length - 1];
+  const rest = entries.length - 1;
+
   return (
-    <DropdownMenu
-      items={[
-        { label: at ? formatDateTimeShort(at) : '—', disabled: true },
-        { label: task || 'Без задачи', disabled: true },
-      ]}
-      trigger={({ ref, toggle }) => (
-        <button
-          ref={ref}
-          type="button"
-          onClick={toggle}
-          aria-label={ariaLabel}
-          title={task || undefined}
-          className={`max-w-[64px] shrink-0 truncate rounded-badge px-1.5 py-0.5 text-[10px] font-bold ${CHIP_TONE_CLASSES[tone]}`}
-        >
-          {task || '—'}
-        </button>
-      )}
-    />
+    <div className="flex flex-col gap-0.5">
+      <div className="flex h-[18px] items-center gap-1.5">
+        {last ? (
+          <>
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
+            <span className="min-w-0 flex-1 truncate text-[11.5px] text-text">{last.task || 'Без задачи'}</span>
+            <span className="shrink-0 text-[10px] text-muted">{last.at ? formatDateTimeShort(last.at) : ''}</span>
+          </>
+        ) : (
+          <span className="text-[11.5px] text-muted">Касаний ещё не было</span>
+        )}
+        {rest > 0 && (
+          <DropdownMenu
+            items={entries
+              .slice(0, -1)
+              .reverse()
+              .map((e) => ({ label: `${e.at ? formatDateTimeShort(e.at) : '—'} — ${e.task || 'без задачи'}`, disabled: true }))}
+            trigger={({ ref, toggle }) => (
+              <button
+                ref={ref}
+                type="button"
+                onClick={toggle}
+                aria-label={`Ещё ${rest} касани${rest === 1 ? 'е' : 'й'}`}
+                className="shrink-0 rounded-badge px-1 text-[10px] font-bold text-muted hover:bg-surface-alt hover:text-text"
+              >
+                +{rest}
+              </button>
+            )}
+          />
+        )}
+      </div>
+      {pendingRow}
+    </div>
   );
 }
 
 /**
- * Ряд из 5 точек — попытки дозвона, см. 2026-08-12-lead-card-call-attempts-design.md.
+ * Попытки дозвона (до 5), см. 2026-08-12-lead-card-call-attempts-design.md.
  * Меню выбора результата — через DropdownMenu (портал, `position: fixed`) —
- * точка попытки лежит у левого края узкой карточки в канбане, обычный
- * absolute-попап вылезал за край карточки и обрезался/наезжал на соседнюю
- * колонку.
+ * ряд лежит у левого края узкой карточки в канбане, обычный absolute-попап
+ * вылезал за край карточки и обрезался/наезжал на соседнюю колонку.
  */
 function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
   const isCold = attempts.length === MAX_ATTEMPTS && attempts.every((a) => a.result === 'fail');
+  const exhausted = attempts.length >= MAX_ATTEMPTS;
   const deadlineLabel = !isCold && nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
 
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1">
-        {Array.from({ length: MAX_ATTEMPTS }, (_, i) => {
-          const attempt = attempts[i];
-          if (attempt) {
-            return (
-              <TouchChip
-                key={i}
-                task={attempt.task}
-                at={attempt.at}
-                tone={attempt.result === 'success' ? 'success' : 'danger'}
-                ariaLabel={`Попытка ${i + 1}: задача`}
-              />
-            );
-          }
-          if (i === attempts.length) {
-            return (
-              <DropdownMenu
-                key={i}
-                items={[
-                  { label: '✓ Успешно', onClick: () => onMark('success') },
-                  { label: '✕ Не успешно', danger: true, onClick: () => onMark('fail') },
-                ]}
-                trigger={({ ref, toggle }) => (
-                  <AttemptDot ref={ref} toggle={toggle} ariaLabel={`Попытка ${i + 1}: отметить результат звонка`} />
-                )}
-              />
-            );
-          }
-          return <Circle key={i} className="h-4 w-4 text-border" />;
-        })}
-      </div>
-      {isCold && (
-        <span title="Холодный лид: 5 неудачных попыток дозвона" className="flex items-center">
-          <Snowflake className="h-4 w-4 text-danger" />
-        </span>
-      )}
-      {deadlineLabel && <span className="text-[12px] font-bold text-text">{deadlineLabel}</span>}
-    </div>
-  );
+  let pendingRow;
+  if (isCold) {
+    pendingRow = <TimelineRow icon={Snowflake} iconClass="text-danger" text="Холодный лид — 5 неудачных попыток" muted />;
+  } else if (exhausted) {
+    pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Попыток больше нет" time={deadlineLabel} muted />;
+  } else {
+    pendingRow = (
+      <DropdownMenu
+        items={[
+          { label: '✓ Успешно', onClick: () => onMark('success') },
+          { label: '✕ Не успешно', danger: true, onClick: () => onMark('fail') },
+        ]}
+        trigger={({ ref, toggle }) => (
+          <TimelineRow
+            ref={ref}
+            icon={CircleDashed}
+            iconClass="text-orange"
+            text={`Попытка ${attempts.length + 1}`}
+            time={deadlineLabel}
+            onClick={toggle}
+            ariaLabel={`Попытка ${attempts.length + 1}: отметить результат звонка`}
+          />
+        )}
+      />
+    );
+  }
+
+  return <TouchTimeline entries={attempts} pendingRow={pendingRow} />;
 }
 
-/** Ряд из 2 точек — касания в «Дожиме» (см. LeadsPage.markTouch), задача обязательна на каждом. */
+/** Касания в «Дожиме» (ровно 2, см. LeadsPage.markTouch) — задача обязательна на каждом. */
 function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark }) {
   const count = closingTouchNumber ?? 0;
-  const deadlineLabel = count < 2 && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
   const log = closingTouchLog ?? [];
+  const deadlineLabel = count < 2 && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
 
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1">
-        {Array.from({ length: 2 }, (_, i) => {
-          if (i < count) {
-            return <TouchChip key={i} task={log[i]?.task} at={log[i]?.at} tone="success" ariaLabel={`Касание ${i + 1}: задача`} />;
-          }
-          if (i === count) {
-            return <AttemptDot key={i} toggle={onMark} ariaLabel={`Касание ${i + 1}: отметить`} />;
-          }
-          return <Circle key={i} className="h-4 w-4 text-border" />;
-        })}
-      </div>
-      {deadlineLabel && <span className="text-[12px] font-bold text-text">{deadlineLabel}</span>}
-    </div>
-  );
+  const pendingRow =
+    count < 2 ? (
+      <TimelineRow
+        icon={CircleDashed}
+        iconClass="text-orange"
+        text={`Касание ${count + 1}`}
+        time={deadlineLabel}
+        onClick={onMark}
+        ariaLabel={`Касание ${count + 1}: отметить`}
+      />
+    ) : (
+      <TimelineRow icon={CheckCircle2} iconClass="text-success" text="Оба касания сделаны" muted />
+    );
+
+  return <TouchTimeline entries={log} pendingRow={pendingRow} />;
 }
 
 /**
@@ -397,53 +415,51 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
 
   const rescheduleUsed = attempts.some((a) => a.result === 'reschedule');
   const failStreak = attempts.filter((a) => a.result === 'fail').length;
+  const exhausted = attempts.length >= UNREACHABLE_MAX_ATTEMPTS;
 
   // Задачу теперь всегда спрашивает markUnreachable (DeadlineModal) — тут
   // просто передаём результат + onReschedule дальше, сама запись/переход
   // происходит там, уже после того, как оператор ввёл задачу.
   const pick = (result) => onMark(result, onReschedule);
+  const deadlineLabel = nextAttemptDueAt ? formatDateTimeShort(nextAttemptDueAt) : null;
 
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {Array.from({ length: UNREACHABLE_MAX_ATTEMPTS }, (_, i) => {
-        const attempt = attempts[i];
-        if (attempt) {
-          return (
-            <TouchChip
-              key={i}
-              task={attempt.task}
-              at={attempt.at}
-              tone={attempt.result === 'reschedule' ? 'warn' : 'danger'}
-              ariaLabel={`Попытка ${i + 1}: задача`}
-            />
-          );
-        }
-        if (i !== attempts.length) return <Circle key={i} className="h-4 w-4 text-border" />;
-        return (
-          <DropdownMenu
-            key={i}
-            items={[
-              ...(rescheduleUsed ? [] : [{ label: 'Перенос', onClick: () => pick('reschedule') }]),
-              { label: 'Неуспешно', danger: true, onClick: () => pick('fail') },
-            ]}
-            trigger={({ ref, toggle }) => <AttemptDot ref={ref} toggle={toggle} ariaLabel={`Попытка ${i + 1}: связаться`} />}
+  let pendingRow;
+  if (failStreak >= UNREACHABLE_MAX_ATTEMPTS) {
+    pendingRow = (
+      <button
+        type="button"
+        onClick={onDecline}
+        className="flex h-[18px] items-center gap-1.5 text-[11.5px] font-bold text-danger hover:opacity-80"
+      >
+        <XCircle className="h-3.5 w-3.5 shrink-0" />
+        Отказ
+      </button>
+    );
+  } else if (exhausted) {
+    pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Попыток больше нет" time={deadlineLabel} muted />;
+  } else {
+    pendingRow = (
+      <DropdownMenu
+        items={[
+          ...(rescheduleUsed ? [] : [{ label: 'Перенос', onClick: () => pick('reschedule') }]),
+          { label: 'Неуспешно', danger: true, onClick: () => pick('fail') },
+        ]}
+        trigger={({ ref, toggle }) => (
+          <TimelineRow
+            ref={ref}
+            icon={CircleDashed}
+            iconClass="text-orange"
+            text="Попытка связаться"
+            time={deadlineLabel}
+            onClick={toggle}
+            ariaLabel={`Попытка ${attempts.length + 1}: связаться`}
           />
-        );
-      })}
-      {nextAttemptDueAt && failStreak < UNREACHABLE_MAX_ATTEMPTS && (
-        <span className="text-[11px] text-muted">до {formatDateTimeShort(nextAttemptDueAt)}</span>
-      )}
-      {failStreak >= UNREACHABLE_MAX_ATTEMPTS && (
-        <button
-          type="button"
-          onClick={onDecline}
-          className="rounded-field border border-danger px-2 py-1 text-[12px] font-bold text-danger hover:bg-danger/10"
-        >
-          Отказ
-        </button>
-      )}
-    </div>
-  );
+        )}
+      />
+    );
+  }
+
+  return <TouchTimeline entries={attempts} pendingRow={pendingRow} />;
 }
 
 /**
