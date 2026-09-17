@@ -295,7 +295,7 @@ function HistoryTimeline({ lead }) {
   };
 
   return (
-    <div className="max-h-[60px] overflow-y-auto pr-1">
+    <div className="max-h-[110px] overflow-y-auto pr-1">
       {nodes.map((node, i) => (
         <div key={i} className="relative flex items-center gap-1.5 pb-2 pl-0.5 last:pb-0">
           {i < nodes.length - 1 && <span className="absolute bottom-[-4px] left-[5px] top-3.5 w-px bg-border" />}
@@ -720,11 +720,11 @@ export function LeadCard({
           скругление карточки, растягивая заливку до самых краёв поверх её
           собственного p-3.5. */}
       <div
-        className={`flex items-center justify-between gap-2 border-b pb-2.5 ${
+        className={`flex items-center justify-between gap-2 border-b pb-1.5 ${
           overdue
-            ? '-mx-3.5 -mt-3.5 rounded-t-xl border-[rgba(225,29,72,0.26)] bg-[rgba(225,29,72,0.09)] px-3.5 pt-3.5 dark:border-[rgba(251,113,133,0.30)] dark:bg-[rgba(251,113,133,0.13)]'
+            ? '-mx-3.5 -mt-3.5 rounded-t-xl border-[rgba(225,29,72,0.26)] bg-[rgba(225,29,72,0.09)] px-3.5 pt-2 dark:border-[rgba(251,113,133,0.30)] dark:bg-[rgba(251,113,133,0.13)]'
             : !isTerminal
-              ? '-mx-3.5 -mt-3.5 rounded-t-xl border-success/30 bg-success/10 px-3.5 pt-3.5'
+              ? '-mx-3.5 -mt-3.5 rounded-t-xl border-success/30 bg-success/10 px-3.5 pt-2'
               : 'border-border'
         }`}
       >
@@ -813,8 +813,24 @@ export function LeadCard({
         </div>
       )}
 
-      <div className="mt-auto flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
-        {operatorLabel ? (
+      {/* Modal рендерится в document.body через портал, но события всплывают
+          по React-дереву, не DOM — без stopPropagation клик внутри модалки
+          (например, «Закрыть») доходил бы до onClick корня карточки и
+          открывал бы её (onOpen). Вынесен из футера (см. ниже) — иначе,
+          даже пустой (target=null), добавлял ещё один gap-промежуток между
+          рядом иконок и строкой даты/источника под ним. */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <LeadFormDataModal target={formDataOpen ? { lead } : null} onClose={() => setFormDataOpen(false)} />
+      </div>
+
+      {/* Единый узкий блок низа карточки — ряд иконок + (при открытии)
+          чек-лист/комментарии + строка даты/источника, все на gap-0.5
+          вместо общего для всей карточки gap-2.5: раньше между рядом
+          иконок и строкой даты был двойной зазор (корневой gap плюс ещё
+          один — от соседнего пустого div модалки, см. выше). */}
+      <div className="mt-auto flex flex-col gap-0.5">
+        <div className="flex items-center justify-between border-t border-border pt-1" onClick={(e) => e.stopPropagation()}>
+          {operatorLabel ? (
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
             style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
@@ -884,24 +900,17 @@ export function LeadCard({
         )}
       </div>
 
-      {(stage === 'new' || stage === 'calling') && checklistOpen && (
-        <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} />
-      )}
-      {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
+        {(stage === 'new' || stage === 'calling') && checklistOpen && (
+          <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} />
+        )}
+        {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
 
-      {/* Modal рендерится в document.body через портал, но события всплывают
-          по React-дереву, не DOM — без stopPropagation клик внутри модалки
-          (например, «Закрыть») доходил бы до onClick корня карточки и
-          открывал бы её (onOpen). */}
-      <div onClick={(e) => e.stopPropagation()}>
-        <LeadFormDataModal target={formDataOpen ? { lead } : null} onClose={() => setFormDataOpen(false)} />
+        <span className="text-[10px] text-muted">
+          {formatDateTimeShort(lead.createdAt)}
+          {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
+          {stage === 'new' || stage === 'calling' ? ` · Чек-лист ${checklistPct}%` : ''}
+        </span>
       </div>
-
-      <span className="-mt-1 text-[10px] text-muted">
-        {formatDateTimeShort(lead.createdAt)}
-        {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
-        {stage === 'new' || stage === 'calling' ? ` · Чек-лист ${checklistPct}%` : ''}
-      </span>
     </div>
   );
 }
