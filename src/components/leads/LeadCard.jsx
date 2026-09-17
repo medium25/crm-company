@@ -1,5 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
@@ -180,18 +179,18 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
 
 /**
  * Общий тайм-лайн касаний — одна и та же форма для Дозвона/Дожима/«Не
- * выходит на связь»: РОВНО 2 строки (последний факт + следующий шаг),
- * независимо от того, сколько попыток уже накоплено (1 из 5 vs 5 из 5) —
- * иначе карточка «плавала» бы по высоте между лидами и между стадиями
- * (Дозвон до 5 попыток, Дожим ровно 2). Вся история, кроме последней
- * записи — по клику «+N», во всплывающем списке, высоту не трогает.
- * `pendingRow` — второй ряд, содержимое зависит от трекера (передаётся
- * вызывающей стороной), но обязано быть, а не null — иначе 2-я строка
- * схлопывается и высота блока у разных лидов снова расходится.
- * @param {Array<{at: Date, task: string}>} entries
+ * выходит на связь»: вся история сразу видна на карточке, прокручиваемым
+ * окошком фиксированной высоты (не попапом по клику) — так высота карточки
+ * не зависит ни от числа попыток (1 из 5 vs 5 из 5), ни от того, открыл ли
+ * оператор историю: лишние записи уходят под внутренний скролл, а не
+ * растягивают карточку. Записи соединены вертикальной линией (таймлайн),
+ * между ними — просрочка, если факт (at) наступил позже дедлайна, что
+ * стоял на тот момент (entry.expectedBy).
+ * `pendingRow` — следующий шаг, ниже прокручиваемой истории, всегда виден
+ * без скролла.
+ * @param {Array<{at: Date, task: string, expectedBy?: Date}>} entries
  * @param {import('react').ReactNode} pendingRow
  */
-const POPOVER_MARGIN = 8;
 
 /**
  * Кол-во часов, на которое факт (entry.at) опоздал относительно дедлайна,
@@ -211,117 +210,29 @@ function overdueLabel(entry) {
   return `Задача была просрочена на ${hours} ${word}`;
 }
 
-/**
- * Полная история касаний — прокручиваемое окошко со всеми записями по
- * порядку (старые сверху), соединёнными вертикальной линией, как классический
- * таймлайн. Между записями (сверху текста задачи) — просрочка, если факт
- * (at) наступил позже дедлайна, что стоял на тот момент (expectedBy).
- */
-function TouchHistoryPopover({ entries, trigger }) {
-  const [open, setOpen] = useState(false);
-  const [style, setStyle] = useState(null);
-  const triggerRef = useRef(null);
-  const panelRef = useRef(null);
-
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current || !panelRef.current) return;
-    const t = triggerRef.current.getBoundingClientRect();
-    const p = panelRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - t.bottom;
-    const openUpward = spaceBelow < p.height + POPOVER_MARGIN && t.top > p.height + POPOVER_MARGIN;
-    setStyle({
-      position: 'fixed',
-      top: openUpward ? t.top - p.height - 4 : t.bottom + 4,
-      left: Math.max(POPOVER_MARGIN, Math.min(t.right - p.width, window.innerWidth - p.width - POPOVER_MARGIN)),
-    });
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClickOutside = (e) => {
-      if (triggerRef.current?.contains(e.target)) return;
-      if (panelRef.current?.contains(e.target)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onClickOutside);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <>
-      {trigger({ ref: triggerRef, toggle: () => setOpen((v) => !v) })}
-      {open &&
-        createPortal(
-          <div
-            ref={panelRef}
-            style={style ?? { position: 'fixed', top: -9999, left: -9999 }}
-            className="z-[60] w-72 rounded-field border border-border bg-surface p-3 shadow-hover"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="mb-2 text-[12px] font-bold text-text">История касаний</p>
-            <div className="max-h-64 overflow-y-auto pr-1">
-              {entries.map((entry, i) => {
-                const overdue = overdueLabel(entry);
-                return (
-                  <div key={i} className="relative flex gap-2 pl-0.5 pb-3 last:pb-0">
-                    {i < entries.length - 1 && <span className="absolute bottom-[-4px] left-[6.5px] top-4 w-px bg-border" />}
-                    <CheckCircle2 className="z-10 mt-0.5 h-3.5 w-3.5 shrink-0 bg-surface text-success" />
-                    <div className="min-w-0 flex-1">
-                      {overdue && <p className="mb-1 text-[11px] font-bold text-danger">{overdue}</p>}
-                      <p className="text-[12px] leading-snug text-text">{entry.task || 'Без задачи'}</p>
-                      <p className="text-[10px] text-muted">{entry.at ? formatDateTimeShort(entry.at) : '—'}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
-  );
-}
-
 function TouchTimeline({ entries, pendingRow }) {
-  const last = entries[entries.length - 1];
-  const rest = entries.length - 1;
-
   return (
-    <div className="flex flex-col gap-0.5">
-      <div className="flex h-[18px] items-center gap-1.5">
-        {last ? (
-          <>
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
-            <span className="min-w-0 flex-1 truncate text-[11.5px] text-text">{last.task || 'Без задачи'}</span>
-            <span className="shrink-0 text-[10px] text-muted">{last.at ? formatDateTimeShort(last.at) : ''}</span>
-          </>
-        ) : (
-          <span className="text-[11.5px] text-muted">Касаний ещё не было</span>
-        )}
-        {rest > 0 && (
-          <TouchHistoryPopover
-            entries={entries}
-            trigger={({ ref, toggle }) => (
-              <button
-                ref={ref}
-                type="button"
-                onClick={toggle}
-                aria-label={`Вся история — ещё ${rest} касани${rest === 1 ? 'е' : 'й'}`}
-                className="shrink-0 rounded-badge px-1 text-[10px] font-bold text-muted hover:bg-surface-alt hover:text-text"
-              >
-                +{rest}
-              </button>
-            )}
-          />
-        )}
-      </div>
+    <div className="flex flex-col gap-1">
+      {entries.length > 0 ? (
+        <div className="max-h-[60px] overflow-y-auto pr-1">
+          {entries.map((entry, i) => {
+            const overdue = overdueLabel(entry);
+            return (
+              <div key={i} className="relative flex gap-1.5 pb-2 pl-0.5 last:pb-0">
+                {i < entries.length - 1 && <span className="absolute bottom-[-4px] left-[5px] top-3.5 w-px bg-border" />}
+                <CheckCircle2 className="z-10 mt-0.5 h-3 w-3 shrink-0 bg-surface text-success" />
+                <div className="min-w-0 flex-1">
+                  {overdue && <p className="text-[10px] font-bold leading-tight text-danger">{overdue}</p>}
+                  <p className="truncate text-[11px] leading-tight text-text">{entry.task || 'Без задачи'}</p>
+                  <p className="text-[9px] leading-tight text-muted">{entry.at ? formatDateTimeShort(entry.at) : '—'}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <span className="text-[11.5px] text-muted">Касаний ещё не было</span>
+      )}
       {pendingRow}
     </div>
   );
