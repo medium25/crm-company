@@ -246,8 +246,21 @@ function buildTimelineNodes(history) {
  * рисует свой «следующий шаг» (CallAttemptDots/TouchDots/UnreachableBlock).
  */
 function HistoryTimeline({ lead }) {
+  // useState ДО early return — иначе при первом же появлении истории
+  // (0 записей → 1) хуки в этом инстансе компонента перестанут совпадать
+  // между рендерами (React бросит "Rendered fewer hooks than expected").
+  const [expanded, setExpanded] = useState(() => new Set());
   const nodes = buildTimelineNodes(buildFullHistory(lead));
   if (nodes.length === 0) return null;
+
+  const toggle = (i) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  };
 
   return (
     <div className="max-h-[60px] overflow-y-auto pr-1">
@@ -265,7 +278,13 @@ function HistoryTimeline({ lead }) {
             <>
               <ArrowRight className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-navy" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] leading-tight text-navy">
+                <p
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggle(i);
+                  }}
+                  className={`cursor-pointer text-[11px] leading-tight text-navy ${expanded.has(i) ? '' : 'truncate'}`}
+                >
                   {i === 0 ? 'Создан — ' : 'Переведён в '}«{COLUMNS.find((c) => c.key === node.stage)?.label ?? node.stage}»
                 </p>
                 <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
@@ -275,7 +294,13 @@ function HistoryTimeline({ lead }) {
             <>
               <CheckCircle2 className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-success" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] leading-tight text-text">
+                <p
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggle(i);
+                  }}
+                  className={`cursor-pointer text-[11px] leading-tight text-text ${expanded.has(i) ? '' : 'truncate'}`}
+                >
                   {node.entry.outcome || node.entry.task || 'Без задачи'}
                   {node.entry.nextStep && <> &gt; {node.entry.nextStep}</>}
                 </p>
