@@ -310,7 +310,7 @@ function HistoryTimeline({ lead }) {
   const ICON_TONES = { overdue: 'text-danger', ontime: 'text-success', stage: 'text-navy', entry: 'text-success' };
 
   return (
-    <div className="relative max-h-[110px] overflow-y-auto rounded-field bg-surface-alt p-2">
+    <div className="relative max-h-[110px] flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
       {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
       {nodes.map((node, i) => {
         const Icon = ICONS[node.type];
@@ -765,7 +765,7 @@ export function LeadCard({
       </div>
 
       {(stage === 'new' || stage === 'calling') && (
-        <div className="flex flex-1 flex-col justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
           <CallAttemptDots
             attempts={attempts}
@@ -795,7 +795,7 @@ export function LeadCard({
       )}
 
       {stage === 'closing' && (
-        <div className="flex flex-1 flex-col justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
           <TouchDots
             closingTouchNumber={lead.closingTouchNumber}
