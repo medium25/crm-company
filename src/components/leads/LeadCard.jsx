@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Clock, Users, X } from 'lucide-react';
+import { Circle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -148,7 +148,7 @@ export function trialScheduleLabel(lead) {
 const MAX_ATTEMPTS = 5;
 const UNREACHABLE_MAX_ATTEMPTS = 3;
 
-/** Триггер-точка попытки — общий для CallAttemptDots и UnreachableBlock. */
+/** Триггер-точка попытки — общий для CallAttemptDots/TouchDots/UnreachableBlock, пока попытка ещё не отмечена. */
 function AttemptDot({ ref, toggle, ariaLabel }) {
   return (
     <button
@@ -160,6 +160,42 @@ function AttemptDot({ ref, toggle, ariaLabel }) {
     >
       <Circle className="h-4 w-4" />
     </button>
+  );
+}
+
+const CHIP_TONE_CLASSES = {
+  success: 'bg-success/15 text-success',
+  danger: 'bg-danger/15 text-danger',
+  warn: 'bg-orange/15 text-orange',
+};
+
+/**
+ * Чип уже отмеченного касания — короткий обрезанный текст задачи вместо
+ * голой иконки исхода (см. LeadsPage.jsx: задача теперь обязательна на
+ * каждом касании во всех трёх трекерах ниже). Цвет чипа — тот же смысл,
+ * что раньше нёс Icon (успех/неудача/перенос). Клик — точное время и
+ * полный текст задачи, для тех случаев, когда обрезанный не влезает.
+ */
+function TouchChip({ task, at, tone, ariaLabel }) {
+  return (
+    <DropdownMenu
+      items={[
+        { label: at ? formatDateTimeShort(at) : '—', disabled: true },
+        { label: task || 'Без задачи', disabled: true },
+      ]}
+      trigger={({ ref, toggle }) => (
+        <button
+          ref={ref}
+          type="button"
+          onClick={toggle}
+          aria-label={ariaLabel}
+          title={task || undefined}
+          className={`max-w-[64px] shrink-0 truncate rounded-badge px-1.5 py-0.5 text-[10px] font-bold ${CHIP_TONE_CLASSES[tone]}`}
+        >
+          {task || '—'}
+        </button>
+      )}
+    />
   );
 }
 
@@ -176,26 +212,17 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         {Array.from({ length: MAX_ATTEMPTS }, (_, i) => {
           const attempt = attempts[i];
           if (attempt) {
-            const Icon = attempt.result === 'success' ? CheckCircle2 : XCircle;
             return (
-              <DropdownMenu
+              <TouchChip
                 key={i}
-                items={[{ label: attempt.at ? formatDateTimeShort(attempt.at) : '—', disabled: true }]}
-                trigger={({ ref, toggle }) => (
-                  <button
-                    ref={ref}
-                    type="button"
-                    onClick={toggle}
-                    aria-label={`Попытка ${i + 1}: когда отмечена`}
-                    className="flex h-4 w-4 items-center justify-center"
-                  >
-                    <Icon className={`h-4 w-4 ${attempt.result === 'success' ? 'text-success' : 'text-danger'}`} />
-                  </button>
-                )}
+                task={attempt.task}
+                at={attempt.at}
+                tone={attempt.result === 'success' ? 'success' : 'danger'}
+                ariaLabel={`Попытка ${i + 1}: задача`}
               />
             );
           }
@@ -226,16 +253,19 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
   );
 }
 
-/** Ряд из 2 точек — касания в «Дожиме» (см. LeadsPage.markTouch), без результата — просто факт касания. */
-function TouchDots({ closingTouchNumber, nextTouchAt, onMark }) {
+/** Ряд из 2 точек — касания в «Дожиме» (см. LeadsPage.markTouch), задача обязательна на каждом. */
+function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark }) {
   const count = closingTouchNumber ?? 0;
   const deadlineLabel = count < 2 && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
+  const log = closingTouchLog ?? [];
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         {Array.from({ length: 2 }, (_, i) => {
-          if (i < count) return <CheckCircle2 key={i} className="h-4 w-4 text-success" />;
+          if (i < count) {
+            return <TouchChip key={i} task={log[i]?.task} at={log[i]?.at} tone="success" ariaLabel={`Касание ${i + 1}: задача`} />;
+          }
           if (i === count) {
             return <AttemptDot key={i} toggle={onMark} ariaLabel={`Касание ${i + 1}: отметить`} />;
           }
@@ -344,8 +374,8 @@ function LeadInfoPopover({ items }) {
  * тут же в onMark) или «Неуспешно»; на 3-й неуспешной подряд открывается
  * «Отказ».
  * @param {Object} lead
- * @param {(result: 'reschedule'|'fail') => Promise<void>|void} onMark
- * @param {() => void} onReschedule доп. действие при «Перенос» — на пробном открывает TrialFormModal, в дожиме no-op (там дедлайн уже спрошен внутри onMark)
+ * @param {(result: 'reschedule'|'fail', onRescheduleCb?: () => void) => void} onMark
+ * @param {() => void} onReschedule доп. действие при «Перенос» — на пробном открывает TrialFormModal, в дожиме no-op. Вызывается ИЗ LeadsPage.markUnreachable, ПОСЛЕ того как задача сохранена (не раньше — иначе форма пробного открылась бы поверх ещё не закрытой DeadlineModal)
  * @param {() => void} onDecline
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
@@ -368,32 +398,23 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
   const rescheduleUsed = attempts.some((a) => a.result === 'reschedule');
   const failStreak = attempts.filter((a) => a.result === 'fail').length;
 
-  const pick = async (result) => {
-    await onMark(result);
-    if (result === 'reschedule') onReschedule();
-  };
+  // Задачу теперь всегда спрашивает markUnreachable (DeadlineModal) — тут
+  // просто передаём результат + onReschedule дальше, сама запись/переход
+  // происходит там, уже после того, как оператор ввёл задачу.
+  const pick = (result) => onMark(result, onReschedule);
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {Array.from({ length: UNREACHABLE_MAX_ATTEMPTS }, (_, i) => {
         const attempt = attempts[i];
         if (attempt) {
-          const Icon = attempt.result === 'reschedule' ? Clock : XCircle;
           return (
-            <DropdownMenu
+            <TouchChip
               key={i}
-              items={[{ label: attempt.at ? formatDateTimeShort(attempt.at) : '—', disabled: true }]}
-              trigger={({ ref, toggle }) => (
-                <button
-                  ref={ref}
-                  type="button"
-                  onClick={toggle}
-                  aria-label={`Попытка ${i + 1}: когда отмечена`}
-                  className="flex h-4 w-4 items-center justify-center"
-                >
-                  <Icon className={`h-4 w-4 ${attempt.result === 'reschedule' ? 'text-orange' : 'text-danger'}`} />
-                </button>
-              )}
+              task={attempt.task}
+              at={attempt.at}
+              tone={attempt.result === 'reschedule' ? 'warn' : 'danger'}
+              ariaLabel={`Попытка ${i + 1}: задача`}
             />
           );
         }
@@ -610,7 +631,7 @@ export function LeadCard({
           {trialDay && (
             <UnreachableBlock
               lead={lead}
-              onMark={(result) => onMarkUnreachable(lead, result)}
+              onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
               onReschedule={() => onRescheduleTrial(lead)}
               onDecline={() => onDecline(lead)}
               nextAttemptDueAt={lead.unreachableNextCallDueAt}
@@ -632,10 +653,15 @@ export function LeadCard({
 
       {stage === 'closing' && (
         <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-          <TouchDots closingTouchNumber={lead.closingTouchNumber} nextTouchAt={lead.nextTouchAt} onMark={() => onMarkTouch(lead)} />
+          <TouchDots
+            closingTouchNumber={lead.closingTouchNumber}
+            nextTouchAt={lead.nextTouchAt}
+            closingTouchLog={lead.closingTouchLog}
+            onMark={() => onMarkTouch(lead)}
+          />
           <UnreachableBlock
             lead={lead}
-            onMark={(result) => onMarkUnreachable(lead, result)}
+            onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
             onReschedule={() => {}}
             onDecline={() => onDecline(lead)}
             nextAttemptDueAt={lead.nextTouchAt}

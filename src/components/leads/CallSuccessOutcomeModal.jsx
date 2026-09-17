@@ -8,18 +8,22 @@ import { DatePicker } from '../ui/DatePicker.jsx';
 /**
  * После успешного дозвона («трубку взяли, разговор состоялся») — три
  * реальных исхода вместо голого «дедлайн следующего звонка»: клиент взял
- * время подумать (комментарий + новый дедлайн), записался на пробный
- * (передаём дальше в TrialFormModal), отказался (передаём в
- * DeclineLeadModal). Экран «думает» — единственный, что закрывается прямо
- * тут; «Запись»/«Отказ» просто вызывают колбэк и модалка закрывается,
- * дальше ведёт уже другая форма.
+ * время подумать (задача + новый дедлайн), записался на пробный (передаём
+ * дальше в TrialFormModal), отказался (передаём в DeclineLeadModal).
+ *
+ * Задача (что сделать / о чём договорились) — обязательна для ЛЮБОГО из
+ * трёх исходов (каждое касание лида должно нести задачу), поэтому поле
+ * вынесено на экран выбора исхода, а не только внутрь «Думает» — кнопки
+ * исхода заблокированы, пока задача не заполнена. «Думает» дополнительно
+ * просит новый дедлайн звонка (единственный исход, что не уводит лида со
+ * стадии «Дозвон» сразу).
  * @param {Object} props
- * @param {{lead: Object, suggestedDate: Date, onThink: (comment: string, date: Date) => Promise<void>, onTrial: () => void, onDecline: () => void}|null} props.target
+ * @param {{lead: Object, suggestedDate: Date, onThink: (task: string, date: Date) => Promise<void>, onTrial: (task: string) => void, onDecline: (task: string) => void}|null} props.target
  * @param {() => void} props.onClose
  */
 export function CallSuccessOutcomeModal({ target, onClose }) {
   const [step, setStep] = useState('choose');
-  const [comment, setComment] = useState('');
+  const [task, setTask] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [saving, setSaving] = useState(false);
@@ -27,7 +31,7 @@ export function CallSuccessOutcomeModal({ target, onClose }) {
   useEffect(() => {
     if (!target) return;
     setStep('choose');
-    setComment('');
+    setTask('');
     setDate(format(target.suggestedDate, 'yyyy-MM-dd'));
     setTime(format(target.suggestedDate, 'HH:mm'));
   }, [target]);
@@ -37,7 +41,7 @@ export function CallSuccessOutcomeModal({ target, onClose }) {
   const submitThink = async () => {
     setSaving(true);
     try {
-      await target.onThink(comment.trim(), new Date(`${date}T${time}:00`));
+      await target.onThink(task.trim(), new Date(`${date}T${time}:00`));
       onClose();
     } finally {
       setSaving(false);
@@ -62,15 +66,6 @@ export function CallSuccessOutcomeModal({ target, onClose }) {
         }
       >
         <div className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1 block text-[13px] text-muted">Комментарий</label>
-            <textarea
-              className="min-h-20 w-full resize-none rounded-field border border-border bg-surface p-2 text-[14px] text-text focus:border-navy focus:outline-none"
-              placeholder="Что сказал клиент, о чём договорились…"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-          </div>
           <DatePicker label="Дата следующего звонка" required value={date} onChange={(e) => setDate(e.target.value)} />
           <Input label="Время" type="time" required value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
@@ -82,20 +77,33 @@ export function CallSuccessOutcomeModal({ target, onClose }) {
     <Modal open={Boolean(target)} onClose={onClose} title="Дозвон успешен">
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted">Что дальше с «{target.lead.fullName}»?</p>
-        <Button onClick={() => setStep('think')}>Думает</Button>
+        <div>
+          <label className="mb-1 block text-[13px] text-muted">Задача</label>
+          <textarea
+            className="min-h-20 w-full resize-none rounded-field border border-border bg-surface p-2 text-[14px] text-text focus:border-navy focus:outline-none"
+            placeholder="Что сказал клиент, о чём договорились…"
+            value={task}
+            onChange={(e) => setTask(e.target.value)}
+          />
+        </div>
+        <Button disabled={!task.trim()} onClick={() => setStep('think')}>
+          Думает
+        </Button>
         <Button
+          disabled={!task.trim()}
           onClick={() => {
             onClose();
-            target.onTrial();
+            target.onTrial(task.trim());
           }}
         >
           Запись на пробный
         </Button>
         <Button
           variant="secondary"
+          disabled={!task.trim()}
           onClick={() => {
             onClose();
-            target.onDecline();
+            target.onDecline(task.trim());
           }}
         >
           Отказ

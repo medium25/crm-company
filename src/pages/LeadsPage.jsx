@@ -263,8 +263,16 @@ export function LeadsPage() {
     // (см. src/lib/leadDeviationAnalysis.js): «просрочка при звонке N»
     // сравнивает факт (at) с этим дедлайном, а не с тем, что назначается
     // следующим шагом. null у старых лидов без этого поля — разбор тогда
-    // приблизительно восстанавливает дедлайн по стандартной сетке.
-    const nextAttempts = [...attempts, { result, at: new Date(), expectedBy: lead.nextCallDueAt ?? null }];
+    // приблизительно восстанавливает дедлайн по стандартной сетке. `task` —
+    // короткая задача/заметка, обязательна для КАЖДОГО касания (чем именно
+    // закончилось это взаимодействие) — известна только после того, как
+    // оператор её впишет в модалке, поэтому сам итоговый объект попытки
+    // собирается отложенно (buildAttempts), а не сразу тут.
+    const buildAttempts = (task) => [...attempts, { result, at: new Date(), expectedBy: lead.nextCallDueAt ?? null, task }];
+    // Превью без task — только чтобы посчитать следующий дедлайн/провалидировать
+    // его ДО того, как задача введена (nextCallDueAt/validateCallDeadline
+    // читают только length/result, task им не нужен).
+    const preview = [...attempts, { result }];
 
     const stageFields = {};
     if (columnKeyOf(lead) === 'new') {
@@ -275,45 +283,60 @@ export function LeadsPage() {
     if (result === 'success') {
       // Трубку взяли, разговор состоялся — дальше не «когда перезвонить»
       // (как при неудаче), а что реально произошло: думает / записался /
-      // отказался (см. CallSuccessOutcomeModal, план из чата).
+      // отказался (см. CallSuccessOutcomeModal). Задача теперь обязательна
+      // для всех трёх исходов — собирается внутри самой модалки.
       setSuccessOutcomeTarget({
         lead,
-        suggestedDate: nextCallDueAt(nextAttempts) ?? unreachableCallDueAt(),
-        onThink: (comment, dueDate) => commitCallAttempt(lead, nextAttempts, result, { dueDate, comment, stageFields }),
-        onTrial: () => {
+        suggestedDate: nextCallDueAt(preview) ?? unreachableCallDueAt(),
+        onThink: (task, dueDate) => commitCallAttempt(lead, buildAttempts(task), result, { dueDate, comment: task, stageFields }),
+        onTrial: (task) => {
           if (checklistBlocksLeaving(lead)) {
             showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
             return;
           }
-          commitCallAttempt(lead, nextAttempts, result, { stageFields });
+          commitCallAttempt(lead, buildAttempts(task), result, { stageFields });
           setTrialTarget({ lead, mode: 'schedule' });
         },
-        onDecline: () => {
+        onDecline: (task) => {
           if (checklistBlocksLeaving(lead)) {
             showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
             return;
           }
-          commitCallAttempt(lead, nextAttempts, result, { stageFields });
+          commitCallAttempt(lead, buildAttempts(task), result, { stageFields });
           setDeclineTarget(lead);
         },
       });
       return;
     }
 
-    const isCold = nextAttempts.length === 5 && nextAttempts.every((a) => a.result === 'fail');
+    const isCold = preview.length === 5 && attempts.every((a) => a.result === 'fail');
     if (isCold) {
-      // терминальная стадия «Отказ» — дедлайну неоткуда взяться, спрашивать нечего
-      commitCallAttempt(lead, nextAttempts, result, {
-        stageFields: { funnelStage: 'lost', lostReason: 'cold_lead', lostAt: serverTimestamp(), stageHistory: [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }] },
+      // терминальная стадия «Отказ» — дедлайну взяться неоткуда, но задача
+      // (итог последней попытки) всё равно обязательна — noDate-модалка.
+      setDeadlineTarget({
+        lead,
+        title: 'Задача — итог 5-й попытки',
+        noDate: true,
+        requireTask: true,
+        onConfirm: (_date, task) =>
+          commitCallAttempt(lead, buildAttempts(task), result, {
+            stageFields: {
+              funnelStage: 'lost',
+              lostReason: 'cold_lead',
+              lostAt: serverTimestamp(),
+              stageHistory: [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }],
+            },
+          }),
       });
       return;
     }
     setDeadlineTarget({
       lead,
       title: 'Дедлайн следующего звонка',
-      suggestedDate: nextCallDueAt(nextAttempts),
-      onConfirm: (dueDate) => commitCallAttempt(lead, nextAttempts, result, { dueDate, stageFields }),
-      validate: (candidate) => validateCallDeadline(candidate, nextAttempts, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
+      suggestedDate: nextCallDueAt(preview),
+      requireTask: true,
+      onConfirm: (dueDate, task) => commitCallAttempt(lead, buildAttempts(task), result, { dueDate, stageFields }),
+      validate: (candidate) => validateCallDeadline(candidate, preview, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
 
@@ -377,29 +400,42 @@ export function LeadsPage() {
   // Дожим — ровно 2 касания (см. firstTouchDueAt/secondTouchDueAt): первое
   // за день до второго урока, второе — в день второго урока. Оба дня
   // фиксированы датой пробного, оператору выбирать нечего (lockDate).
+  // Задача обязательна на КАЖДОМ касании, включая финальное (2-е) — там
+  // дедлайну взяться неоткуда (noDate), но что сделано/сказано — фиксируем.
   const markTouch = (lead) => {
     const nextNumber = (lead.closingTouchNumber ?? 0) + 1;
     const isFinal = nextNumber >= 2;
     // closingTouchLog — параллельно counter'у closingTouchNumber, только
     // для разбора отклонений при отказе (leadDeviationAnalysis.js): сам
     // счётчик не хранит, КОГДА было касание и был ли дедлайн, лог хранит.
-    const nextLog = [...(lead.closingTouchLog ?? []), { at: new Date(), expectedBy: lead.nextTouchAt ?? null }];
-    const commit = (dueDate) =>
-      patch(
-        lead,
-        { closingTouchNumber: nextNumber, nextTouchAt: isFinal ? null : dueDate, unreachableAttempts: [], closingTouchLog: nextLog },
-        `Касание ${nextNumber} отмечено.`,
-      );
+    const buildLog = (task) => [...(lead.closingTouchLog ?? []), { at: new Date(), expectedBy: lead.nextTouchAt ?? null, task }];
 
     if (isFinal) {
-      commit(null); // 2-е касание финальное — дальше дожима нет, дедлайну взяться неоткуда
+      setDeadlineTarget({
+        lead,
+        title: `Задача — касание ${nextNumber}`,
+        noDate: true,
+        requireTask: true,
+        onConfirm: (_date, task) =>
+          patch(
+            lead,
+            { closingTouchNumber: nextNumber, nextTouchAt: null, unreachableAttempts: [], closingTouchLog: buildLog(task) },
+            `Касание ${nextNumber} отмечено.`,
+          ),
+      });
       return;
     }
     setDeadlineTarget({
       lead,
       title: 'Дедлайн второго касания',
       suggestedDate: secondTouchDueAt(lead.trialDate?.toDate?.()),
-      onConfirm: commit,
+      requireTask: true,
+      onConfirm: (dueDate, task) =>
+        patch(
+          lead,
+          { closingTouchNumber: nextNumber, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: buildLog(task) },
+          `Касание ${nextNumber} отмечено.`,
+        ),
       lockDate: true,
     });
   };
@@ -410,32 +446,72 @@ export function LeadsPage() {
   // пробного сама по себе следующий шаг), «Неуспешно» требует дедлайн
   // следующего звонка. В «Дожиме» нет отдельной формы переноса — там и
   // «Перенос», и «Неуспешно» одинаково просят новый дедлайн касания
-  // (то же поле nextTouchAt, что и у markTouch).
-  const markUnreachable = (lead, result) => {
+  // (то же поле nextTouchAt, что и у markTouch). Задача обязательна на
+  // каждой попытке, включая «Перенос» и случай исчерпанных 3 попыток (там
+  // раньше коммитили молча, без модалки вообще — noDate-задача добавлена).
+  // `onRescheduleCb` — пробрасывается из LeadCard.jsx (UnreachableBlock),
+  // вызывается ПОСЛЕ того, как задача сохранена, а не раньше — иначе
+  // TrialFormModal открылся бы поверх ещё не закрытой DeadlineModal.
+  const markUnreachable = (lead, result, onRescheduleCb) => {
     // expectedBy — тот же смысл, что у markAttempt: дедлайн, действовавший
     // до этой попытки (для «Дожима» — nextTouchAt, на «Пробном» —
     // unreachableNextCallDueAt), нужен разбору отклонений при отказе.
     const expectedBy = (lead.funnelStage === 'closing' ? lead.nextTouchAt : lead.unreachableNextCallDueAt) ?? null;
-    const attempts = [...(lead.unreachableAttempts ?? []), { result, at: new Date(), expectedBy }];
-    const attemptsExhausted = attempts.length >= 3;
+    const priorAttempts = lead.unreachableAttempts ?? [];
+    const buildAttempts = (task) => [...priorAttempts, { result, at: new Date(), expectedBy, task }];
+    const attemptsExhausted = priorAttempts.length + 1 >= 3;
 
     if (lead.funnelStage === 'closing') {
-      const commit = (dueDate) => patch(lead, { unreachableAttempts: attempts, nextTouchAt: dueDate });
       if (attemptsExhausted) {
-        commit(null);
+        setDeadlineTarget({
+          lead,
+          title: 'Задача — попытка связаться',
+          noDate: true,
+          requireTask: true,
+          onConfirm: (_date, task) => patch(lead, { unreachableAttempts: buildAttempts(task), nextTouchAt: null }),
+        });
         return;
       }
-      setDeadlineTarget({ lead, title: 'Дедлайн следующего касания', suggestedDate: unreachableCallDueAt(), onConfirm: commit });
+      setDeadlineTarget({
+        lead,
+        title: 'Дедлайн следующего касания',
+        suggestedDate: unreachableCallDueAt(),
+        requireTask: true,
+        onConfirm: (dueDate, task) => patch(lead, { unreachableAttempts: buildAttempts(task), nextTouchAt: dueDate }),
+      });
       return;
     }
 
-    const commit = (dueDate) => patch(lead, { unreachableAttempts: attempts, unreachableNextCallDueAt: dueDate });
-
-    if (result === 'reschedule' || attemptsExhausted) {
-      commit(null);
+    if (result === 'reschedule') {
+      setDeadlineTarget({
+        lead,
+        title: 'Задача — перенос пробного',
+        noDate: true,
+        requireTask: true,
+        onConfirm: async (_date, task) => {
+          await patch(lead, { unreachableAttempts: buildAttempts(task) });
+          onRescheduleCb?.();
+        },
+      });
       return;
     }
-    setDeadlineTarget({ lead, title: 'Дедлайн следующего звонка', suggestedDate: unreachableCallDueAt(), onConfirm: commit });
+    if (attemptsExhausted) {
+      setDeadlineTarget({
+        lead,
+        title: 'Задача — попытка связаться',
+        noDate: true,
+        requireTask: true,
+        onConfirm: (_date, task) => patch(lead, { unreachableAttempts: buildAttempts(task), unreachableNextCallDueAt: null }),
+      });
+      return;
+    }
+    setDeadlineTarget({
+      lead,
+      title: 'Дедлайн следующего звонка',
+      suggestedDate: unreachableCallDueAt(),
+      requireTask: true,
+      onConfirm: (dueDate, task) => patch(lead, { unreachableAttempts: buildAttempts(task), unreachableNextCallDueAt: dueDate }),
+    });
   };
 
   const openAddForm = () => setFormLead({});
