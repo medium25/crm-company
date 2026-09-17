@@ -242,7 +242,7 @@ export function DeadlineModal({ target, onClose }) {
             <Input
               label="Что произошло?"
               required
-              placeholder="Например: не взял трубку"
+              placeholder="Например: номер выключен"
               value={outcome}
               onChange={(e) => {
                 setOutcome(e.target.value);
