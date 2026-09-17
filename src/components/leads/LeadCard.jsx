@@ -277,10 +277,8 @@ function HistoryTimeline({ lead }) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[11px] leading-tight text-text">
                   {node.entry.outcome || node.entry.task || 'Без задачи'}
+                  {node.entry.nextStep && <> &gt; {node.entry.nextStep}</>}
                 </p>
-                {node.entry.nextStep && (
-                  <p className="truncate text-[10px] leading-tight text-muted">→ {node.entry.nextStep}</p>
-                )}
                 <p className="text-[9px] leading-tight text-muted">{node.entry.at ? formatDateTimeShort(node.entry.at) : '—'}</p>
               </div>
             </>
