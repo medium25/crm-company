@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, CircleDashed, AlertTriangle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, CircleDashed, AlertTriangle, Zap, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -177,22 +177,44 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
   );
 }
 
-/**
- * Кол-во часов, на которое факт (entry.at) опоздал относительно дедлайна,
- * который на тот момент уже стоял (entry.expectedBy — дедлайн предыдущего
- * шага, записывается в момент КАЖДОЙ отметки, см. LeadsPage.jsx
- * buildAttempts/buildLog). null — если дедлайна не было или уложились.
- */
-function overdueLabel(entry) {
-  const expected = entry.expectedBy?.toDate ? entry.expectedBy.toDate() : entry.expectedBy;
-  const at = entry.at?.toDate ? entry.at.toDate() : entry.at;
-  if (!expected || !at) return null;
-  const hours = Math.round((at.getTime() - expected.getTime()) / 3600000);
-  if (hours <= 0) return null;
+// Идеальное время обработки — и новый лид, и задача (дедлайн, что стоял
+// на лиде до этой отметки) должны быть обработаны за 30 минут с момента
+// поступления/наступления.
+const IDEAL_RESPONSE_MINUTES = 30;
+
+function pluralHours(hours) {
   const mod10 = hours % 10;
   const mod100 = hours % 100;
-  const word = mod10 === 1 && mod100 !== 11 ? 'час' : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'часа' : 'часов';
-  return `Задача была просрочена на ${hours} ${word}`;
+  return mod10 === 1 && mod100 !== 11 ? 'час' : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'часа' : 'часов';
+}
+
+function pluralMinutes(minutes) {
+  const mod10 = minutes % 10;
+  const mod100 = minutes % 100;
+  return mod10 === 1 && mod100 !== 11 ? 'минуту' : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'минуты' : 'минут';
+}
+
+/**
+ * Насколько быстро отреагировали на entry — относительно дедлайна, что
+ * стоял на лиде ДО этой отметки (entry.expectedBy, записывается в момент
+ * КАЖДОЙ отметки, см. LeadsPage.jsx buildAttempts/buildLog). Для самого
+ * первого касания (expectedBy ещё нет — реагировать было не на что, кроме
+ * самого факта прихода лида) отсчёт — от `fallbackAt` (момент создания
+ * лида, см. buildTimelineNodes). null — если сравнивать вообще не с чем.
+ * @returns {{tone: 'good'|'bad', label: string}|null}
+ */
+function responseTiming(entry, fallbackAt) {
+  const expectedRaw = entry.expectedBy ?? fallbackAt;
+  const expected = expectedRaw?.toDate ? expectedRaw.toDate() : expectedRaw;
+  const at = entry.at?.toDate ? entry.at.toDate() : entry.at;
+  if (!expected || !at) return null;
+  const minutes = Math.round((at.getTime() - expected.getTime()) / 60000);
+  if (minutes <= IDEAL_RESPONSE_MINUTES) {
+    return { tone: 'good', label: minutes <= 0 ? 'Обработано вовремя' : `Обработано вовремя — за ${minutes} ${pluralMinutes(minutes)}` };
+  }
+  const hours = Math.round(minutes / 60);
+  if (hours <= 0) return { tone: 'good', label: 'Обработано вовремя' };
+  return { tone: 'bad', label: `Задача была просрочена на ${hours} ${pluralHours(hours)}` };
 }
 
 function msOf(v) {
@@ -223,17 +245,18 @@ function buildFullHistory(lead) {
   return items;
 }
 
-// Просрочка — отдельный узел таймлайна (как системное уведомление в ленте
-// активности), не текст, приклеенный поверх задачи следующей записи.
+// Просрочка/«вовремя» — отдельный узел таймлайна (как системное уведомление
+// в ленте активности), не текст, приклеенный поверх задачи следующей записи.
 function buildTimelineNodes(history) {
+  const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const nodes = [];
   history.forEach((item) => {
     if (item.type === 'stage') {
       nodes.push(item);
       return;
     }
-    const overdue = overdueLabel(item);
-    if (overdue) nodes.push({ type: 'overdue', label: overdue });
+    const timing = responseTiming(item, fallbackAt);
+    if (timing) nodes.push({ type: timing.tone === 'good' ? 'ontime' : 'overdue', label: timing.label });
     nodes.push({ type: 'entry', entry: item });
   });
   return nodes;
@@ -271,6 +294,13 @@ function HistoryTimeline({ lead }) {
             <>
               <AlertTriangle className="z-10 h-3 w-3 shrink-0 bg-surface text-danger" />
               <span className="rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-danger">
+                {node.label}
+              </span>
+            </>
+          ) : node.type === 'ontime' ? (
+            <>
+              <Zap className="z-10 h-3 w-3 shrink-0 bg-surface text-success" />
+              <span className="rounded-badge bg-success/10 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-success">
                 {node.label}
               </span>
             </>
