@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { format } from 'date-fns';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
-import { Input } from '../ui/Input.jsx';
-import { DatePicker } from '../ui/DatePicker.jsx';
+import { DeadlinePicker } from './DeadlineModal.jsx';
 
 /**
  * После успешного дозвона («трубку взяли, разговор состоялся») — три
@@ -24,16 +22,14 @@ import { DatePicker } from '../ui/DatePicker.jsx';
 export function CallSuccessOutcomeModal({ target, onClose }) {
   const [step, setStep] = useState('choose');
   const [task, setTask] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  const [deadline, setDeadline] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!target) return;
     setStep('choose');
     setTask('');
-    setDate(format(target.suggestedDate, 'yyyy-MM-dd'));
-    setTime(format(target.suggestedDate, 'HH:mm'));
+    setDeadline(target.suggestedDate);
   }, [target]);
 
   if (!target) return null;
@@ -41,7 +37,7 @@ export function CallSuccessOutcomeModal({ target, onClose }) {
   const submitThink = async () => {
     setSaving(true);
     try {
-      await target.onThink(task.trim(), new Date(`${date}T${time}:00`));
+      await target.onThink(task.trim(), deadline);
       onClose();
     } finally {
       setSaving(false);
@@ -66,8 +62,7 @@ export function CallSuccessOutcomeModal({ target, onClose }) {
         }
       >
         <div className="flex flex-col gap-4">
-          <DatePicker label="Дата следующего звонка" required value={date} onChange={(e) => setDate(e.target.value)} />
-          <Input label="Время" type="time" required value={time} onChange={(e) => setTime(e.target.value)} />
+          <DeadlinePicker value={deadline} onChange={setDeadline} />
         </div>
       </Modal>
     );
