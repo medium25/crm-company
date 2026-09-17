@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, CircleDashed, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, CircleDashed, AlertTriangle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -210,25 +210,45 @@ function overdueLabel(entry) {
   return `Задача была просрочена на ${hours} ${word}`;
 }
 
+// Просрочка — отдельный узел таймлайна (как системное уведомление в ленте
+// активности), не текст, приклеенный поверх задачи следующей записи.
+function buildTimelineNodes(entries) {
+  const nodes = [];
+  entries.forEach((entry) => {
+    const overdue = overdueLabel(entry);
+    if (overdue) nodes.push({ type: 'overdue', label: overdue });
+    nodes.push({ type: 'entry', entry });
+  });
+  return nodes;
+}
+
 function TouchTimeline({ entries, pendingRow }) {
+  const nodes = buildTimelineNodes(entries);
   return (
     <div className="flex flex-col gap-1">
-      {entries.length > 0 ? (
+      {nodes.length > 0 ? (
         <div className="max-h-[60px] overflow-y-auto pr-1">
-          {entries.map((entry, i) => {
-            const overdue = overdueLabel(entry);
-            return (
-              <div key={i} className="relative flex gap-1.5 pb-2 pl-0.5 last:pb-0">
-                {i < entries.length - 1 && <span className="absolute bottom-[-4px] left-[5px] top-3.5 w-px bg-border" />}
-                <CheckCircle2 className="z-10 mt-0.5 h-3 w-3 shrink-0 bg-surface text-success" />
-                <div className="min-w-0 flex-1">
-                  {overdue && <p className="text-[10px] font-bold leading-tight text-danger">{overdue}</p>}
-                  <p className="truncate text-[11px] leading-tight text-text">{entry.task || 'Без задачи'}</p>
-                  <p className="text-[9px] leading-tight text-muted">{entry.at ? formatDateTimeShort(entry.at) : '—'}</p>
-                </div>
-              </div>
-            );
-          })}
+          {nodes.map((node, i) => (
+            <div key={i} className="relative flex items-center gap-1.5 pb-2 pl-0.5 last:pb-0">
+              {i < nodes.length - 1 && <span className="absolute bottom-[-4px] left-[5px] top-3.5 w-px bg-border" />}
+              {node.type === 'overdue' ? (
+                <>
+                  <AlertTriangle className="z-10 h-3 w-3 shrink-0 bg-surface text-danger" />
+                  <span className="rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-danger">
+                    {node.label}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-success" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] leading-tight text-text">{node.entry.task || 'Без задачи'}</p>
+                    <p className="text-[9px] leading-tight text-muted">{node.entry.at ? formatDateTimeShort(node.entry.at) : '—'}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       ) : (
         <span className="text-[11.5px] text-muted">Касаний ещё не было</span>
