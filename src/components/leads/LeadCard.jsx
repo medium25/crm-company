@@ -153,7 +153,11 @@ const UNREACHABLE_MAX_ATTEMPTS = 3;
  * сделанного шага, что для предстоящего/кликабельного, поэтому весь блок
  * (см. TouchTimeline) не «плавает» в зависимости от текста.
  */
-function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabel, muted }) {
+function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabel, muted, tone }) {
+  // tone — лёгкая заливка строки цветом акцента КАРТОЧКИ (success/danger,
+  // тот же, что красит шапку карточки — overdue/«В норме»), не фиксированный
+  // оранжевый: строка выглядит частью той же карточки, а не чужеродной кнопкой.
+  const toneClass = tone === 'success' ? 'bg-success/10' : tone === 'danger' ? 'bg-danger/10' : '';
   const content = (
     <>
       <Icon className={`h-3.5 w-3.5 shrink-0 ${iconClass}`} />
@@ -162,7 +166,7 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
     </>
   );
   if (!onClick) {
-    return <div className="flex h-[18px] items-center justify-center gap-1.5">{content}</div>;
+    return <div className={`flex h-[18px] items-center justify-center gap-1.5 rounded-field ${toneClass}`}>{content}</div>;
   }
   return (
     <button
@@ -170,7 +174,7 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className="flex h-[18px] w-full items-center justify-center gap-1.5 hover:opacity-80"
+      className={`flex h-[18px] w-full items-center justify-center gap-1.5 rounded-field hover:opacity-80 ${toneClass}`}
     >
       {content}
     </button>
@@ -364,10 +368,11 @@ function HistoryTimeline({ lead }) {
  * ряд лежит у левого края узкой карточки в канбане, обычный absolute-попап
  * вылезал за край карточки и обрезался/наезжал на соседнюю колонку.
  */
-function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
+function CallAttemptDots({ attempts, onMark, nextCallDueAt, overdue }) {
   const isCold = attempts.length === MAX_ATTEMPTS && attempts.every((a) => a.result === 'fail');
   const exhausted = attempts.length >= MAX_ATTEMPTS;
   const deadlineLabel = !isCold && nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
+  const tone = overdue ? 'danger' : 'success';
 
   let pendingRow;
   if (isCold) {
@@ -385,11 +390,12 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
           <TimelineRow
             ref={ref}
             icon={CircleDashed}
-            iconClass="text-orange"
+            iconClass={overdue ? 'text-danger' : 'text-success'}
             text={`Касание ${attempts.length + 1}`}
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
+            tone={tone}
           />
         )}
       />
@@ -400,7 +406,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
 }
 
 /** Касания в «Дожиме» (ровно 2, см. LeadsPage.markTouch) — задача обязательна на каждом. */
-function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark }) {
+function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark, overdue }) {
   const count = closingTouchNumber ?? 0;
   const log = closingTouchLog ?? [];
   const deadlineLabel = count < 2 && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
@@ -409,11 +415,12 @@ function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark })
     count < 2 ? (
       <TimelineRow
         icon={CircleDashed}
-        iconClass="text-orange"
+        iconClass={overdue ? 'text-danger' : 'text-success'}
         text={`Касание ${count + 1}`}
         time={deadlineLabel}
         onClick={onMark}
         ariaLabel={`Касание ${count + 1}: отметить`}
+        tone={overdue ? 'danger' : 'success'}
       />
     ) : (
       <TimelineRow icon={CheckCircle2} iconClass="text-success" text="Оба касания сделаны" muted />
@@ -524,7 +531,7 @@ function LeadInfoPopover({ items }) {
  * @param {() => void} onDecline
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
-function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt }) {
+function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt, overdue }) {
   const attempts = lead.unreachableAttempts ?? [];
   const [active, setActive] = useState(attempts.length > 0);
 
@@ -575,11 +582,12 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
           <TimelineRow
             ref={ref}
             icon={CircleDashed}
-            iconClass="text-orange"
+            iconClass={overdue ? 'text-danger' : 'text-success'}
             text={`Касание ${attempts.length + 1}`}
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: связаться`}
+            tone={overdue ? 'danger' : 'success'}
           />
         )}
       />
@@ -759,7 +767,12 @@ export function LeadCard({
       {(stage === 'new' || stage === 'calling') && (
         <div className="flex flex-1 flex-col justify-center gap-1" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
-          <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} nextCallDueAt={lead.nextCallDueAt} />
+          <CallAttemptDots
+            attempts={attempts}
+            onMark={(result) => onMarkAttempt(lead, result)}
+            nextCallDueAt={lead.nextCallDueAt}
+            overdue={overdue}
+          />
         </div>
       )}
 
@@ -789,6 +802,7 @@ export function LeadCard({
             nextTouchAt={lead.nextTouchAt}
             closingTouchLog={lead.closingTouchLog}
             onMark={() => onMarkTouch(lead)}
+            overdue={overdue}
           />
           <UnreachableBlock
             lead={lead}
@@ -796,6 +810,7 @@ export function LeadCard({
             onReschedule={() => {}}
             onDecline={() => onDecline(lead)}
             nextAttemptDueAt={lead.nextTouchAt}
+            overdue={overdue}
           />
         </div>
       )}
