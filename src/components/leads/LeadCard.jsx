@@ -178,21 +178,6 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
 }
 
 /**
- * Общий тайм-лайн касаний — одна и та же форма для Дозвона/Дожима/«Не
- * выходит на связь»: вся история сразу видна на карточке, прокручиваемым
- * окошком фиксированной высоты (не попапом по клику) — так высота карточки
- * не зависит ни от числа попыток (1 из 5 vs 5 из 5), ни от того, открыл ли
- * оператор историю: лишние записи уходят под внутренний скролл, а не
- * растягивают карточку. Записи соединены вертикальной линией (таймлайн),
- * между ними — просрочка, если факт (at) наступил позже дедлайна, что
- * стоял на тот момент (entry.expectedBy).
- * `pendingRow` — следующий шаг, ниже прокручиваемой истории, всегда виден
- * без скролла.
- * @param {Array<{at: Date, task: string, expectedBy?: Date}>} entries
- * @param {import('react').ReactNode} pendingRow
- */
-
-/**
  * Кол-во часов, на которое факт (entry.at) опоздал относительно дедлайна,
  * который на тот момент уже стоял (entry.expectedBy — дедлайн предыдущего
  * шага, записывается в момент КАЖДОЙ отметки, см. LeadsPage.jsx
@@ -210,55 +195,98 @@ function overdueLabel(entry) {
   return `Задача была просрочена на ${hours} ${word}`;
 }
 
+function msOf(v) {
+  if (!v) return 0;
+  if (v.toDate) return v.toDate().getTime();
+  if (v instanceof Date) return v.getTime();
+  return 0;
+}
+
+/**
+ * Единая история лида — переходы между колонками (lead.stageHistory) +
+ * все касания (callAttempts/closingTouchLog/unreachableAttempts), слитые
+ * в одну ленту по времени. Раньше каждый трекер показывал только СВОЮ
+ * историю (callAttempts — только в «Дозвоне» и т.п.) — при переводе в
+ * другую колонку она визуально пропадала с карточки (данные никуда не
+ * девались, просто нечем было их показать). Теперь одна лента видна на
+ * любой стадии, переход между колонками — тоже запись в ней.
+ * @param {Object} lead
+ * @returns {Array<{type: 'stage'|'entry', stage?: string, at: Date, ...}>}
+ */
+function buildFullHistory(lead) {
+  const items = [];
+  (lead.stageHistory ?? []).forEach((h) => items.push({ type: 'stage', stage: h.stage, at: h.enteredAt }));
+  (lead.callAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
+  (lead.closingTouchLog ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
+  (lead.unreachableAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
+  items.sort((a, b) => msOf(a.at) - msOf(b.at));
+  return items;
+}
+
 // Просрочка — отдельный узел таймлайна (как системное уведомление в ленте
 // активности), не текст, приклеенный поверх задачи следующей записи.
-function buildTimelineNodes(entries) {
+function buildTimelineNodes(history) {
   const nodes = [];
-  entries.forEach((entry) => {
-    const overdue = overdueLabel(entry);
+  history.forEach((item) => {
+    if (item.type === 'stage') {
+      nodes.push(item);
+      return;
+    }
+    const overdue = overdueLabel(item);
     if (overdue) nodes.push({ type: 'overdue', label: overdue });
-    nodes.push({ type: 'entry', entry });
+    nodes.push({ type: 'entry', entry: item });
   });
   return nodes;
 }
 
-function TouchTimeline({ entries, pendingRow }) {
-  const nodes = buildTimelineNodes(entries);
+/**
+ * Прокручиваемая лента (см. buildFullHistory) — одна на карточку,
+ * независимо от текущей стадии, фиксированной высоты (не растягивает
+ * карточку числом записей). Рядом с ней (ниже, вне ленты) каждый трекер
+ * рисует свой «следующий шаг» (CallAttemptDots/TouchDots/UnreachableBlock).
+ */
+function HistoryTimeline({ lead }) {
+  const nodes = buildTimelineNodes(buildFullHistory(lead));
+  if (nodes.length === 0) return null;
+
   return (
-    <div className="flex flex-col gap-1">
-      {nodes.length > 0 ? (
-        <div className="max-h-[60px] overflow-y-auto pr-1">
-          {nodes.map((node, i) => (
-            <div key={i} className="relative flex items-center gap-1.5 pb-2 pl-0.5 last:pb-0">
-              {i < nodes.length - 1 && <span className="absolute bottom-[-4px] left-[5px] top-3.5 w-px bg-border" />}
-              {node.type === 'overdue' ? (
-                <>
-                  <AlertTriangle className="z-10 h-3 w-3 shrink-0 bg-surface text-danger" />
-                  <span className="rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-danger">
-                    {node.label}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-success" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] leading-tight text-text">
-                      {node.entry.outcome || node.entry.task || 'Без задачи'}
-                    </p>
-                    {node.entry.nextStep && (
-                      <p className="truncate text-[10px] leading-tight text-muted">→ {node.entry.nextStep}</p>
-                    )}
-                    <p className="text-[9px] leading-tight text-muted">{node.entry.at ? formatDateTimeShort(node.entry.at) : '—'}</p>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+    <div className="max-h-[60px] overflow-y-auto pr-1">
+      {nodes.map((node, i) => (
+        <div key={i} className="relative flex items-center gap-1.5 pb-2 pl-0.5 last:pb-0">
+          {i < nodes.length - 1 && <span className="absolute bottom-[-4px] left-[5px] top-3.5 w-px bg-border" />}
+          {node.type === 'overdue' ? (
+            <>
+              <AlertTriangle className="z-10 h-3 w-3 shrink-0 bg-surface text-danger" />
+              <span className="rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-danger">
+                {node.label}
+              </span>
+            </>
+          ) : node.type === 'stage' ? (
+            <>
+              <ArrowRight className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-navy" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] leading-tight text-navy">
+                  {i === 0 ? 'Создан — ' : 'Переведён в '}«{COLUMNS.find((c) => c.key === node.stage)?.label ?? node.stage}»
+                </p>
+                <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-success" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] leading-tight text-text">
+                  {node.entry.outcome || node.entry.task || 'Без задачи'}
+                </p>
+                {node.entry.nextStep && (
+                  <p className="truncate text-[10px] leading-tight text-muted">→ {node.entry.nextStep}</p>
+                )}
+                <p className="text-[9px] leading-tight text-muted">{node.entry.at ? formatDateTimeShort(node.entry.at) : '—'}</p>
+              </div>
+            </>
+          )}
         </div>
-      ) : (
-        <span className="text-[11.5px] text-muted">Касаний ещё не было</span>
-      )}
-      {pendingRow}
+      ))}
     </div>
   );
 }
@@ -301,7 +329,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
     );
   }
 
-  return <TouchTimeline entries={attempts} pendingRow={pendingRow} />;
+  return pendingRow;
 }
 
 /** Касания в «Дожиме» (ровно 2, см. LeadsPage.markTouch) — задача обязательна на каждом. */
@@ -324,7 +352,7 @@ function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark })
       <TimelineRow icon={CheckCircle2} iconClass="text-success" text="Оба касания сделаны" muted />
     );
 
-  return <TouchTimeline entries={log} pendingRow={pendingRow} />;
+  return pendingRow;
 }
 
 /**
@@ -491,7 +519,7 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
     );
   }
 
-  return <TouchTimeline entries={attempts} pendingRow={pendingRow} />;
+  return pendingRow;
 }
 
 /**
@@ -662,7 +690,8 @@ export function LeadCard({
       </div>
 
       {(stage === 'new' || stage === 'calling') && (
-        <div onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+          <HistoryTimeline lead={lead} />
           <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} nextCallDueAt={lead.nextCallDueAt} />
         </div>
       )}
@@ -675,11 +704,19 @@ export function LeadCard({
               Напомнить: {formatRelativeDay(contactDueDate(lead.trialDate.toDate()))}
             </span>
           )}
+          <HistoryTimeline lead={lead} />
+        </div>
+      )}
+
+      {stage === 'trial_completed' && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <HistoryTimeline lead={lead} />
         </div>
       )}
 
       {stage === 'closing' && (
-        <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+          <HistoryTimeline lead={lead} />
           <TouchDots
             closingTouchNumber={lead.closingTouchNumber}
             nextTouchAt={lead.nextTouchAt}
@@ -696,11 +733,22 @@ export function LeadCard({
         </div>
       )}
 
-      {stage === 'lost' && lead.lostReason && (
-        <p className="text-[12px] text-danger">
-          Причина: {LOST_REASON_OPTIONS.find((o) => o.value === lead.lostReason)?.label ?? lead.lostReason}
-          {lead.lostReasonDetail ? ` — ${lead.lostReasonDetail}` : ''}
-        </p>
+      {stage === 'won' && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <HistoryTimeline lead={lead} />
+        </div>
+      )}
+
+      {stage === 'lost' && (
+        <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {lead.lostReason && (
+            <p className="text-[12px] text-danger">
+              Причина: {LOST_REASON_OPTIONS.find((o) => o.value === lead.lostReason)?.label ?? lead.lostReason}
+              {lead.lostReasonDetail ? ` — ${lead.lostReasonDetail}` : ''}
+            </p>
+          )}
+          <HistoryTimeline lead={lead} />
+        </div>
       )}
 
       <div className="mt-auto flex items-center justify-between border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
