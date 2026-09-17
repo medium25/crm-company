@@ -757,7 +757,7 @@ export function LeadCard({
       </div>
 
       {(stage === 'new' || stage === 'calling') && (
-        <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-1 flex-col justify-center gap-1" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
           <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} nextCallDueAt={lead.nextCallDueAt} />
         </div>
@@ -782,7 +782,7 @@ export function LeadCard({
       )}
 
       {stage === 'closing' && (
-        <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-1 flex-col justify-center gap-1" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
           <TouchDots
             closingTouchNumber={lead.closingTouchNumber}
