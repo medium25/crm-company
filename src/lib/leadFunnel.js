@@ -331,19 +331,6 @@ export function validateCallDeadline(candidate, attempts, workSchedule) {
   }
 
   const index = attempts.length;
-  if (index === 0 || index === 2) {
-    const daySchedule = workSchedule?.[candidate.getDay()];
-    const endOfDay = new Date(candidate);
-    if (daySchedule) {
-      const [endHour, endMinute] = daySchedule.end.split(':').map(Number);
-      endOfDay.setHours(endHour, endMinute, 0, 0);
-    } else {
-      endOfDay.setHours(WORKING_END_HOUR, 0, 0, 0);
-    }
-    if (endOfDay.getTime() - candidate.getTime() < MIN_GAP_BETWEEN_CALLS_MS) {
-      return 'Слишком поздно — не успеет позвонить второй раз в этот день. Оставьте минимум час до конца рабочего дня.';
-    }
-  }
 
   if (index === 1 || index === 3) {
     const prevAt = attempts[attempts.length - 1]?.at;
