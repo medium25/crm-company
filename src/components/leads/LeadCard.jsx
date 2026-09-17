@@ -294,28 +294,36 @@ function HistoryTimeline({ lead }) {
     });
   };
 
+  // Иконка каждого узла — в столбце фиксированной ширины (h-4 w-4) с фоном
+  // ЦВЕТА ПАНЕЛИ (bg-surface-alt, тот же, что у контейнера) — так одна
+  // сквозная линия (единственный absolute-элемент на весь список, не по
+  // сегменту на строку, как раньше) визуально «прокалывается» иконками,
+  // не обрывается и не съезжает между строками разной высоты. Раньше у
+  // каждой строки была своя, независимо посчитанная линия — на стыке
+  // однострочных (прострочка/вовремя) и двухстрочных (переход/касание)
+  // узлов она не совпадала, отсюда ощущение «каждая иконка сама по себе».
+  const ICONS = { overdue: AlertTriangle, ontime: Zap, stage: ArrowRight, entry: CheckCircle2 };
+  const ICON_TONES = { overdue: 'text-danger', ontime: 'text-success', stage: 'text-navy', entry: 'text-success' };
+
   return (
-    <div className="max-h-[110px] overflow-y-auto pr-1">
-      {nodes.map((node, i) => (
-        <div key={i} className="relative flex items-center gap-1.5 pb-2 pl-0.5 last:pb-0">
-          {i < nodes.length - 1 && <span className="absolute bottom-[-4px] left-[5px] top-3.5 w-px bg-border" />}
-          {node.type === 'overdue' ? (
-            <>
-              <AlertTriangle className="z-10 h-3 w-3 shrink-0 bg-surface text-danger" />
-              <span className="rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-danger">
+    <div className="relative max-h-[110px] overflow-y-auto rounded-field bg-surface-alt p-2">
+      {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
+      {nodes.map((node, i) => {
+        const Icon = ICONS[node.type];
+        return (
+          <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
+            <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center bg-surface-alt">
+              <Icon className={`h-3 w-3 ${ICON_TONES[node.type]}`} />
+            </div>
+            {node.type === 'overdue' || node.type === 'ontime' ? (
+              <span
+                className={`rounded-badge px-1.5 py-0.5 text-[10px] font-bold leading-tight ${
+                  node.type === 'overdue' ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'
+                }`}
+              >
                 {node.label}
               </span>
-            </>
-          ) : node.type === 'ontime' ? (
-            <>
-              <Zap className="z-10 h-3 w-3 shrink-0 bg-surface text-success" />
-              <span className="rounded-badge bg-success/10 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-success">
-                {node.label}
-              </span>
-            </>
-          ) : node.type === 'stage' ? (
-            <>
-              <ArrowRight className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-navy" />
+            ) : node.type === 'stage' ? (
               <div className="min-w-0 flex-1">
                 <p
                   onClick={(e) => {
@@ -328,10 +336,7 @@ function HistoryTimeline({ lead }) {
                 </p>
                 <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
               </div>
-            </>
-          ) : (
-            <>
-              <CheckCircle2 className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-success" />
+            ) : (
               <div className="min-w-0 flex-1">
                 <p
                   onClick={(e) => {
@@ -345,10 +350,10 @@ function HistoryTimeline({ lead }) {
                 </p>
                 <p className="text-[9px] leading-tight text-muted">{node.entry.at ? formatDateTimeShort(node.entry.at) : '—'}</p>
               </div>
-            </>
-          )}
-        </div>
-      ))}
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
