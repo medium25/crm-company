@@ -157,12 +157,12 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
   const content = (
     <>
       <Icon className={`h-3.5 w-3.5 shrink-0 ${iconClass}`} />
-      <span className={`min-w-0 flex-1 truncate text-left text-[11.5px] ${muted ? 'text-muted' : 'text-text'}`}>{text}</span>
+      <span className={`max-w-[65%] truncate text-[11.5px] ${muted ? 'text-muted' : 'text-text'}`}>{text}</span>
       {time && <span className="shrink-0 text-[10px] text-muted">{time}</span>}
     </>
   );
   if (!onClick) {
-    return <div className="flex h-[18px] items-center gap-1.5">{content}</div>;
+    return <div className="flex h-[18px] items-center justify-center gap-1.5">{content}</div>;
   }
   return (
     <button
@@ -170,7 +170,7 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className="flex h-[18px] w-full items-center gap-1.5 hover:opacity-80"
+      className="flex h-[18px] w-full items-center justify-center gap-1.5 hover:opacity-80"
     >
       {content}
     </button>
@@ -373,7 +373,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
   if (isCold) {
     pendingRow = <TimelineRow icon={Snowflake} iconClass="text-danger" text="Холодный лид — 5 неудачных попыток" muted />;
   } else if (exhausted) {
-    pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Попыток больше нет" time={deadlineLabel} muted />;
+    pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Касаний больше нет" time={deadlineLabel} muted />;
   } else {
     pendingRow = (
       <DropdownMenu
@@ -386,10 +386,10 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
             ref={ref}
             icon={CircleDashed}
             iconClass="text-orange"
-            text={`Попытка ${attempts.length + 1}`}
+            text={`Касание ${attempts.length + 1}`}
             time={deadlineLabel}
             onClick={toggle}
-            ariaLabel={`Попытка ${attempts.length + 1}: отметить результат звонка`}
+            ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
           />
         )}
       />
@@ -563,7 +563,7 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
       </button>
     );
   } else if (exhausted) {
-    pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Попыток больше нет" time={deadlineLabel} muted />;
+    pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Касаний больше нет" time={deadlineLabel} muted />;
   } else {
     pendingRow = (
       <DropdownMenu
@@ -576,10 +576,10 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
             ref={ref}
             icon={CircleDashed}
             iconClass="text-orange"
-            text="Попытка связаться"
+            text={`Касание ${attempts.length + 1}`}
             time={deadlineLabel}
             onClick={toggle}
-            ariaLabel={`Попытка ${attempts.length + 1}: связаться`}
+            ariaLabel={`Касание ${attempts.length + 1}: связаться`}
           />
         )}
       />
