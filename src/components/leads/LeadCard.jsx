@@ -650,27 +650,6 @@ export function LeadCard({
               Напомнить: {formatRelativeDay(contactDueDate(lead.trialDate.toDate()))}
             </span>
           )}
-
-          {trialDay && (
-            <UnreachableBlock
-              lead={lead}
-              onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
-              onReschedule={() => onRescheduleTrial(lead)}
-              onDecline={() => onDecline(lead)}
-              nextAttemptDueAt={lead.unreachableNextCallDueAt}
-            />
-          )}
-
-          {trialDay && (
-            <label className="flex items-center gap-1.5 text-[12px] text-muted">
-              <input
-                type="checkbox"
-                checked={Boolean(lead.callReminderDone)}
-                onChange={(e) => onToggleCallReminder(lead, e.target.checked)}
-              />
-              {lead.callReminderDone ? 'Напомнили через звонок' : 'Напомнить через звонок'}
-            </label>
-          )}
         </div>
       )}
 
