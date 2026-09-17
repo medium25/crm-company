@@ -241,7 +241,16 @@ function buildFullHistory(lead) {
   (lead.callAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
   (lead.closingTouchLog ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
   (lead.unreachableAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
-  items.sort((a, b) => msOf(a.at) - msOf(b.at));
+  items.sort((a, b) => {
+    const diff = msOf(a.at) - msOf(b.at);
+    if (diff !== 0) return diff;
+    // Тай-брейк на одинаковый at: касание, что вызвало автопереход стадии
+    // (см. LeadsPage.jsx buildStageFields — тот же `at`, что у попытки),
+    // должно идти ДО самого перехода — оно причина, переход следствие.
+    if (a.type === 'entry' && b.type === 'stage') return -1;
+    if (a.type === 'stage' && b.type === 'entry') return 1;
+    return 0;
+  });
   return items;
 }
 

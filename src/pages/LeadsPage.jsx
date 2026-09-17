@@ -270,20 +270,28 @@ export function LeadsPage() {
     // (buildAttempts), а не сразу тут. Исход успешного звонка
     // (CallSuccessOutcomeModal) пишет только одно поле (комментарий) —
     // nextStep там всегда пустой, не отдельный шаг диалога.
-    const buildAttempts = (outcome, nextStep = '') => [
+    // `at` передаётся явно (не new Date() внутри), а не сама попытка целиком —
+    // чтобы момент касания и момент связанного перехода стадии (buildStageFields)
+    // всегда совпадали. Раньше stageHistory.enteredAt считался ОДИН раз в самом
+    // начале markAttempt (в момент клика по точке, до открытия модалки), а
+    // entry.at — только на «Подтвердить» (секунды/минуты спустя, пока
+    // заполняли задачу) — из-за этого «Переведён в «Дозвон»» в истории иногда
+    // оказывался РАНЬШЕ самой попытки, что его вызвала.
+    const buildAttempts = (outcome, nextStep, at) => [
       ...attempts,
-      { result, at: new Date(), expectedBy: lead.nextCallDueAt ?? null, outcome, nextStep },
+      { result, at, expectedBy: lead.nextCallDueAt ?? null, outcome, nextStep },
     ];
+    // Автопереход 'new' → 'calling' по первой же отметке — тем же `at`, что
+    // и у самой попытки (см. выше), иначе переход в истории «обгонял» бы
+    // вызвавшую его попытку.
+    const buildStageFields = (at) =>
+      columnKeyOf(lead) === 'new'
+        ? { funnelStage: 'calling', stageHistory: [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: at }] }
+        : {};
     // Превью без outcome/nextStep — только чтобы посчитать следующий дедлайн/
     // провалидировать его ДО того, как задача введена (nextCallDueAt/
     // validateCallDeadline читают только length/result).
     const preview = [...attempts, { result }];
-
-    const stageFields = {};
-    if (columnKeyOf(lead) === 'new') {
-      stageFields.funnelStage = 'calling';
-      stageFields.stageHistory = [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: new Date() }];
-    }
 
     if (result === 'success') {
       // Трубку взяли, разговор состоялся — дальше не «когда перезвонить»
@@ -293,13 +301,17 @@ export function LeadsPage() {
       setSuccessOutcomeTarget({
         lead,
         suggestedDate: nextCallDueAt(preview) ?? unreachableCallDueAt(),
-        onThink: (task, dueDate) => commitCallAttempt(lead, buildAttempts(task), result, { dueDate, comment: task, stageFields }),
+        onThink: (task, dueDate) => {
+          const at = new Date();
+          commitCallAttempt(lead, buildAttempts(task, '', at), result, { dueDate, comment: task, stageFields: buildStageFields(at) });
+        },
         onTrial: (task) => {
           if (checklistBlocksLeaving(lead)) {
             showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
             return;
           }
-          commitCallAttempt(lead, buildAttempts(task), result, { stageFields });
+          const at = new Date();
+          commitCallAttempt(lead, buildAttempts(task, '', at), result, { stageFields: buildStageFields(at) });
           setTrialTarget({ lead, mode: 'schedule' });
         },
         onDecline: (task) => {
@@ -307,7 +319,8 @@ export function LeadsPage() {
             showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
             return;
           }
-          commitCallAttempt(lead, buildAttempts(task), result, { stageFields });
+          const at = new Date();
+          commitCallAttempt(lead, buildAttempts(task, '', at), result, { stageFields: buildStageFields(at) });
           setDeclineTarget(lead);
         },
         // ^ оставлены как одна строка (task) — CallSuccessOutcomeModal не
@@ -327,15 +340,17 @@ export function LeadsPage() {
         title: 'Задача — итог 5-й попытки',
         noDate: true,
         requireTask: true,
-        onConfirm: (_date, outcome, nextStep) =>
-          commitCallAttempt(lead, buildAttempts(outcome, nextStep), result, {
+        onConfirm: (_date, outcome, nextStep) => {
+          const at = new Date();
+          return commitCallAttempt(lead, buildAttempts(outcome, nextStep, at), result, {
             stageFields: {
               funnelStage: 'lost',
               lostReason: 'cold_lead',
               lostAt: serverTimestamp(),
-              stageHistory: [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: new Date() }],
+              stageHistory: [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: at }],
             },
-          }),
+          });
+        },
       });
       return;
     }
@@ -344,7 +359,10 @@ export function LeadsPage() {
       title: 'Дедлайн следующего звонка',
       suggestedDate: nextCallDueAt(preview),
       requireTask: true,
-      onConfirm: (dueDate, outcome, nextStep) => commitCallAttempt(lead, buildAttempts(outcome, nextStep), result, { dueDate, stageFields }),
+      onConfirm: (dueDate, outcome, nextStep) => {
+        const at = new Date();
+        commitCallAttempt(lead, buildAttempts(outcome, nextStep, at), result, { dueDate, stageFields: buildStageFields(at) });
+      },
       validate: (candidate) => validateCallDeadline(candidate, preview, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
