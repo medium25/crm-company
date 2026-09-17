@@ -157,16 +157,16 @@ export function DeadlinePicker({ value, onChange, lockDate, error }) {
  * в stageDeadline), оператор может поправить перед сохранением — тихого
  * автовычисления без подтверждения больше нет ни в одном из этих мест.
  * @param {Object} props
- * @param {{lead: Object, title: string, suggestedDate?: Date, onConfirm: (date: Date|null, task: string) => Promise<void>, lockDate?: boolean, noDate?: boolean, requireTask?: boolean, validate?: (date: Date) => string|null}|null} props.target
+ * @param {{lead: Object, title: string, suggestedDate?: Date, onConfirm: (date: Date|null, outcome: string, nextStep: string) => Promise<void>, lockDate?: boolean, noDate?: boolean, requireTask?: boolean, validate?: (date: Date) => string|null}|null} props.target
  *   `lockDate` — день менять нельзя (только время); используется там, где
  *   день дедлайна жёстко привязан к дате пробного («Дожим») — у дозвона
  *   день теперь свободный, только предзаполнен подсказкой (2 сегодня/2
  *   завтра/1 послезавтра), оператор может поправить под реальный график.
  *   `noDate` — без поля дедлайна вообще (терминальные/бездедлайновые
  *   отметки — холодный лид, финальное касание «Дожима»); `onConfirm`
- *   получает `date: null`. `requireTask` — обязательное короткое поле
- *   «Задача» (что сделать/о чём договорились), значение чипом отображается
- *   на карточке (см. LeadCard.jsx) — каждое касание обязано его нести.
+ *   получает `date: null`. `requireTask` — два обязательных коротких поля,
+ *   «Что произошло?» и «Следующий шаг» — значение отображается на карточке
+ *   (см. LeadCard.jsx) — каждое касание обязано их нести.
  *   `validate` — доп. проверка выбранного времени (напр. рабочие часы
  *   оператора) — при ошибке возвращает текст, «Подтвердить» её показывает
  *   и не сохраняет.
@@ -174,14 +174,16 @@ export function DeadlinePicker({ value, onChange, lockDate, error }) {
  */
 export function DeadlineModal({ target, onClose }) {
   const [deadline, setDeadline] = useState(null);
-  const [task, setTask] = useState('');
+  const [outcome, setOutcome] = useState('');
+  const [nextStep, setNextStep] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!target) return;
     setDeadline(target.noDate ? null : target.suggestedDate);
-    setTask('');
+    setOutcome('');
+    setNextStep('');
     setError('');
   }, [target]);
 
@@ -189,8 +191,12 @@ export function DeadlineModal({ target, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (target.requireTask && !task.trim()) {
-      setError('Укажи задачу.');
+    if (target.requireTask && !outcome.trim()) {
+      setError('Укажи, что произошло.');
+      return;
+    }
+    if (target.requireTask && !nextStep.trim()) {
+      setError('Укажи следующий шаг.');
       return;
     }
     const candidate = target.noDate ? null : deadline;
@@ -204,7 +210,7 @@ export function DeadlineModal({ target, onClose }) {
     setError('');
     setSaving(true);
     try {
-      await target.onConfirm(candidate, task.trim());
+      await target.onConfirm(candidate, outcome.trim(), nextStep.trim());
       onClose();
     } finally {
       setSaving(false);
@@ -232,16 +238,28 @@ export function DeadlineModal({ target, onClose }) {
           {target.noDate ? 'Задача по' : 'Дедлайн следующего действия по'} «{target.lead.fullName}»
         </p>
         {target.requireTask && (
-          <Input
-            label="Задача"
-            required
-            placeholder="Что сделать / о чём договорились"
-            value={task}
-            onChange={(e) => {
-              setTask(e.target.value);
-              setError('');
-            }}
-          />
+          <>
+            <Input
+              label="Что произошло?"
+              required
+              placeholder="Например: не взял трубку"
+              value={outcome}
+              onChange={(e) => {
+                setOutcome(e.target.value);
+                setError('');
+              }}
+            />
+            <Input
+              label="Следующий шаг"
+              required
+              placeholder="Например: перезвонить вечером"
+              value={nextStep}
+              onChange={(e) => {
+                setNextStep(e.target.value);
+                setError('');
+              }}
+            />
+          </>
         )}
         {!target.noDate && (
           <DeadlinePicker

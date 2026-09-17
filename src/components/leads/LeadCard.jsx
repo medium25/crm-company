@@ -242,7 +242,12 @@ function TouchTimeline({ entries, pendingRow }) {
                 <>
                   <CheckCircle2 className="z-10 h-3 w-3 shrink-0 self-start bg-surface text-success" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] leading-tight text-text">{node.entry.task || 'Без задачи'}</p>
+                    <p className="truncate text-[11px] leading-tight text-text">
+                      {node.entry.outcome || node.entry.task || 'Без задачи'}
+                    </p>
+                    {node.entry.nextStep && (
+                      <p className="truncate text-[10px] leading-tight text-muted">→ {node.entry.nextStep}</p>
+                    )}
                     <p className="text-[9px] leading-tight text-muted">{node.entry.at ? formatDateTimeShort(node.entry.at) : '—'}</p>
                   </div>
                 </>

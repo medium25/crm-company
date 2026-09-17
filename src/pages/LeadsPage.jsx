@@ -263,15 +263,20 @@ export function LeadsPage() {
     // (см. src/lib/leadDeviationAnalysis.js): «просрочка при звонке N»
     // сравнивает факт (at) с этим дедлайном, а не с тем, что назначается
     // следующим шагом. null у старых лидов без этого поля — разбор тогда
-    // приблизительно восстанавливает дедлайн по стандартной сетке. `task` —
-    // короткая задача/заметка, обязательна для КАЖДОГО касания (чем именно
-    // закончилось это взаимодействие) — известна только после того, как
-    // оператор её впишет в модалке, поэтому сам итоговый объект попытки
-    // собирается отложенно (buildAttempts), а не сразу тут.
-    const buildAttempts = (task) => [...attempts, { result, at: new Date(), expectedBy: lead.nextCallDueAt ?? null, task }];
-    // Превью без task — только чтобы посчитать следующий дедлайн/провалидировать
-    // его ДО того, как задача введена (nextCallDueAt/validateCallDeadline
-    // читают только length/result, task им не нужен).
+    // приблизительно восстанавливает дедлайн по стандартной сетке. `outcome`
+    // («Что произошло?») + `nextStep` («Следующий шаг») — обязательны для
+    // КАЖДОГО касания, известны только после того, как оператор впишет их в
+    // модалке, поэтому сам итоговый объект попытки собирается отложенно
+    // (buildAttempts), а не сразу тут. Исход успешного звонка
+    // (CallSuccessOutcomeModal) пишет только одно поле (комментарий) —
+    // nextStep там всегда пустой, не отдельный шаг диалога.
+    const buildAttempts = (outcome, nextStep = '') => [
+      ...attempts,
+      { result, at: new Date(), expectedBy: lead.nextCallDueAt ?? null, outcome, nextStep },
+    ];
+    // Превью без outcome/nextStep — только чтобы посчитать следующий дедлайн/
+    // провалидировать его ДО того, как задача введена (nextCallDueAt/
+    // validateCallDeadline читают только length/result).
     const preview = [...attempts, { result }];
 
     const stageFields = {};
@@ -305,6 +310,10 @@ export function LeadsPage() {
           commitCallAttempt(lead, buildAttempts(task), result, { stageFields });
           setDeclineTarget(lead);
         },
+        // ^ оставлены как одна строка (task) — CallSuccessOutcomeModal не
+        // просит nextStep отдельно, тут это уже подразумевается выбором
+        // кнопки исхода (Думает/Запись/Отказ), см. DeadlineModal для
+        // остальных мест — там и «Что произошло?», и «Следующий шаг».
       });
       return;
     }
@@ -318,8 +327,8 @@ export function LeadsPage() {
         title: 'Задача — итог 5-й попытки',
         noDate: true,
         requireTask: true,
-        onConfirm: (_date, task) =>
-          commitCallAttempt(lead, buildAttempts(task), result, {
+        onConfirm: (_date, outcome, nextStep) =>
+          commitCallAttempt(lead, buildAttempts(outcome, nextStep), result, {
             stageFields: {
               funnelStage: 'lost',
               lostReason: 'cold_lead',
@@ -335,7 +344,7 @@ export function LeadsPage() {
       title: 'Дедлайн следующего звонка',
       suggestedDate: nextCallDueAt(preview),
       requireTask: true,
-      onConfirm: (dueDate, task) => commitCallAttempt(lead, buildAttempts(task), result, { dueDate, stageFields }),
+      onConfirm: (dueDate, outcome, nextStep) => commitCallAttempt(lead, buildAttempts(outcome, nextStep), result, { dueDate, stageFields }),
       validate: (candidate) => validateCallDeadline(candidate, preview, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
@@ -408,7 +417,7 @@ export function LeadsPage() {
     // closingTouchLog — параллельно counter'у closingTouchNumber, только
     // для разбора отклонений при отказе (leadDeviationAnalysis.js): сам
     // счётчик не хранит, КОГДА было касание и был ли дедлайн, лог хранит.
-    const buildLog = (task) => [...(lead.closingTouchLog ?? []), { at: new Date(), expectedBy: lead.nextTouchAt ?? null, task }];
+    const buildLog = (outcome, nextStep) => [...(lead.closingTouchLog ?? []), { at: new Date(), expectedBy: lead.nextTouchAt ?? null, outcome, nextStep }];
 
     if (isFinal) {
       setDeadlineTarget({
@@ -416,10 +425,10 @@ export function LeadsPage() {
         title: `Задача — касание ${nextNumber}`,
         noDate: true,
         requireTask: true,
-        onConfirm: (_date, task) =>
+        onConfirm: (_date, outcome, nextStep) =>
           patch(
             lead,
-            { closingTouchNumber: nextNumber, nextTouchAt: null, unreachableAttempts: [], closingTouchLog: buildLog(task) },
+            { closingTouchNumber: nextNumber, nextTouchAt: null, unreachableAttempts: [], closingTouchLog: buildLog(outcome, nextStep) },
             `Касание ${nextNumber} отмечено.`,
           ),
       });
@@ -430,10 +439,10 @@ export function LeadsPage() {
       title: 'Дедлайн второго касания',
       suggestedDate: secondTouchDueAt(lead.trialDate?.toDate?.()),
       requireTask: true,
-      onConfirm: (dueDate, task) =>
+      onConfirm: (dueDate, outcome, nextStep) =>
         patch(
           lead,
-          { closingTouchNumber: nextNumber, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: buildLog(task) },
+          { closingTouchNumber: nextNumber, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: buildLog(outcome, nextStep) },
           `Касание ${nextNumber} отмечено.`,
         ),
       lockDate: true,
@@ -458,7 +467,7 @@ export function LeadsPage() {
     // unreachableNextCallDueAt), нужен разбору отклонений при отказе.
     const expectedBy = (lead.funnelStage === 'closing' ? lead.nextTouchAt : lead.unreachableNextCallDueAt) ?? null;
     const priorAttempts = lead.unreachableAttempts ?? [];
-    const buildAttempts = (task) => [...priorAttempts, { result, at: new Date(), expectedBy, task }];
+    const buildAttempts = (outcome, nextStep) => [...priorAttempts, { result, at: new Date(), expectedBy, outcome, nextStep }];
     const attemptsExhausted = priorAttempts.length + 1 >= 3;
 
     if (lead.funnelStage === 'closing') {
@@ -468,7 +477,7 @@ export function LeadsPage() {
           title: 'Задача — попытка связаться',
           noDate: true,
           requireTask: true,
-          onConfirm: (_date, task) => patch(lead, { unreachableAttempts: buildAttempts(task), nextTouchAt: null }),
+          onConfirm: (_date, outcome, nextStep) => patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), nextTouchAt: null }),
         });
         return;
       }
@@ -477,7 +486,7 @@ export function LeadsPage() {
         title: 'Дедлайн следующего касания',
         suggestedDate: unreachableCallDueAt(),
         requireTask: true,
-        onConfirm: (dueDate, task) => patch(lead, { unreachableAttempts: buildAttempts(task), nextTouchAt: dueDate }),
+        onConfirm: (dueDate, outcome, nextStep) => patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), nextTouchAt: dueDate }),
       });
       return;
     }
@@ -488,8 +497,8 @@ export function LeadsPage() {
         title: 'Задача — перенос пробного',
         noDate: true,
         requireTask: true,
-        onConfirm: async (_date, task) => {
-          await patch(lead, { unreachableAttempts: buildAttempts(task) });
+        onConfirm: async (_date, outcome, nextStep) => {
+          await patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep) });
           onRescheduleCb?.();
         },
       });
@@ -501,7 +510,8 @@ export function LeadsPage() {
         title: 'Задача — попытка связаться',
         noDate: true,
         requireTask: true,
-        onConfirm: (_date, task) => patch(lead, { unreachableAttempts: buildAttempts(task), unreachableNextCallDueAt: null }),
+        onConfirm: (_date, outcome, nextStep) =>
+          patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), unreachableNextCallDueAt: null }),
       });
       return;
     }
@@ -510,7 +520,8 @@ export function LeadsPage() {
       title: 'Дедлайн следующего звонка',
       suggestedDate: unreachableCallDueAt(),
       requireTask: true,
-      onConfirm: (dueDate, task) => patch(lead, { unreachableAttempts: buildAttempts(task), unreachableNextCallDueAt: dueDate }),
+      onConfirm: (dueDate, outcome, nextStep) =>
+        patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), unreachableNextCallDueAt: dueDate }),
     });
   };
 
