@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isToday, isTomorrow, isSameMonth, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronDown, ChevronRight, Info, Plus, CheckCircle2, XCircle, AlertTriangle, Sun, Clock, Calendar } from 'lucide-react';
+import { ChevronDown, ChevronRight, Settings, Plus, CheckCircle2, XCircle, AlertTriangle, Sun, Clock, Calendar } from 'lucide-react';
 import { LeadCard } from './LeadCard.jsx';
 import { STAGE_COLOR_SWATCHES } from './columns.js';
 import { stageDeadline, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
@@ -18,64 +18,39 @@ const TONE_NAVY = 'bg-navy/15 text-navy';
 const TONE_MUTED = 'bg-border text-muted';
 
 /**
- * Значок «ⓘ» рядом с названием колонки — попап с инструкцией по работе с
- * карточками на этой стадии (`column.hint`, см. columns.js). Тот же паттерн
- * открытия/закрытия (клик вне / Escape), что у попапов на LeadCard.
- * @param {{summary: string, steps: Array<string>}} hint
+ * Кнопка-шестерёнка слева от названия колонки — открывает тот же редактор
+ * название/цвет, что и двойной клик по заголовку (EditableStageTitle).
+ * Раньше тут был значок «ⓘ» с попапом-инструкцией (column.hint,
+ * см. columns.js) — убран, инструкции по стадиям больше не показываем
+ * прямо на доске, настройка стадии важнее и должна быть видна сразу.
  */
-function ColumnHint({ hint }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    const onKeyDown = (e) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onClickOutside);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onClickOutside);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
+function ColumnSettingsButton({ onOpen }) {
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Как работать с карточками на этой стадии"
-        className="flex h-5 w-5 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-navy"
-      >
-        <Info className="h-3.5 w-3.5" />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-7 z-20 w-72 rounded-field border border-border bg-surface p-3 text-left shadow-hover">
-          <p className="mb-2 text-[13px] font-bold text-text">{hint.summary}</p>
-          <ul className="list-disc space-y-1.5 pl-4 text-[13px] text-muted">
-            {hint.steps.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="Настройки стадии — название и цвет"
+      className="flex h-5 w-5 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-navy"
+    >
+      <Settings className="h-3.5 w-3.5" />
+    </button>
   );
 }
 
 /**
- * Название колонки — само служит триггером редактирования (двойной клик),
- * без отдельной иконки-карандаша. Попап правит `label`/`color` (ключ
- * стадии и порядок неизменны, см. `withStageOverrides` в columns.js).
- * Сохранение пишет в `settings/{branchId}.leadStageOverrides.{key}` через
- * `onEdit`.
+ * Название колонки — двойной клик по заголовку ИЛИ кнопка-шестерёнка слева
+ * (ColumnSettingsButton) открывают один и тот же попап: правит `label`/
+ * `color` (ключ стадии и порядок неизменны, см. `withStageOverrides` в
+ * columns.js). Сохранение пишет в `settings/{branchId}.leadStageOverrides.
+ * {key}` через `onEdit`. `open`/`onOpenChange` — состояние поднято в
+ * LeadColumn, чтобы шестерёнка (отдельный элемент в гриде шапки) тоже
+ * могла им управлять.
  * @param {{label: string, color: string}} props.column
  * @param {(patch: {label: string, color: string}) => void} props.onEdit
+ * @param {boolean} props.open
+ * @param {(open: boolean) => void} props.onOpenChange
  */
-function EditableStageTitle({ column, onEdit }) {
-  const [open, setOpen] = useState(false);
+function EditableStageTitle({ column, onEdit, open, onOpenChange }) {
   const [label, setLabel] = useState(column.label);
   const [color, setColor] = useState(column.color);
   const ref = useRef(null);
@@ -85,22 +60,22 @@ function EditableStageTitle({ column, onEdit }) {
     setLabel(column.label);
     setColor(column.color);
     const onClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target)) onOpenChange(false);
     };
-    const onKeyDown = (e) => e.key === 'Escape' && setOpen(false);
+    const onKeyDown = (e) => e.key === 'Escape' && onOpenChange(false);
     document.addEventListener('mousedown', onClickOutside);
     window.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('mousedown', onClickOutside);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, column.label, column.color]);
+  }, [open, column.label, column.color, onOpenChange]);
 
   const save = () => {
     const trimmed = label.trim();
     if (!trimmed) return;
     onEdit({ label: trimmed, color });
-    setOpen(false);
+    onOpenChange(false);
   };
 
   return (
@@ -108,7 +83,7 @@ function EditableStageTitle({ column, onEdit }) {
       <span
         role="button"
         tabIndex={0}
-        onDoubleClick={() => setOpen(true)}
+        onDoubleClick={() => onOpenChange(true)}
         title="Двойной клик — редактировать стадию"
         className="truncate text-[15px] font-bold uppercase tracking-wide text-text"
       >
@@ -398,6 +373,7 @@ function humanizeReasonKey(key) {
  */
 export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, onEditColumn, ...cardActions }) {
   const [dragOver, setDragOver] = useState(false);
+  const [stageEditOpen, setStageEditOpen] = useState(false);
   const isTrialScheduled = column.key === 'trial_scheduled';
   const isWon = column.key === 'won';
   const isLost = column.key === 'lost';
@@ -414,11 +390,16 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 border-b-2 px-4 py-3" style={{ borderBottomColor: column.color }}>
         <span className="flex min-w-0 items-center gap-1.5 justify-self-start">
-          {column.hint && <ColumnHint hint={column.hint} />}
+          {onEditColumn && <ColumnSettingsButton onOpen={() => setStageEditOpen(true)} />}
         </span>
         <span className="min-w-0 justify-self-center">
           {onEditColumn ? (
-            <EditableStageTitle column={column} onEdit={(patch) => onEditColumn(column.key, patch)} />
+            <EditableStageTitle
+              column={column}
+              onEdit={(patch) => onEditColumn(column.key, patch)}
+              open={stageEditOpen}
+              onOpenChange={setStageEditOpen}
+            />
           ) : (
             <span className="truncate text-[15px] font-bold uppercase tracking-wide text-text">{column.label}</span>
           )}
