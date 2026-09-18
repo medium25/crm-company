@@ -296,7 +296,7 @@ function buildFullHistory(lead) {
 function buildTimelineNodes(history) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const interactions = history.filter((item) => item.type === 'entry');
-  return interactions.map((item, i) => {
+  const nodes = interactions.map((item, i) => {
     const timing = responseTiming(item, fallbackAt);
     return {
       type: 'entry',
@@ -305,6 +305,12 @@ function buildTimelineNodes(history) {
       at: item.at,
     };
   });
+  // Последняя поставленная задача (nextStep последнего касания) ещё не
+  // отработана — отдельный выделенный узел в конце ленты, не такой же
+  // серый пункт, как уже сделанные.
+  const pendingTask = interactions[interactions.length - 1]?.nextStep;
+  if (pendingTask) nodes.push({ type: 'pending', task: pendingTask });
+  return nodes;
 }
 
 /**
@@ -367,43 +373,55 @@ function HistoryTimeline({ lead }) {
   return (
     <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
       {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
-      {nodes.map((node, i) => (
-        <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
+      {nodes.map((node, i) =>
+        node.type === 'pending' ? (
           <div
-            ref={dateOpenAt === i ? dateRef : null}
-            className="relative z-10 shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDateOpenAt((v) => (v === i ? null : i));
-            }}
+            key={i}
+            className="relative flex items-start gap-1.5 rounded-field border border-navy bg-navy/10 px-1.5 py-1"
           >
-            <button
-              type="button"
-              aria-label="Дата и время"
-              className="flex h-4 w-4 items-center justify-center bg-surface-alt"
-            >
-              <CheckCircle2 className={`h-3 w-3 ${ICON_TONE}`} />
-            </button>
-            {dateOpenAt === i && (
-              <div className="absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded-field border border-border bg-surface px-2 py-1 text-[10px] text-muted shadow-hover">
-                {node.at ? formatDateTimeShort(node.at) : '—'}
-              </div>
-            )}
+            <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center bg-transparent">
+              <ClipboardCheck className="h-3.5 w-3.5 text-navy" />
+            </div>
+            <p className="min-w-0 flex-1 text-[11px] font-bold leading-tight text-navy">{node.task}</p>
           </div>
-          <div className="min-w-0 flex-1">
-            {node.task && <p className="text-[9px] leading-tight text-muted">{node.task}</p>}
-            <p
+        ) : (
+          <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
+            <div
+              ref={dateOpenAt === i ? dateRef : null}
+              className="relative z-10 shrink-0"
               onClick={(e) => {
                 e.stopPropagation();
-                toggle(i);
+                setDateOpenAt((v) => (v === i ? null : i));
               }}
-              className={`cursor-pointer text-[11px] leading-tight text-text ${expanded.has(i) ? '' : 'truncate'}`}
             >
-              {node.result}
-            </p>
+              <button
+                type="button"
+                aria-label="Дата и время"
+                className="flex h-4 w-4 items-center justify-center bg-surface-alt"
+              >
+                <CheckCircle2 className={`h-3 w-3 ${ICON_TONE}`} />
+              </button>
+              {dateOpenAt === i && (
+                <div className="absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded-field border border-border bg-surface px-2 py-1 text-[10px] text-muted shadow-hover">
+                  {node.at ? formatDateTimeShort(node.at) : '—'}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              {node.task && <p className="text-[9px] leading-tight text-muted">{node.task}</p>}
+              <p
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggle(i);
+                }}
+                className={`cursor-pointer text-[11px] leading-tight text-text ${expanded.has(i) ? '' : 'truncate'}`}
+              >
+                {node.result}
+              </p>
+            </div>
           </div>
-        </div>
-      ))}
+        ),
+      )}
     </div>
   );
 }
