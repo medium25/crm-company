@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X, Settings } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -11,7 +11,7 @@ import { LeadFormDataModal } from './LeadFormDataModal.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, isTrialDay, contactDueDate, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay, formatOverdueBy, formatSource } from '../../lib/format.js';
-import { LEAD_CHECKLIST_ITEMS, checklistCheckedCount, checklistPercent } from '../../lib/leadChecklist.js';
+import { DEFAULT_CHECKLIST_ITEMS, checklistCheckedCount, checklistPercent } from '../../lib/leadChecklist.js';
 
 /**
  * Компактная лента комментариев лида, разворачивается прямо в карточке.
@@ -91,29 +91,87 @@ export function LeadCommentsPanel({ leadId }) {
 
 /**
  * Чек-лист первого разговора — раскрывается прямо в карточке, только в
- * «Новый лид»/«Дозвон» (см. LEAD_CHECKLIST_ITEMS). Пишет сразу в Firestore
- * по каждому клику — тот же самооптимистичный паттерн, что и остальные
- * действия на карточке (onMarkAttempt и т.п.), без промежуточного стейта.
+ * «Новый лид»/«Дозвон». Отметки пишутся сразу в Firestore по каждому
+ * клику — тот же самооптимистичный паттерн, что и остальные действия на
+ * карточке (onMarkAttempt и т.п.), без промежуточного стейта. Сам список
+ * пунктов (`items`, из settings/{branchId}.checklistItems — общий для
+ * всех лидов филиала, не для этого одного) редактируется тут же через ⚙ —
+ * добавить/удалить пункт, пишет `onEditItems` (editChecklistItems в
+ * LeadsPage.jsx).
  */
-function LeadChecklistPanel({ leadId, checklist }) {
-  const checked = checklistCheckedCount(checklist);
-  const percent = checklistPercent(checklist);
+function LeadChecklistPanel({ leadId, checklist, items, onEditItems }) {
+  const [editing, setEditing] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const checked = checklistCheckedCount(checklist, items);
+  const percent = checklistPercent(checklist, items);
+
+  const removeItem = (key) => onEditItems?.(items.filter((i) => i.key !== key));
+
+  const addItem = () => {
+    const label = newLabel.trim();
+    if (!label) return;
+    onEditItems?.([...items, { key: `item_${Date.now()}`, label }]);
+    setNewLabel('');
+  };
+
   return (
     <div className="mt-1.5 flex flex-col gap-1 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
-      <p className="text-[11px] font-bold text-muted">
-        Соблюдено: {checked}/{LEAD_CHECKLIST_ITEMS.length} ({percent}%)
-      </p>
-      {LEAD_CHECKLIST_ITEMS.map((item) => (
-        <label key={item.key} className="flex cursor-pointer items-start gap-1.5 text-[12px] leading-tight text-text">
-          <input
-            type="checkbox"
-            className="mt-0.5 shrink-0"
-            checked={Boolean(checklist?.[item.key])}
-            onChange={(e) => updateDoc(doc(db, 'students', leadId), { [`checklist.${item.key}`]: e.target.checked })}
-          />
-          {item.label}
-        </label>
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-bold text-muted">
+          Соблюдено: {checked}/{items.length} ({percent}%)
+        </p>
+        {onEditItems && (
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            aria-label="Редактировать пункты чек-листа"
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full hover:bg-surface-alt ${editing ? 'text-navy' : 'text-muted'}`}
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {items.map((item) => (
+        <div key={item.key} className="flex items-start gap-1.5">
+          {editing ? (
+            <button
+              type="button"
+              onClick={() => removeItem(item.key)}
+              aria-label={`Удалить пункт: ${item.label}`}
+              className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-danger hover:opacity-70"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <input
+              type="checkbox"
+              className="mt-0.5 shrink-0"
+              checked={Boolean(checklist?.[item.key])}
+              onChange={(e) => updateDoc(doc(db, 'students', leadId), { [`checklist.${item.key}`]: e.target.checked })}
+            />
+          )}
+          <label className="cursor-pointer text-[12px] leading-tight text-text">{item.label}</label>
+        </div>
       ))}
+      {editing && (
+        <div className="mt-1 flex items-center gap-1">
+          <input
+            type="text"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addItem()}
+            placeholder="Новый пункт…"
+            className="h-7 min-w-0 flex-1 rounded-field border border-border-strong bg-white px-2 text-[12px] text-text focus:border-navy focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={addItem}
+            className="flex h-7 shrink-0 items-center justify-center rounded-field bg-navy px-2 text-[11px] font-bold text-white hover:bg-navy-hover"
+          >
+            Добавить
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -445,7 +503,7 @@ function HistoryTimeline({ lead }) {
  * leadFunnel.js) и порог автопереноса в «Холодный лид» (LeadsPage.
  * markAttempt) по-прежнему завязаны только на `calling.maxTouches`.
  */
-function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
+function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts, onOpenChecklist }) {
   const deadlineLabel = nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
   const [confirming, setConfirming] = useState(false);
   const ref = useRef(null);
@@ -486,7 +544,10 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
     <TouchActionButton
       text={`Касание ${attempts.length}/${maxAttempts}`}
       time={deadlineLabel}
-      onClick={() => setConfirming(true)}
+      onClick={() => {
+        setConfirming(true);
+        onOpenChecklist?.();
+      }}
       ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
       compact
     />
@@ -722,7 +783,9 @@ export function LeadCard({
   onOpenBooking,
   onDismissFromBoard,
   onResetToNew,
+  onEditChecklist,
   columns = COLUMNS,
+  checklistItems = DEFAULT_CHECKLIST_ITEMS,
 }) {
   const stage = lead.funnelStage ?? 'new';
   const isTerminal = stage === 'won' || stage === 'lost';
@@ -749,8 +812,8 @@ export function LeadCard({
   const hasComments = (lead.commentsCount ?? 0) > 0;
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [formDataOpen, setFormDataOpen] = useState(false);
-  const checklistChecked = checklistCheckedCount(lead.checklist);
-  const checklistPct = checklistPercent(lead.checklist);
+  const checklistChecked = checklistCheckedCount(lead.checklist, checklistItems);
+  const checklistPct = checklistPercent(lead.checklist, checklistItems);
 
   const createdAt = lead.createdAt?.toDate?.();
   // Риск-бейдж независим от даты (в отличие от overdue) — загорается сразу
@@ -943,7 +1006,8 @@ export function LeadCard({
               attempts={attempts}
               onMark={(result) => onMarkAttempt(lead, result)}
               nextCallDueAt={lead.nextCallDueAt}
-              maxAttempts={columns.find((c) => c.key === stage)?.maxTouches ?? 5}
+              maxAttempts={columns.find((c) => c.key === 'calling')?.maxTouches ?? 5}
+              onOpenChecklist={() => setChecklistOpen(true)}
             />
           ) : stage === 'closing' ? (
             <TouchDots
@@ -1026,7 +1090,7 @@ export function LeadCard({
       </div>
 
         {(stage === 'new' || stage === 'calling') && checklistOpen && (
-          <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} />
+          <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} items={checklistItems} onEditItems={onEditChecklist} />
         )}
         {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
 

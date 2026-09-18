@@ -1,4 +1,4 @@
-import { LEAD_CHECKLIST_ITEMS } from './leadChecklist.js';
+import { DEFAULT_CHECKLIST_ITEMS } from './leadChecklist.js';
 import { stageDeadline } from './leadFunnel.js';
 import { pluralize } from './format.js';
 
@@ -50,7 +50,7 @@ function callAttemptDeadline(attempts, i) {
 }
 
 function checklistDeviation(lead) {
-  const numbered = LEAD_CHECKLIST_ITEMS.map((item, idx) => ({ ...item, num: idx + 1 }));
+  const numbered = DEFAULT_CHECKLIST_ITEMS.map((item, idx) => ({ ...item, num: idx + 1 }));
   const unchecked = numbered.filter((item) => !lead.checklist?.[item.key]);
   if (unchecked.length === 0) return null;
   return {

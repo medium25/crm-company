@@ -21,7 +21,7 @@ import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
-import { checklistPercent } from '../lib/leadChecklist.js';
+import { checklistPercent, DEFAULT_CHECKLIST_ITEMS } from '../lib/leadChecklist.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt, validateCallDeadline } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
 
@@ -113,6 +113,15 @@ export function LeadsPage() {
   // колонки «Дозвон» (см. columns.js), читают markAttempt/nextCallDueAt
   // ниже вместо жёстко зашитого 5.
   const callMaxAttempts = resolvedColumns.find((c) => c.key === 'calling')?.maxTouches ?? 5;
+  // Чек-лист первого разговора — список пунктов редактируемый (⚙ на панели
+  // чек-листа в LeadCard.jsx), хранится тут же в settings/{branchId}.
+  const resolvedChecklistItems = branchSettings?.checklistItems ?? DEFAULT_CHECKLIST_ITEMS;
+  const editChecklistItems = (items) => {
+    if (!branchSettingsRef) return;
+    setDoc(branchSettingsRef, { checklistItems: items }, { merge: true }).catch(() =>
+      showToast('Не удалось сохранить чек-лист.', { type: 'error' }),
+    );
+  };
 
   const editStageColumn = (stageKey, patch) => {
     if (!branchSettingsRef) return;
@@ -338,7 +347,8 @@ export function LeadsPage() {
   // onDecline). «Пробный назначен» из-под этого гейта убран по просьбе —
   // туда можно без отметок в чек-листе.
   const checklistBlocksLeaving = (lead) =>
-    (columnKeyOf(lead) === 'new' || columnKeyOf(lead) === 'calling') && checklistPercent(lead.checklist) === 0;
+    (columnKeyOf(lead) === 'new' || columnKeyOf(lead) === 'calling') &&
+    checklistPercent(lead.checklist, resolvedChecklistItems) === 0;
 
   const moveLead = (lead, stageKey) => {
     if (columnKeyOf(lead) === stageKey) return;
@@ -544,6 +554,7 @@ export function LeadsPage() {
     onMarkAttempt: markAttempt,
     onMarkUnreachable: markUnreachable,
     onToggleCallReminder: (lead, checked) => patch(lead, { callReminderDone: checked }),
+    onEditChecklist: editChecklistItems,
   };
 
   return (
@@ -598,6 +609,7 @@ export function LeadsPage() {
             onAdd={column.key === 'new' ? openAddForm : undefined}
             onEditColumn={editStageColumn}
             columns={resolvedColumns}
+            checklistItems={resolvedChecklistItems}
             onDropLead={(leadId, columnKey) => {
               const lead = leadsById.get(leadId);
               if (lead) moveLead(lead, columnKey);
