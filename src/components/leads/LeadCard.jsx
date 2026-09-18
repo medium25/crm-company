@@ -939,16 +939,6 @@ export function LeadCard({
                 <ClipboardCheck className="h-4 w-4" />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setCommentsOpen((v) => !v)}
-              aria-label="Комментарии"
-              className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-                hasComments ? 'text-navy' : 'text-muted'
-              }`}
-            >
-              <MessageSquareText className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
-            </button>
             {!isTerminal && (
               <button
                 type="button"
@@ -959,6 +949,16 @@ export function LeadCard({
                 <Users className="h-4 w-4" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setCommentsOpen((v) => !v)}
+              aria-label="Комментарии"
+              className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+                hasComments ? 'text-navy' : 'text-muted'
+              }`}
+            >
+              <MessageSquareText className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
+            </button>
             {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
             <DropdownMenu items={menuItems} />
           </div>
