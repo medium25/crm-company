@@ -302,11 +302,21 @@ function buildTimelineNodes(history) {
  * рисует свой «следующий шаг» (CallAttemptDots/TouchDots/UnreachableBlock).
  */
 function HistoryTimeline({ lead }) {
-  // useState ДО early return — иначе при первом же появлении истории
-  // (0 записей → 1) хуки в этом инстансе компонента перестанут совпадать
-  // между рендерами (React бросит "Rendered fewer hooks than expected").
+  // useState/useRef/useEffect ДО early return — иначе при первом же
+  // появлении истории (0 записей → 1) хуки в этом инстансе компонента
+  // перестанут совпадать между рендерами (React бросит "Rendered fewer
+  // hooks than expected").
   const [expanded, setExpanded] = useState(() => new Set());
+  const scrollRef = useRef(null);
   const nodes = buildTimelineNodes(buildFullHistory(lead));
+
+  // Лента отсортирована по возрастанию (старое сверху, новое снизу) —
+  // без автоскролла окно по умолчанию открывалось на самой старой записи,
+  // самую свежую/актуальную задачу приходилось искать скроллом вниз.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [nodes.length]);
+
   if (nodes.length === 0) return null;
 
   const toggle = (i) => {
@@ -333,7 +343,7 @@ function HistoryTimeline({ lead }) {
   const ICON_TONE = 'text-navy';
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
+    <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
       {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
       {nodes.map((node, i) => {
         const Icon = ICONS[node.type];
