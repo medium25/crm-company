@@ -737,7 +737,7 @@ export function LeadCard({
   // ещё в «Новом лиде», в счёт «Дозвона» не идёт.
   const callingEnteredAt = (lead.stageHistory ?? []).filter((h) => h.stage === 'calling').at(-1)?.enteredAt;
   const attempts = (lead.callAttempts ?? []).filter(
-    (a) => stage !== 'calling' || !callingEnteredAt || msOf(a.at) >= msOf(callingEnteredAt),
+    (a) => stage !== 'calling' || !callingEnteredAt || msOf(a.at) > msOf(callingEnteredAt),
   );
   const operatorLabel = operatorInitials(operatorName);
   // Раньше жил отдельным слотом слева в футере — теперь там кнопка
