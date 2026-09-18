@@ -17,7 +17,6 @@ import { DismissFromBoardModal } from '../components/leads/DismissFromBoardModal
 import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
-import { CallSuccessOutcomeModal } from '../components/leads/CallSuccessOutcomeModal.jsx';
 import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
@@ -176,7 +175,6 @@ export function LeadsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
   const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
-  const [successOutcomeTarget, setSuccessOutcomeTarget] = useState(null); // { lead, suggestedDate, onThink, onTrial, onDecline }
   const [bookingTarget, setBookingTarget] = useState(null);
   const [resetTarget, setResetTarget] = useState(null);
   const [dismissTarget, setDismissTarget] = useState(null);
@@ -213,8 +211,7 @@ export function LeadsPage() {
   /**
    * Пишет саму попытку звонка (callLogs + students.callAttempts) — общая
    * часть для обоих исходов (успех/неудача), опционально с комментарием
-   * (только «клиент думает» после успеха, см. CallSuccessOutcomeModal) и
-   * доп. полями стадии (переход new→calling всегда, calling→lost при 5
+   * и доп. полями стадии (переход new→calling всегда, calling→lost при 5
    * неудачах подряд).
    */
   const commitCallAttempt = async (lead, nextAttempts, result, { dueDate = null, comment = '', stageFields = {} } = {}) => {
@@ -269,11 +266,10 @@ export function LeadsPage() {
     // следующим шагом. null у старых лидов без этого поля — разбор тогда
     // приблизительно восстанавливает дедлайн по стандартной сетке. `outcome`
     // («Что произошло?») + `nextStep` («Следующий шаг») — обязательны для
-    // КАЖДОГО касания, известны только после того, как оператор впишет их в
-    // модалке, поэтому сам итоговый объект попытки собирается отложенно
-    // (buildAttempts), а не сразу тут. Исход успешного звонка
-    // (CallSuccessOutcomeModal) пишет только одно поле (комментарий) —
-    // nextStep там всегда пустой, не отдельный шаг диалога.
+    // КАЖДОГО касания (успех и неудача через одну и ту же модалку),
+    // известны только после того, как оператор впишет их в модалке, поэтому
+    // сам итоговый объект попытки собирается отложенно (buildAttempts),
+    // а не сразу тут.
     // `at` передаётся явно (не new Date() внутри), а не сама попытка целиком —
     // чтобы момент касания и момент связанного перехода стадии (buildStageFields)
     // всегда совпадали. Раньше stageHistory.enteredAt считался ОДИН раз в самом
@@ -297,45 +293,11 @@ export function LeadsPage() {
     // validateCallDeadline читают только length/result).
     const preview = [...attempts, { result }];
 
-    if (result === 'success') {
-      // Трубку взяли, разговор состоялся — дальше не «когда перезвонить»
-      // (как при неудаче), а что реально произошло: думает / записался /
-      // отказался (см. CallSuccessOutcomeModal). Задача теперь обязательна
-      // для всех трёх исходов — собирается внутри самой модалки.
-      setSuccessOutcomeTarget({
-        lead,
-        suggestedDate: nextCallDueAt(preview, callMaxAttempts) ?? unreachableCallDueAt(),
-        onThink: (task, dueDate) => {
-          const at = new Date();
-          commitCallAttempt(lead, buildAttempts(task, '', at), result, { dueDate, comment: task, stageFields: buildStageFields(at) });
-        },
-        onTrial: (task) => {
-          if (checklistBlocksLeaving(lead)) {
-            showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
-            return;
-          }
-          const at = new Date();
-          commitCallAttempt(lead, buildAttempts(task, '', at), result, { stageFields: buildStageFields(at) });
-          setTrialTarget({ lead, mode: 'schedule' });
-        },
-        onDecline: (task) => {
-          if (checklistBlocksLeaving(lead)) {
-            showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
-            return;
-          }
-          const at = new Date();
-          commitCallAttempt(lead, buildAttempts(task, '', at), result, { stageFields: buildStageFields(at) });
-          setDeclineTarget(lead);
-        },
-        // ^ оставлены как одна строка (task) — CallSuccessOutcomeModal не
-        // просит nextStep отдельно, тут это уже подразумевается выбором
-        // кнопки исхода (Думает/Запись/Отказ), см. DeadlineModal для
-        // остальных мест — там и «Что произошло?», и «Следующий шаг».
-      });
-      return;
-    }
-
-    const isCold = preview.length === callMaxAttempts && attempts.every((a) => a.result === 'fail');
+    // «Успешно»/«Не успешно» ведут через одну и ту же простую модалку
+    // (Что произошло/Следующий шаг/Дедлайн) — трёхкнопочный выбор исхода
+    // (Думает/Запись на пробный/Отказ, CallSuccessOutcomeModal) убран по
+    // просьбе, запись на пробный/отказ теперь только через «⋮» на карточке.
+    const isCold = result === 'fail' && preview.length === callMaxAttempts && attempts.every((a) => a.result === 'fail');
     if (isCold) {
       // терминальная стадия «Отказ» — дедлайну взяться неоткуда, но задача
       // (итог последней попытки) всё равно обязательна — noDate-модалка.
@@ -360,7 +322,7 @@ export function LeadsPage() {
     }
     setDeadlineTarget({
       lead,
-      title: 'Дедлайн следующего звонка',
+      title: 'Следующая задача:',
       suggestedDate: nextCallDueAt(preview, callMaxAttempts),
       requireTask: true,
       onConfirm: (dueDate, outcome, nextStep) => {
@@ -372,10 +334,9 @@ export function LeadsPage() {
   };
 
   // Пока по лиду не отмечен ни один пункт чек-листа первого разговора (см.
-  // src/lib/leadChecklist.js) — некуда переносить дальше «Новый лид»/
-  // «Дозвон»: ни вручную (стрелка/меню, drag-n-drop — оба идут через
-  // moveLead), ни через исход успешного звонка (Запись/Отказ в
-  // CallSuccessOutcomeModal). «Думает» не двигает стадию — не под гейтом.
+  // src/lib/leadChecklist.js) — некуда переносить в «Отказ» (moveLead,
+  // onDecline). «Пробный назначен» из-под этого гейта убран по просьбе —
+  // туда можно без отметок в чек-листе.
   const checklistBlocksLeaving = (lead) =>
     (columnKeyOf(lead) === 'new' || columnKeyOf(lead) === 'calling') && checklistPercent(lead.checklist) === 0;
 
@@ -385,7 +346,7 @@ export function LeadsPage() {
       showToast('Нельзя вернуть лида на предыдущую стадию.', { type: 'error' });
       return;
     }
-    if (stageKey !== 'calling' && checklistBlocksLeaving(lead)) {
+    if (stageKey !== 'calling' && stageKey !== 'trial_scheduled' && checklistBlocksLeaving(lead)) {
       showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
       return;
     }
@@ -403,7 +364,7 @@ export function LeadsPage() {
     if (stageKey === 'calling') {
       setDeadlineTarget({
         lead,
-        title: 'Дедлайн следующего звонка',
+        title: 'Следующая задача:',
         suggestedDate: nextCallDueAt(lead.callAttempts ?? [], callMaxAttempts),
         onConfirm: (dueDate) => commit({ nextCallDueAt: dueDate }),
         validate: (candidate) => validateCallDeadline(candidate, lead.callAttempts ?? [], branchSettings?.operatorSchedules?.[lead.assignedOperator]),
@@ -539,7 +500,7 @@ export function LeadsPage() {
     }
     setDeadlineTarget({
       lead,
-      title: 'Дедлайн следующего звонка',
+      title: 'Следующая задача:',
       suggestedDate: unreachableCallDueAt(),
       requireTask: true,
       onConfirm: (dueDate, outcome, nextStep) =>
@@ -571,13 +532,7 @@ export function LeadsPage() {
     },
     onDelete: (lead) => setDeleteTarget(lead),
     onResetToNew: (lead) => setResetTarget(lead),
-    onScheduleTrial: (lead) => {
-      if (checklistBlocksLeaving(lead)) {
-        showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
-        return;
-      }
-      setTrialTarget({ lead, mode: 'schedule' });
-    },
+    onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
     onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
     onOpenBooking: (lead) => setBookingTarget(lead),
     // Только «Оплачено» — убирает карточку с доски, студент остаётся в
@@ -659,7 +614,6 @@ export function LeadsPage() {
       <DismissFromBoardModal lead={dismissTarget} onClose={() => setDismissTarget(null)} />
       <TrialFormModal target={trialTarget} timeSlots={branchSettings?.trialTimeSlots} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
-      <CallSuccessOutcomeModal target={successOutcomeTarget} onClose={() => setSuccessOutcomeTarget(null)} />
       <GroupBookingModal lead={bookingTarget} allLeads={allLeads} onClose={() => setBookingTarget(null)} />
     </div>
   );

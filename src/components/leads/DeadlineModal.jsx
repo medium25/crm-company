@@ -238,15 +238,11 @@ export function DeadlineModal({ target, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <p className="text-[13px] text-muted">
-          {target.noDate ? 'Задача по' : 'Дедлайн следующего действия по'} «{target.lead.fullName}»
-        </p>
         {target.requireTask && (
           <>
             <Input
               label="Что произошло?"
               required
-              placeholder="Например: номер выключен"
               value={outcome}
               onChange={(e) => {
                 setOutcome(e.target.value);
@@ -256,7 +252,6 @@ export function DeadlineModal({ target, onClose }) {
             <Input
               label="Следующий шаг"
               required
-              placeholder="Например: перезвонить вечером"
               value={nextStep}
               onChange={(e) => {
                 setNextStep(e.target.value);
