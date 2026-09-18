@@ -863,68 +863,67 @@ export function LeadCard({
           ) : (
             <span />
           )}
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {stage === 'won' ? (
-            // «Оплачено» — карточка ведёт себя как уведомление: только
-            // посмотреть (клик по карточке) и скрыть с доски. Ни коммента, ни
-            // ⋮-меню с «Удалить навсегда» тут никогда не было и не будет —
-            // студент остаётся в системе, убирается только вид на доске
-            // (onDismissFromBoard, см. LeadsPage.boardHiddenAt).
-            <button
-              type="button"
-              onClick={() => onDismissFromBoard(lead)}
-              aria-label="Скрыть с доски"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : (
-            <div className="flex items-center gap-0.5">
-              {(stage === 'new' || stage === 'calling') && (
-                <button
-                  type="button"
-                  onClick={() => setChecklistOpen((v) => !v)}
-                  aria-label="Чек-лист"
-                  className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-                    checklistOpen
-                      ? 'text-navy'
-                      : checklistChecked === 0
-                        ? 'text-muted'
-                        : checklistPct === 100
-                          ? 'text-success'
-                          : 'text-orange'
-                  }`}
-                >
-                  <ClipboardCheck className="h-4 w-4" />
-                </button>
-              )}
+        {stage === 'won' ? (
+          // «Оплачено» — карточка ведёт себя как уведомление: только
+          // посмотреть (клик по карточке) и скрыть с доски. Ни коммента, ни
+          // ⋮-меню с «Удалить навсегда» тут никогда не было и не будет —
+          // студент остаётся в системе, убирается только вид на доске
+          // (onDismissFromBoard, см. LeadsPage.boardHiddenAt).
+          <button
+            type="button"
+            onClick={() => onDismissFromBoard(lead)}
+            aria-label="Скрыть с доски"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : (
+          <div className="flex shrink-0 items-center gap-0.5">
+            {(stage === 'new' || stage === 'calling') && (
               <button
                 type="button"
-                onClick={() => setCommentsOpen((v) => !v)}
-                aria-label="Комментарии"
+                onClick={() => setChecklistOpen((v) => !v)}
+                aria-label="Чек-лист"
                 className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-                  hasComments ? 'text-navy' : 'text-muted'
+                  checklistOpen
+                    ? 'text-navy'
+                    : checklistChecked === 0
+                      ? 'text-muted'
+                      : checklistPct === 100
+                        ? 'text-success'
+                        : 'text-orange'
                 }`}
               >
-                <MessageSquareText className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
+                <ClipboardCheck className="h-4 w-4" />
               </button>
-              {!isTerminal && (
-                <button
-                  type="button"
-                  onClick={() => onOpenBooking(lead)}
-                  aria-label="Свободные места в группе"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
-                >
-                  <Users className="h-4 w-4" />
-                </button>
-              )}
-              {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
-              <DropdownMenu items={menuItems} />
-            </div>
-          )}
-          {operatorBadge}
-        </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setCommentsOpen((v) => !v)}
+              aria-label="Комментарии"
+              className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+                hasComments ? 'text-navy' : 'text-muted'
+              }`}
+            >
+              <MessageSquareText className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
+            </button>
+            {!isTerminal && (
+              <button
+                type="button"
+                onClick={() => onOpenBooking(lead)}
+                aria-label="Свободные места в группе"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+              >
+                <Users className="h-4 w-4" />
+              </button>
+            )}
+            {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
+            <DropdownMenu items={menuItems} />
+          </div>
+        )}
       </div>
+
+      {operatorBadge && <div className="flex justify-end">{operatorBadge}</div>}
 
         {(stage === 'new' || stage === 'calling') && checklistOpen && (
           <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} />
