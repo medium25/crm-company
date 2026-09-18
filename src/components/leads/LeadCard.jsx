@@ -923,18 +923,19 @@ export function LeadCard({
         )}
       </div>
 
-      {operatorBadge && <div className="flex justify-end">{operatorBadge}</div>}
-
         {(stage === 'new' || stage === 'calling') && checklistOpen && (
           <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} />
         )}
         {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
 
-        <span className="text-[10px] text-muted">
-          {formatDateTimeShort(lead.createdAt)}
-          {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
-          {stage === 'new' || stage === 'calling' ? ` · Чек-лист ${checklistPct}%` : ''}
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-muted">
+            {formatDateTimeShort(lead.createdAt)}
+            {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
+            {stage === 'new' || stage === 'calling' ? ` · Чек-лист ${checklistPct}%` : ''}
+          </span>
+          {operatorBadge}
+        </div>
       </div>
     </div>
   );
