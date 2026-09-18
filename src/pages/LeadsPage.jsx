@@ -283,7 +283,7 @@ export function LeadsPage() {
     // оказывался РАНЬШЕ самой попытки, что его вызвала.
     const buildAttempts = (outcome, nextStep, at) => [
       ...attempts,
-      { result, at, expectedBy: lead.nextCallDueAt ?? null, outcome, nextStep },
+      { result, at, expectedBy: lead.nextCallDueAt ?? null, outcome, nextStep, byName: staff?.fullName ?? '' },
     ];
     // Автопереход 'new' → 'calling' по первой же отметке — тем же `at`, что
     // и у самой попытки (см. выше), иначе переход в истории «обгонял» бы
@@ -439,7 +439,10 @@ export function LeadsPage() {
     // closingTouchLog — параллельно counter'у closingTouchNumber, только
     // для разбора отклонений при отказе (leadDeviationAnalysis.js): сам
     // счётчик не хранит, КОГДА было касание и был ли дедлайн, лог хранит.
-    const buildLog = (outcome, nextStep) => [...(lead.closingTouchLog ?? []), { at: new Date(), expectedBy: lead.nextTouchAt ?? null, outcome, nextStep }];
+    const buildLog = (outcome, nextStep) => [
+      ...(lead.closingTouchLog ?? []),
+      { at: new Date(), expectedBy: lead.nextTouchAt ?? null, outcome, nextStep, byName: staff?.fullName ?? '' },
+    ];
 
     if (isFinal) {
       setDeadlineTarget({
@@ -489,7 +492,10 @@ export function LeadsPage() {
     // unreachableNextCallDueAt), нужен разбору отклонений при отказе.
     const expectedBy = (lead.funnelStage === 'closing' ? lead.nextTouchAt : lead.unreachableNextCallDueAt) ?? null;
     const priorAttempts = lead.unreachableAttempts ?? [];
-    const buildAttempts = (outcome, nextStep) => [...priorAttempts, { result, at: new Date(), expectedBy, outcome, nextStep }];
+    const buildAttempts = (outcome, nextStep) => [
+      ...priorAttempts,
+      { result, at: new Date(), expectedBy, outcome, nextStep, byName: staff?.fullName ?? '' },
+    ];
     const attemptsExhausted = priorAttempts.length + 1 >= 3;
 
     if (lead.funnelStage === 'closing') {
