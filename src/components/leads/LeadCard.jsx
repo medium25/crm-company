@@ -264,6 +264,7 @@ function buildFullHistory(lead) {
   (lead.callAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
   (lead.closingTouchLog ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
   (lead.unreachableAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
+  (lead.operatorTransfers ?? []).forEach((e) => items.push({ type: 'operator', fromName: e.fromName, toName: e.toName, at: e.at }));
   items.sort((a, b) => {
     const diff = msOf(a.at) - msOf(b.at);
     if (diff !== 0) return diff;
@@ -283,12 +284,12 @@ function buildTimelineNodes(history) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const nodes = [];
   history.forEach((item) => {
-    if (item.type === 'stage') {
+    if (item.type === 'stage' || item.type === 'operator') {
       nodes.push(item);
       return;
     }
     const timing = responseTiming(item, fallbackAt);
-    if (timing) nodes.push({ type: timing.tone === 'good' ? 'ontime' : 'overdue', label: timing.label });
+    if (timing) nodes.push({ type: timing.tone === 'good' ? 'ontime' : 'overdue', label: timing.label, at: item.at });
     nodes.push({ type: 'entry', entry: item });
   });
   return nodes;
@@ -325,8 +326,11 @@ function HistoryTimeline({ lead }) {
   // каждой строки была своя, независимо посчитанная линия — на стыке
   // однострочных (прострочка/вовремя) и двухстрочных (переход/касание)
   // узлов она не совпадала, отсюда ощущение «каждая иконка сама по себе».
-  const ICONS = { overdue: AlertTriangle, ontime: Zap, stage: ArrowRight, entry: CheckCircle2 };
-  const ICON_TONES = { overdue: 'text-danger', ontime: 'text-success', stage: 'text-navy', entry: 'text-success' };
+  // Единый стиль для всех типов узлов — раньше цвет иконки менялся по типу
+  // (красная просрочка/зелёное вовремя/навy переход/зелёное касание), теперь
+  // все записи ленты выглядят однородно, различаются только иконкой-формой.
+  const ICONS = { overdue: AlertTriangle, ontime: Zap, stage: ArrowRight, entry: CheckCircle2, operator: Users };
+  const ICON_TONE = 'text-navy';
 
   return (
     <div className="relative min-h-0 flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
@@ -336,16 +340,20 @@ function HistoryTimeline({ lead }) {
         return (
           <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
             <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center bg-surface-alt">
-              <Icon className={`h-3 w-3 ${ICON_TONES[node.type]}`} />
+              <Icon className={`h-3 w-3 ${ICON_TONE}`} />
             </div>
             {node.type === 'overdue' || node.type === 'ontime' ? (
-              <span
-                className={`rounded-badge px-1.5 py-0.5 text-[10px] font-bold leading-tight ${
-                  node.type === 'overdue' ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'
-                }`}
-              >
-                {node.label}
-              </span>
+              <div className="min-h-[25px] min-w-0 flex-1">
+                <p className="text-[11px] leading-tight text-text">{node.label}</p>
+                <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
+              </div>
+            ) : node.type === 'operator' ? (
+              <div className="min-h-[25px] min-w-0 flex-1">
+                <p className="text-[11px] leading-tight text-text">
+                  Передан от «{node.fromName}» к «{node.toName}»
+                </p>
+                <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
+              </div>
             ) : node.type === 'stage' ? (
               <div className="min-w-0 flex-1">
                 <p

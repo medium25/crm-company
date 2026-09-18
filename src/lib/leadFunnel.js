@@ -1,5 +1,18 @@
 // src/lib/leadFunnel.js
-import { doc, getDoc, updateDoc, collection, query, where, getCountFromServer, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getCountFromServer,
+  serverTimestamp,
+  writeBatch,
+  getDocs,
+  arrayUnion,
+  Timestamp,
+} from 'firebase/firestore';
 import { differenceInCalendarDays, addDays, startOfDay } from 'date-fns';
 import { notifySheetsExport } from './sheetsExportHook.js';
 
@@ -410,18 +423,23 @@ export async function getActiveLeadIdsForOperator(db, operatorId, branchId) {
 }
 
 /**
- * Массовый перевод лидов другому оператору — меняет только владельца
- * (assignedOperator), funnelStage/stageHistory/дедлайны не трогаются:
- * прогресс по воронке остаётся как есть, переезжает только ответственный.
- * Чанки по 400 — лимит Firestore batch 500, запас на случай большого списка
- * у одного оператора.
+ * Массовый перевод лидов другому оператору — меняет владельца
+ * (assignedOperator) и дописывает запись в operatorTransfers (видна в
+ * единой истории карточки лида, см. HistoryTimeline в LeadCard.jsx) —
+ * funnelStage/stageHistory/дедлайны не трогаются: прогресс по воронке
+ * остаётся как есть, переезжает только ответственный. Чанки по 400 —
+ * лимит Firestore batch 500, запас на случай большого списка у одного
+ * оператора. `at` — Timestamp.now(), не serverTimestamp(): Firestore не
+ * поддерживает server timestamp внутри элемента arrayUnion.
  * @param {import('firebase/firestore').Firestore} db
  * @param {Array<string>} leadIds
  * @param {string} newOperatorId
  * @param {{uid: string}} user
+ * @param {{fromName: string, toName: string}} names имена операторов-источника/получателя для читаемой записи в истории
  */
-export async function reassignLeadsToOperator(db, leadIds, newOperatorId, user) {
+export async function reassignLeadsToOperator(db, leadIds, newOperatorId, user, names) {
   const CHUNK = 400;
+  const at = Timestamp.now();
   for (let i = 0; i < leadIds.length; i += CHUNK) {
     const batch = writeBatch(db);
     for (const id of leadIds.slice(i, i + CHUNK)) {
@@ -429,6 +447,7 @@ export async function reassignLeadsToOperator(db, leadIds, newOperatorId, user) 
         assignedOperator: newOperatorId,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
+        operatorTransfers: arrayUnion({ fromName: names.fromName, toName: names.toName, at }),
       });
     }
     await batch.commit();

@@ -84,7 +84,8 @@ export function OperatorLeadsPanel({ operator, operators, stageOverrides, onClos
     if (selected.size === 0 || !targetId) return;
     setTransferring(true);
     try {
-      await reassignLeadsToOperator(db, Array.from(selected), targetId, user);
+      const targetName = operators.find((op) => op.id === targetId)?.fullName ?? '';
+      await reassignLeadsToOperator(db, Array.from(selected), targetId, user, { fromName: operator.fullName, toName: targetName });
       showToast(`Переведено лидов: ${selected.size}.`);
       onTransferred?.();
       onClose();

@@ -40,7 +40,8 @@ export function TransferAllLeadsModal({ operator, operators, onClose, onTransfer
         onClose();
         return;
       }
-      await reassignLeadsToOperator(db, leadIds, targetId, user);
+      const targetName = operators.find((op) => op.id === targetId)?.fullName ?? '';
+      await reassignLeadsToOperator(db, leadIds, targetId, user, { fromName: operator.fullName, toName: targetName });
       showToast(`Переведено лидов: ${leadIds.length}.`);
       onTransferred?.();
       onClose();
