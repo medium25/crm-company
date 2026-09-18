@@ -44,24 +44,31 @@ function ColumnSettingsButton({ onOpen }) {
  * columns.js). Сохранение пишет в `settings/{branchId}.leadStageOverrides.
  * {key}` через `onEdit`. `open`/`onOpenChange` — состояние поднято в
  * LeadColumn, чтобы шестерёнка (отдельный элемент в гриде шапки) тоже
- * могла им управлять.
+ * могла им управлять. `maxTouchesColumn`/`onEditMaxTouches` — отдельная
+ * пара: «Новый лид» и «Дозвон» делят один и тот же счётчик попыток
+ * (CallAttemptDots в LeadCard.jsx), поэтому у «Нового лида» это поле в
+ * попапе тоже есть, но читает/пишет значение колонки «Дозвон» (см.
+ * maxTouchesSourceKey в LeadColumn ниже), а не своё — иначе два разных
+ * числа для одного и того же счётчика могли бы разъехаться.
  * @param {{label: string, color: string}} props.column
  * @param {(patch: {label: string, color: string}) => void} props.onEdit
+ * @param {{maxTouches?: number}} props.maxTouchesColumn
+ * @param {(n: number) => void} props.onEditMaxTouches
  * @param {boolean} props.open
  * @param {(open: boolean) => void} props.onOpenChange
  */
-function EditableStageTitle({ column, onEdit, open, onOpenChange }) {
+function EditableStageTitle({ column, onEdit, maxTouchesColumn, onEditMaxTouches, open, onOpenChange }) {
   const [label, setLabel] = useState(column.label);
   const [color, setColor] = useState(column.color);
-  const [maxTouches, setMaxTouches] = useState(column.maxTouches ?? '');
-  const hasMaxTouches = column.maxTouches !== undefined;
+  const [maxTouches, setMaxTouches] = useState(maxTouchesColumn?.maxTouches ?? '');
+  const hasMaxTouches = maxTouchesColumn?.maxTouches !== undefined;
   const ref = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     setLabel(column.label);
     setColor(column.color);
-    setMaxTouches(column.maxTouches ?? '');
+    setMaxTouches(maxTouchesColumn?.maxTouches ?? '');
     const onClickOutside = (e) => {
       if (ref.current && !ref.current.contains(e.target)) onOpenChange(false);
     };
@@ -72,17 +79,16 @@ function EditableStageTitle({ column, onEdit, open, onOpenChange }) {
       document.removeEventListener('mousedown', onClickOutside);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, column.label, column.color, column.maxTouches, onOpenChange]);
+  }, [open, column.label, column.color, maxTouchesColumn?.maxTouches, onOpenChange]);
 
   const save = () => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    const patch = { label: trimmed, color };
+    onEdit({ label: trimmed, color });
     if (hasMaxTouches) {
       const n = Number(maxTouches);
-      patch.maxTouches = Number.isFinite(n) && n > 0 ? Math.round(n) : column.maxTouches;
+      onEditMaxTouches(Number.isFinite(n) && n > 0 ? Math.round(n) : maxTouchesColumn.maxTouches);
     }
-    onEdit(patch);
     onOpenChange(false);
   };
 
@@ -392,7 +398,7 @@ function humanizeReasonKey(key) {
  * @param {(leadId: string, columnKey: string) => void} props.onDropLead
  * @param {(columnKey: string, patch: {label: string, color: string}) => void} props.onEditColumn
  */
-export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, onEditColumn, ...cardActions }) {
+export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, onEditColumn, columns, ...cardActions }) {
   const [dragOver, setDragOver] = useState(false);
   const [stageEditOpen, setStageEditOpen] = useState(false);
   const isTrialScheduled = column.key === 'trial_scheduled';
@@ -407,6 +413,12 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
     [isWon, isLost, leads],
   );
 
+  // «Новый лид» и «Дозвон» делят один счётчик попыток дозвона
+  // (CallAttemptDots в LeadCard.jsx) — редактор макс. касаний у «Нового
+  // лида» показывает и правит значение «Дозвона», не своё собственное.
+  const maxTouchesSourceKey = column.key === 'new' ? 'calling' : column.key;
+  const maxTouchesColumn = (columns ?? []).find((c) => c.key === maxTouchesSourceKey) ?? column;
+
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 border-b-2 px-4 py-3" style={{ borderBottomColor: column.color }}>
@@ -418,6 +430,8 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
             <EditableStageTitle
               column={column}
               onEdit={(patch) => onEditColumn(column.key, patch)}
+              maxTouchesColumn={maxTouchesColumn}
+              onEditMaxTouches={(n) => onEditColumn(maxTouchesSourceKey, { maxTouches: n })}
               open={stageEditOpen}
               onOpenChange={setStageEditOpen}
             />
@@ -545,7 +559,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
         ) : (
           leads.map((lead) => {
             const op = operatorByUid.get(lead.assignedOperator);
-            return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
+            return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} columns={columns} {...cardActions} />;
           })
         )}
       </div>

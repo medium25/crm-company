@@ -42,6 +42,7 @@ export const COLUMNS = [
     key: 'trial_scheduled',
     label: 'Пробный назначен',
     color: '#D6336C',
+    maxTouches: 3,
     hint: {
       summary: 'Дата, время и учитель пробного урока зафиксированы — дождитесь дня занятия.',
       steps: [
@@ -54,6 +55,7 @@ export const COLUMNS = [
     key: 'trial_completed',
     label: 'Пробный проведён',
     color: '#0F9D8C',
+    maxTouches: 2,
     hint: {
       summary: 'Студент уже создан (страница «Пробные») — дождитесь оплаты или переведите вручную в «Дожим».',
       steps: [
