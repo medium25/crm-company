@@ -1,6 +1,6 @@
 // src/pages/LeadsPage.jsx
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Moon, Sun } from 'lucide-react';
 import { collection, doc, query, where, orderBy, onSnapshot, updateDoc, setDoc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase.js';
@@ -36,6 +36,31 @@ export function LeadsPage() {
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const { user, staff } = useAuth();
+
+  // Переход с «Задачи» (?highlight=leadId, см. TasksPage.jsx «Выполнить») —
+  // прокручиваем доску к нужной карточке и на пару секунд подсвечиваем её
+  // рамкой, вместо того чтобы сразу открывать её детальную страницу лида
+  // (оператор должен видеть карточку в контексте колонки, не отдельным окном).
+  const [searchParams] = useSearchParams();
+  const highlightLeadId = searchParams.get('highlight');
+  const [activeHighlight, setActiveHighlight] = useState(highlightLeadId);
+  useEffect(() => {
+    if (!highlightLeadId) return;
+    setActiveHighlight(highlightLeadId);
+    let attempts = 0;
+    const id = setInterval(() => {
+      attempts += 1;
+      const el = document.getElementById(`lead-card-${highlightLeadId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        clearInterval(id);
+        setTimeout(() => setActiveHighlight(null), 3000);
+      } else if (attempts > 20) {
+        clearInterval(id);
+      }
+    }, 150);
+    return () => clearInterval(id);
+  }, [highlightLeadId]);
   // Ceo/manager видят все заявки филиала по умолчанию, с кнопкой
   // переключения на «только мои»; остальные роли (admin/teacher) всегда
   // видят только назначенные лично им — без кнопки, переключать нечего.
@@ -555,10 +580,23 @@ export function LeadsPage() {
     onMarkUnreachable: markUnreachable,
     onToggleCallReminder: (lead, checked) => patch(lead, { callReminderDone: checked }),
     onEditChecklist: editChecklistItems,
+    highlightLeadId: activeHighlight,
   };
 
   return (
     <div>
+      {/* Виден только при переходе с «Задачи» (?highlight=...) — быстрый
+          путь назад, не полагаясь на кнопку «Назад» браузера (карточку уже
+          проскроллили/подсветили, обычный «назад» увёл бы на пустой список
+          без этого состояния). */}
+      {highlightLeadId && (
+        <Link
+          to="/tasks"
+          className="fixed bottom-4 left-4 z-10 flex items-center gap-1 rounded-full bg-navy px-4 py-2 text-[13px] font-bold text-white shadow-hover hover:bg-navy-hover"
+        >
+          ← К задачам
+        </Link>
+      )}
       {/* fixed в угол экрана — не участвует в потоке страницы (колонки
           начинаются сразу сверху) и не переезжает поверх шапок колонок при
           горизонтальном скролле доски, в отличие от absolute сверху. Одна

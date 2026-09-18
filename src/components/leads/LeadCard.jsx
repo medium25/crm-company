@@ -850,7 +850,9 @@ export function LeadCard({
   onEditChecklist,
   columns = COLUMNS,
   checklistItems = DEFAULT_CHECKLIST_ITEMS,
+  highlightLeadId,
 }) {
+  const highlighted = highlightLeadId === lead.id;
   const stage = lead.funnelStage ?? 'new';
   const isTerminal = stage === 'won' || stage === 'lost';
   // callAttempts общий на 'new'+'calling' (счёт не прерывается при
@@ -940,6 +942,7 @@ export function LeadCard({
 
   return (
     <div
+      id={`lead-card-${lead.id}`}
       role="button"
       tabIndex={0}
       draggable={!isTerminal}
@@ -955,6 +958,8 @@ export function LeadCard({
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
       } ${
         priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''
+      } ${
+        highlighted ? 'ring-4 ring-navy ring-offset-2' : ''
       }`}
     >
       {/* И просрочка, и «В норме» красят только шапку (заливка + линия под

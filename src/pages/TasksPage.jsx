@@ -26,8 +26,10 @@ const BUCKETS = [
  * самой карточке (stageDeadline/overdueReasonLabel, leadFunnel.js), никакой
  * отдельной сущности «задача» в Firestore нет — задача существует ровно
  * до тех пор, пока у лида есть неотработанный дедлайн следующего действия.
- * «Выполнить» не отмечает ничего тут — просто открывает карточку лида,
- * где действие (звонок/касание/т.п.) и отмечается как обычно.
+ * «Выполнить» не отмечает ничего тут — переводит на доску «Заявки»
+ * (/leads?highlight=id), где нужная карточка прокручивается в видимую
+ * область и подсвечивается рамкой; действие (звонок/касание/т.п.)
+ * отмечается там же, как обычно. Оттуда есть кнопка «← К задачам».
  */
 export function TasksPage() {
   const navigate = useNavigate();
@@ -166,7 +168,7 @@ export function TasksPage() {
                         <span className="truncate text-[11px] text-link">{formatPhone(lead.phone)}</span>
                         <button
                           type="button"
-                          onClick={() => navigate(`/students/${lead.id}`)}
+                          onClick={() => navigate(`/leads?highlight=${lead.id}`)}
                           className="shrink-0 rounded-field bg-navy px-3 py-1.5 text-[12px] font-bold text-white hover:bg-navy-hover"
                         >
                           Выполнить
