@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { XCircle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
+import { XCircle, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -146,35 +146,6 @@ export function trialScheduleLabel(lead) {
 }
 
 const UNREACHABLE_MAX_ATTEMPTS = 3;
-
-/**
- * Строка тайм-лайна касаний — фиксированная высота (h-[18px]) что для уже
- * сделанного шага, что для предстоящего/кликабельного, поэтому весь блок
- * (см. TouchTimeline) не «плавает» в зависимости от текста.
- */
-function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabel, muted }) {
-  const content = (
-    <>
-      <Icon className={`h-3.5 w-3.5 shrink-0 ${iconClass}`} />
-      <span className={`max-w-[65%] truncate text-[11.5px] ${muted ? 'text-muted' : 'text-text'}`}>{text}</span>
-      {time && <span className="shrink-0 text-[10px] text-muted">{time}</span>}
-    </>
-  );
-  if (!onClick) {
-    return <div className="flex h-[18px] items-center justify-center gap-1.5 rounded-field">{content}</div>;
-  }
-  return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      className="flex h-[18px] w-full items-center justify-center gap-1.5 rounded-field hover:opacity-80"
-    >
-      {content}
-    </button>
-  );
-}
 
 /**
  * Главная кнопка следующего касания — под лентой истории, во всю ширину
@@ -475,34 +446,26 @@ function HistoryTimeline({ lead }) {
  * markAttempt) по-прежнему завязаны только на `calling.maxTouches`.
  */
 function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
-  const isCold = attempts.length === maxAttempts && attempts.every((a) => a.result === 'fail');
-  const deadlineLabel = !isCold && nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
+  const deadlineLabel = nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
 
-  let pendingRow;
-  if (isCold) {
-    pendingRow = <TimelineRow icon={Snowflake} iconClass="text-danger" text={`Холодный лид — ${maxAttempts} неудачных попыток`} muted />;
-  } else {
-    pendingRow = (
-      <DropdownMenu
-        items={[
-          { label: '✓ Успешно', onClick: () => onMark('success') },
-          { label: '✕ Не успешно', danger: true, onClick: () => onMark('fail') },
-        ]}
-        trigger={({ ref, toggle }) => (
-          <TouchActionButton
-            ref={ref}
-            text={`Касание ${attempts.length}/${maxAttempts}`}
-            time={deadlineLabel}
-            onClick={toggle}
-            ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
-            compact
-          />
-        )}
-      />
-    );
-  }
-
-  return pendingRow;
+  return (
+    <DropdownMenu
+      items={[
+        { label: '✓ Успешно', onClick: () => onMark('success') },
+        { label: '✕ Не успешно', danger: true, onClick: () => onMark('fail') },
+      ]}
+      trigger={({ ref, toggle }) => (
+        <TouchActionButton
+          ref={ref}
+          text={`Касание ${attempts.length}/${maxAttempts}`}
+          time={deadlineLabel}
+          onClick={toggle}
+          ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
+          compact
+        />
+      )}
+    />
+  );
 }
 
 /**
