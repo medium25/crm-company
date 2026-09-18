@@ -190,10 +190,10 @@ function TouchActionButton({ ref, onClick, ariaLabel, text, time }) {
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className="flex w-full items-center justify-center gap-1.5 rounded-field bg-[#0088CC] py-2 text-[13px] font-bold text-white hover:bg-[#0077B3]"
+      className="flex w-1/2 flex-col items-center justify-center gap-0.5 rounded-field bg-[#0088CC] py-2 text-[13px] font-bold leading-tight text-white hover:bg-[#0077B3]"
     >
-      {text}
-      {time && <span className="text-[11px] font-normal opacity-80">{time}</span>}
+      <span className="whitespace-nowrap">{text}</span>
+      {time && <span className="text-[10px] font-normal leading-tight opacity-80">{time}</span>}
     </button>
   );
 }
