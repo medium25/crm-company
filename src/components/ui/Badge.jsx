@@ -6,6 +6,8 @@ const VARIANT_CLASSES = {
   'group-code': 'bg-[#EEF0F3] text-text tabular-nums',
   'attendance-present': 'bg-present text-white',
   'attendance-absent': 'bg-absent text-white',
+  'attendance-present-muted': 'bg-muted text-white',
+  'attendance-absent-muted': 'bg-border-strong text-muted',
 };
 
 /**
