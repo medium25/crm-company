@@ -327,9 +327,19 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
   // отработана — отдельный выделенный узел в конце ленты, не такой же
   // серый пункт, как уже сделанные. Номер — следующий в счёте ТЕКУЩЕГО
   // столбца (тот же счёт, что у кнопки касания под лентой).
-  const pendingTask = interactions[interactions.length - 1]?.nextStep;
+  // До первого звонка своего nextStep ещё нет ни у кого — задача на этот
+  // случай фиксированная, та же, что у самого первого касания (i === 0
+  // выше), с дедлайном «через 30 минут после создания лида».
+  const pendingTask =
+    interactions.length === 0
+      ? (currentStage === 'new' || currentStage === 'calling') && fallbackAt
+        ? 'Позвонить в первые 30 минут'
+        : null
+      : interactions[interactions.length - 1].nextStep;
+  const pendingDue =
+    interactions.length === 0 && fallbackAt ? new Date(msOf(fallbackAt) + 30 * 60000) : (pendingDueAt ?? null);
   if (pendingTask) {
-    nodes.push({ type: 'pending', task: pendingTask, dueAt: pendingDueAt ?? null, step: (stepByStage[currentStage] ?? 0) + 1 });
+    nodes.push({ type: 'pending', task: pendingTask, dueAt: pendingDue, step: (stepByStage[currentStage] ?? 0) + 1 });
   }
   return nodes;
 }
