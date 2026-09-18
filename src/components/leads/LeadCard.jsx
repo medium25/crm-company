@@ -329,7 +329,7 @@ function HistoryTimeline({ lead }) {
   const ICON_TONES = { overdue: 'text-danger', ontime: 'text-success', stage: 'text-navy', entry: 'text-success' };
 
   return (
-    <div className="relative max-h-[110px] min-h-0 flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
+    <div className="relative min-h-0 flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
       {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
       {nodes.map((node, i) => {
         const Icon = ICONS[node.type];
@@ -736,7 +736,7 @@ export function LeadCard({
       }}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className={`group relative flex min-h-[215px] flex-col gap-2.5 rounded-xl border bg-surface p-3.5 pb-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group relative flex h-[215px] flex-col gap-2.5 rounded-xl border bg-surface p-3.5 pb-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
       } ${
         priority && !overdue ? 'border-l-4 border-l-orange-soft' : ''
