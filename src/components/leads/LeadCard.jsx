@@ -413,10 +413,11 @@ function HistoryTimeline({ lead }) {
  * Меню выбора результата — через DropdownMenu (портал, `position: fixed`) —
  * ряд лежит у левого края узкой карточки в канбане, обычный absolute-попап
  * вылезал за край карточки и обрезался/наезжал на соседнюю колонку.
- * `maxAttempts` — из columns.js `calling.maxTouches` (⚙ в шапке колонки
- * «Дозвон») — та же сетка «по 2 попытки в день» (nextCallDueAt в
+ * `maxAttempts` — из columns.js, своё значение для 'new' и 'calling'
+ * (⚙ в шапке соответствующей колонки), только для отображения на кнопке:
+ * счётчик попыток общий, сетка «по 2 попытки в день» (nextCallDueAt в
  * leadFunnel.js) и порог автопереноса в «Холодный лид» (LeadsPage.
- * markAttempt) подстраиваются под это же число.
+ * markAttempt) по-прежнему завязаны только на `calling.maxTouches`.
  */
 function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
   const isCold = attempts.length === maxAttempts && attempts.every((a) => a.result === 'fail');
@@ -891,7 +892,7 @@ export function LeadCard({
               attempts={attempts}
               onMark={(result) => onMarkAttempt(lead, result)}
               nextCallDueAt={lead.nextCallDueAt}
-              maxAttempts={columns.find((c) => c.key === 'calling')?.maxTouches ?? 5}
+              maxAttempts={columns.find((c) => c.key === stage)?.maxTouches ?? 5}
             />
           ) : stage === 'closing' ? (
             <TouchDots

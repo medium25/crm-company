@@ -45,11 +45,9 @@ function ColumnSettingsButton({ onOpen }) {
  * {key}` через `onEdit`. `open`/`onOpenChange` — состояние поднято в
  * LeadColumn, чтобы шестерёнка (отдельный элемент в гриде шапки) тоже
  * могла им управлять. `maxTouchesColumn`/`onEditMaxTouches` — отдельная
- * пара: «Новый лид» и «Дозвон» делят один и тот же счётчик попыток
- * (CallAttemptDots в LeadCard.jsx), поэтому у «Нового лида» это поле в
- * попапе тоже есть, но читает/пишет значение колонки «Дозвон» (см.
- * maxTouchesSourceKey в LeadColumn ниже), а не своё — иначе два разных
- * числа для одного и того же счётчика могли бы разъехаться.
+ * пара для поля «Макс. касаний»: своё значение у каждой стадии
+ * (включая «Новый лид», хотя счётчик попыток там общий с «Дозвоном» —
+ * см. LeadCard.jsx CallAttemptDots).
  * @param {{label: string, color: string}} props.column
  * @param {(patch: {label: string, color: string}) => void} props.onEdit
  * @param {{maxTouches?: number}} props.maxTouchesColumn
@@ -413,11 +411,10 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
     [isWon, isLost, leads],
   );
 
-  // «Новый лид» и «Дозвон» делят один счётчик попыток дозвона
-  // (CallAttemptDots в LeadCard.jsx) — редактор макс. касаний у «Нового
-  // лида» показывает и правит значение «Дозвона», не своё собственное.
-  const maxTouchesSourceKey = column.key === 'new' ? 'calling' : column.key;
-  const maxTouchesColumn = (columns ?? []).find((c) => c.key === maxTouchesSourceKey) ?? column;
+  // «Новый лид» и «Дозвон» делят один и тот же счётчик попыток
+  // (CallAttemptDots в LeadCard.jsx, только счёт продолжается после
+  // переезда) — но max у каждой стадии свой, регулируется независимо.
+  const maxTouchesColumn = (columns ?? []).find((c) => c.key === column.key) ?? column;
 
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
@@ -431,7 +428,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
               column={column}
               onEdit={(patch) => onEditColumn(column.key, patch)}
               maxTouchesColumn={maxTouchesColumn}
-              onEditMaxTouches={(n) => onEditColumn(maxTouchesSourceKey, { maxTouches: n })}
+              onEditMaxTouches={(n) => onEditColumn(column.key, { maxTouches: n })}
               open={stageEditOpen}
               onOpenChange={setStageEditOpen}
             />
