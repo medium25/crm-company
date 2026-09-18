@@ -624,10 +624,11 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
         trigger={({ ref, toggle }) => (
           <TouchActionButton
             ref={ref}
-            text={`Касание ${attempts.length + 1}`}
+            text={`Касание ${attempts.length}/${UNREACHABLE_MAX_ATTEMPTS}`}
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: связаться`}
+            compact
           />
         )}
       />
