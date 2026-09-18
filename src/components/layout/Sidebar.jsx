@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   Inbox,
   CalendarCheck,
+  ListChecks,
   CircleUserRound,
   GraduationCap,
   Coins,
@@ -30,6 +31,7 @@ const ITEMS = [
   { key: 'dashboard', to: '/', label: 'Дашборд', icon: LayoutGrid },
   { key: 'leads', to: '/leads', label: 'Заявки', icon: Inbox },
   { key: 'trials', to: '/trials', label: 'Пробные', icon: CalendarCheck },
+  { key: 'tasks', to: '/tasks', label: 'Задачи', icon: ListChecks },
   { key: 'students', to: '/students', label: 'Студенты', icon: CircleUserRound },
   { key: 'teachersGroups', to: '/teachers-groups', label: 'Учителя и группы', icon: GraduationCap },
   { key: 'payments', to: '/payments', label: 'Финансы', icon: Coins },
@@ -44,9 +46,9 @@ const ITEMS = [
  * AddStaffModal) — см. использование ниже.
  */
 const ROLE_ITEM_KEYS = {
-  ceo: ['dashboard', 'leads', 'trials', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
-  manager: ['dashboard', 'leads', 'trials', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
-  admin: ['dashboard', 'leads', 'trials', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  ceo: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  manager: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  admin: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
   teacher: ['teachersGroups'],
 };
 

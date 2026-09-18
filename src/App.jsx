@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { LeadsPage } from './pages/LeadsPage.jsx';
 import { TrialsPage } from './pages/TrialsPage.jsx';
+import { TasksPage } from './pages/TasksPage.jsx';
 import { StudentsPage } from './pages/StudentsPage.jsx';
 import { StudentDetailPage } from './pages/StudentDetailPage.jsx';
 import { GroupsPage } from './pages/GroupsPage.jsx';
@@ -32,6 +33,7 @@ import { UiKitShowcasePage } from './pages/UiKitShowcasePage.jsx';
 const SECTION_PATHS = {
   leads: '/leads',
   trials: '/trials',
+  tasks: '/tasks',
   students: '/students',
   teachersGroups: '/teachers-groups',
   payments: '/payments',
@@ -87,6 +89,14 @@ function App() {
                   element={
                     <ProtectedRoute section="trials">
                       <TrialsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="tasks"
+                  element={
+                    <ProtectedRoute section="tasks">
+                      <TasksPage />
                     </ProtectedRoute>
                   }
                 />

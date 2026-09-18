@@ -10,6 +10,7 @@ export const ROLE_OPTIONS = [
 export const TEST_SECTION_OPTIONS = [
   { value: 'leads', label: 'Заявки' },
   { value: 'trials', label: 'Пробные' },
+  { value: 'tasks', label: 'Задачи' },
   { value: 'students', label: 'Студенты' },
   { value: 'teachersGroups', label: 'Учителя и группы' },
   { value: 'payments', label: 'Финансы' },
