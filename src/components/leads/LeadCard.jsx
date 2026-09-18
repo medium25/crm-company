@@ -249,13 +249,6 @@ function responseTiming(entry, fallbackAt) {
   return { tone: 'bad', label: `Опоздали на ${hours} ${pluralHours(hours)}` };
 }
 
-// «Doniyor Shavkatov» -> «D. Shavkatov» — первая буква имени + фамилия.
-function formatInitials(fullName) {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length < 2) return fullName;
-  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
-}
-
 function msOf(v) {
   if (!v) return 0;
   if (v.toDate) return v.toDate().getTime();
@@ -310,7 +303,6 @@ function buildTimelineNodes(history) {
       task: i === 0 ? 'Позвонить в первые 30 минут' : (interactions[i - 1].nextStep ?? null),
       result: timing ? timing.label : (item.outcome || 'Без задачи'),
       at: item.at,
-      byName: item.byName || null,
     };
   });
 }
@@ -380,10 +372,7 @@ function HistoryTimeline({ lead }) {
             >
               {node.result}
             </p>
-            <p className="text-[9px] leading-tight text-muted">
-              {node.at ? formatDateTimeShort(node.at) : '—'}
-              {node.byName && ` · ${formatInitials(node.byName)}`}
-            </p>
+            <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
           </div>
         </div>
       ))}
