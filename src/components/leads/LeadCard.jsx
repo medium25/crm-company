@@ -577,9 +577,9 @@ function LeadInfoPopover({ items }) {
  * @param {() => void} onDecline
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
-function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt }) {
+function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt, alwaysActive }) {
   const attempts = lead.unreachableAttempts ?? [];
-  const [active, setActive] = useState(attempts.length > 0);
+  const [active, setActive] = useState(alwaysActive || attempts.length > 0);
 
   if (!active) {
     return (
@@ -910,6 +910,7 @@ export function LeadCard({
               onReschedule={() => onRescheduleTrial(lead)}
               onDecline={() => onDecline(lead)}
               nextAttemptDueAt={lead.unreachableNextCallDueAt}
+              alwaysActive
             />
           ) : (
             <span />
