@@ -448,10 +448,20 @@ function HistoryTimeline({ lead }) {
 function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
   const deadlineLabel = nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
   const [confirming, setConfirming] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!confirming) return undefined;
+    const onClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setConfirming(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [confirming]);
 
   if (confirming) {
     return (
-      <div className="flex h-[30px] w-[84px] shrink-0 overflow-hidden rounded-field">
+      <div ref={ref} className="flex h-[30px] w-[84px] shrink-0 overflow-hidden rounded-field">
         <button
           type="button"
           onClick={() => onMark('success')}
