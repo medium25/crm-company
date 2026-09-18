@@ -145,7 +145,6 @@ export function trialScheduleLabel(lead) {
   return course ? `${course} - ${weekdayCap} - ${time}` : `${weekdayCap} - ${time}`;
 }
 
-const MAX_ATTEMPTS = 5;
 const UNREACHABLE_MAX_ATTEMPTS = 3;
 
 /**
@@ -410,19 +409,23 @@ function HistoryTimeline({ lead }) {
 }
 
 /**
- * Попытки дозвона (до 5), см. 2026-08-12-lead-card-call-attempts-design.md.
+ * Попытки дозвона, см. 2026-08-12-lead-card-call-attempts-design.md.
  * Меню выбора результата — через DropdownMenu (портал, `position: fixed`) —
  * ряд лежит у левого края узкой карточки в канбане, обычный absolute-попап
  * вылезал за край карточки и обрезался/наезжал на соседнюю колонку.
+ * `maxAttempts` — из columns.js `calling.maxTouches` (⚙ в шапке колонки
+ * «Дозвон») — та же сетка «по 2 попытки в день» (nextCallDueAt в
+ * leadFunnel.js) и порог автопереноса в «Холодный лид» (LeadsPage.
+ * markAttempt) подстраиваются под это же число.
  */
-function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
-  const isCold = attempts.length === MAX_ATTEMPTS && attempts.every((a) => a.result === 'fail');
-  const exhausted = attempts.length >= MAX_ATTEMPTS;
+function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
+  const isCold = attempts.length === maxAttempts && attempts.every((a) => a.result === 'fail');
+  const exhausted = attempts.length >= maxAttempts;
   const deadlineLabel = !isCold && nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
 
   let pendingRow;
   if (isCold) {
-    pendingRow = <TimelineRow icon={Snowflake} iconClass="text-danger" text={`Холодный лид — ${MAX_ATTEMPTS} неудачных попыток`} muted />;
+    pendingRow = <TimelineRow icon={Snowflake} iconClass="text-danger" text={`Холодный лид — ${maxAttempts} неудачных попыток`} muted />;
   } else if (exhausted) {
     pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Касаний больше нет" time={deadlineLabel} muted />;
   } else {
@@ -435,7 +438,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
         trigger={({ ref, toggle }) => (
           <TouchActionButton
             ref={ref}
-            text={`Касание ${attempts.length + 1}/${MAX_ATTEMPTS}`}
+            text={`Касание ${attempts.length + 1}/${maxAttempts}`}
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
@@ -893,7 +896,12 @@ export function LeadCard({
       <div className="mt-auto flex flex-col gap-0.5">
         <div className="flex items-center justify-between border-t border-border pt-1" onClick={(e) => e.stopPropagation()}>
           {stage === 'new' || stage === 'calling' ? (
-            <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} nextCallDueAt={lead.nextCallDueAt} />
+            <CallAttemptDots
+              attempts={attempts}
+              onMark={(result) => onMarkAttempt(lead, result)}
+              nextCallDueAt={lead.nextCallDueAt}
+              maxAttempts={columns.find((c) => c.key === 'calling')?.maxTouches ?? 5}
+            />
           ) : stage === 'closing' ? (
             <TouchDots
               closingTouchNumber={lead.closingTouchNumber}

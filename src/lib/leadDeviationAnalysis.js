@@ -16,12 +16,14 @@ import { pluralize } from './format.js';
 
 const toDate = (v) => (v?.toDate ? v.toDate() : v instanceof Date ? v : null);
 
-// Та же сетка дедлайнов звонков, что и nextCallDueAt в leadFunnel.js
-// (2 попытки сегодня/2 завтра/1 послезавтра), но как чистая функция от
-// даты-якоря — nextCallDueAt всегда считает от текущего момента, здесь
-// нужно «а каким должен был быть дедлайн ТОГДА».
+// Та же сетка дедлайнов звонков, что и nextCallDueAt в leadFunnel.js (по 2
+// попытки в день), но как чистая функция от даты-якоря — nextCallDueAt
+// всегда считает от текущего момента, здесь нужно «а каким должен был быть
+// дедлайн ТОГДА». Формула не зависит от максимума попыток (тот только
+// решает, КОГДА останавливаться, не КАК распределены дни) — тот же расчёт
+// верен что для 5 попыток, что для любого другого настроенного максимума.
 function callGridDeadline(anchorDate, attemptIndexBefore) {
-  const daysAhead = attemptIndexBefore < 2 ? 0 : attemptIndexBefore < 4 ? 1 : 2;
+  const daysAhead = Math.floor(attemptIndexBefore / 2);
   const d = new Date(anchorDate);
   d.setDate(d.getDate() + daysAhead);
   d.setHours(18, 0, 0, 0);
@@ -72,12 +74,12 @@ function lateCallsDeviation(lead) {
   };
 }
 
-function earlyDeclineDeviation(lead) {
+function earlyDeclineDeviation(lead, callMaxAttempts) {
   const attempts = lead.callAttempts ?? [];
-  if (lead.lostReason === 'cold_lead') return null; // это и есть честные 5 попыток, не отклонение
-  if (attempts.length === 0 || attempts.length >= 5) return null;
+  if (lead.lostReason === 'cold_lead') return null; // это и есть честные callMaxAttempts попыток, не отклонение
+  if (attempts.length === 0 || attempts.length >= callMaxAttempts) return null;
   return {
-    label: `отказ после ${attempts.length} из 5 попыток дозвона`,
+    label: `отказ после ${attempts.length} из ${callMaxAttempts} попыток дозвона`,
     points: -1,
   };
 }
@@ -122,14 +124,17 @@ function overdueAtDeclineDeviation(lead) {
 /**
  * @param {Object} lead документ лида ДО отказа (funnelStage — стадия, с
  * которой отказывают)
+ * @param {number} [callMaxAttempts] макс. рекомендуемых попыток дозвона
+ * (columns.js `calling.maxTouches`, регулируется через ⚙) — по умолчанию 5
+ * для обратной совместимости со старыми вызовами.
  * @returns {{items: Array<{label: string, points: number}>, totalPoints: number}}
  */
-export function analyzeLeadDeviations(lead) {
+export function analyzeLeadDeviations(lead, callMaxAttempts = 5) {
   const stage = lead.funnelStage ?? 'new';
   const items = [];
 
   if (stage === 'new' || stage === 'calling') {
-    items.push(checklistDeviation(lead), lateCallsDeviation(lead), earlyDeclineDeviation(lead));
+    items.push(checklistDeviation(lead), lateCallsDeviation(lead), earlyDeclineDeviation(lead, callMaxAttempts));
   }
   if (stage === 'trial_scheduled') {
     items.push(trialConfirmDeviation(lead), unreachableDeviation(lead));

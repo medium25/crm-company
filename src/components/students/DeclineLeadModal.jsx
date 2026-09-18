@@ -27,7 +27,7 @@ import { Input } from '../ui/Input.jsx';
  * @param {Object|null} props.lead
  * @param {() => void} props.onClose
  */
-export function DeclineLeadModal({ lead, onClose }) {
+export function DeclineLeadModal({ lead, onClose, callMaxAttempts }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [reason, setReason] = useState(LOST_REASON_OPTIONS[0].value);
@@ -67,7 +67,7 @@ export function DeclineLeadModal({ lead, onClose }) {
         user,
       );
       showToast('Лид отклонён.');
-      const { items, totalPoints } = analyzeLeadDeviations({ ...lead, lostReason: reason });
+      const { items, totalPoints } = analyzeLeadDeviations({ ...lead, lostReason: reason }, callMaxAttempts);
       if (items.length > 0) {
         setResult({ fullName: lead.fullName, items, totalPoints });
       } else {

@@ -110,6 +110,10 @@ export function LeadsPage() {
   const branchSettingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
   const { data: branchSettings } = useDoc(branchSettingsRef);
   const resolvedColumns = useMemo(() => withStageOverrides(branchSettings?.leadStageOverrides), [branchSettings]);
+  // Макс. рекомендуемых попыток дозвона — регулируется через ⚙ в шапке
+  // колонки «Дозвон» (см. columns.js), читают markAttempt/nextCallDueAt
+  // ниже вместо жёстко зашитого 5.
+  const callMaxAttempts = resolvedColumns.find((c) => c.key === 'calling')?.maxTouches ?? 5;
 
   const editStageColumn = (stageKey, patch) => {
     if (!branchSettingsRef) return;
@@ -249,7 +253,7 @@ export function LeadsPage() {
       });
       await batch.commit();
       if (stageFields.funnelStage) notifySheetsExport(lead.id, stageFields.funnelStage, lead.rawColumns);
-      if (stageFields.funnelStage === 'lost') showToast(`${lead.fullName}: 5 неудачных попыток, лид отмечен как отказ.`);
+      if (stageFields.funnelStage === 'lost') showToast(`${lead.fullName}: ${callMaxAttempts} неудачных попыток, лид отмечен как отказ.`);
     } catch {
       showToast('Не удалось отметить попытку.', { type: 'error' });
     }
@@ -257,7 +261,7 @@ export function LeadsPage() {
 
   const markAttempt = (lead, result) => {
     const attempts = lead.callAttempts ?? [];
-    if (attempts.length >= 5) return;
+    if (attempts.length >= callMaxAttempts) return;
     // expectedBy — дедлайн, действовавший НА МОМЕНТ этой попытки (тот, что
     // уже лежал на лиде до неё) — нужен для разбора отклонений при отказе
     // (см. src/lib/leadDeviationAnalysis.js): «просрочка при звонке N»
@@ -300,7 +304,7 @@ export function LeadsPage() {
       // для всех трёх исходов — собирается внутри самой модалки.
       setSuccessOutcomeTarget({
         lead,
-        suggestedDate: nextCallDueAt(preview) ?? unreachableCallDueAt(),
+        suggestedDate: nextCallDueAt(preview, callMaxAttempts) ?? unreachableCallDueAt(),
         onThink: (task, dueDate) => {
           const at = new Date();
           commitCallAttempt(lead, buildAttempts(task, '', at), result, { dueDate, comment: task, stageFields: buildStageFields(at) });
@@ -331,13 +335,13 @@ export function LeadsPage() {
       return;
     }
 
-    const isCold = preview.length === 5 && attempts.every((a) => a.result === 'fail');
+    const isCold = preview.length === callMaxAttempts && attempts.every((a) => a.result === 'fail');
     if (isCold) {
       // терминальная стадия «Отказ» — дедлайну взяться неоткуда, но задача
       // (итог последней попытки) всё равно обязательна — noDate-модалка.
       setDeadlineTarget({
         lead,
-        title: 'Задача — итог 5-й попытки',
+        title: `Задача — итог ${callMaxAttempts}-й попытки`,
         noDate: true,
         requireTask: true,
         onConfirm: (_date, outcome, nextStep) => {
@@ -357,7 +361,7 @@ export function LeadsPage() {
     setDeadlineTarget({
       lead,
       title: 'Дедлайн следующего звонка',
-      suggestedDate: nextCallDueAt(preview),
+      suggestedDate: nextCallDueAt(preview, callMaxAttempts),
       requireTask: true,
       onConfirm: (dueDate, outcome, nextStep) => {
         const at = new Date();
@@ -400,7 +404,7 @@ export function LeadsPage() {
       setDeadlineTarget({
         lead,
         title: 'Дедлайн следующего звонка',
-        suggestedDate: nextCallDueAt(lead.callAttempts ?? []),
+        suggestedDate: nextCallDueAt(lead.callAttempts ?? [], callMaxAttempts),
         onConfirm: (dueDate) => commit({ nextCallDueAt: dueDate }),
         validate: (candidate) => validateCallDeadline(candidate, lead.callAttempts ?? [], branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
@@ -649,7 +653,7 @@ export function LeadsPage() {
       </div>
 
       <StudentFormModal student={formLead} onClose={() => setFormLead(null)} onCreated={handleCreated} />
-      <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} />
+      <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} callMaxAttempts={callMaxAttempts} />
       <DeleteLeadModal lead={deleteTarget} onClose={() => setDeleteTarget(null)} />
       <ResetLeadModal lead={resetTarget} onClose={() => setResetTarget(null)} />
       <DismissFromBoardModal lead={dismissTarget} onClose={() => setDismissTarget(null)} />

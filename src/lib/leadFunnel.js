@@ -92,17 +92,20 @@ function endOfDayIn(daysAhead) {
 }
 
 /**
- * Дедлайн следующей попытки дозвона — сетка 2 сегодня/2 завтра/1
- * послезавтра (конец рабочего дня). Пишется на документ лида при каждой отметке
- * попытки (`markAttempt`), чтобы карточка не «зависала» в «Дозвоне»
- * незамеченной. `null` — попыток не осталось (5 уже сделано).
+ * Дедлайн следующей попытки дозвона — сетка «по 2 попытки в день» (конец
+ * рабочего дня), сдвигается на день каждые 2 попытки. Пишется на документ
+ * лида при каждой отметке попытки (`markAttempt`), чтобы карточка не
+ * «зависала» в «Дозвоне» незамеченной. `max` — максимум рекомендуемых
+ * попыток (см. columns.js `calling.maxTouches`, регулируется через ⚙ в
+ * шапке колонки «Дозвон»); `null` — попыток не осталось.
  * @param {Array<{result: 'success'|'fail'}>} attempts
+ * @param {number} [max]
  * @returns {Date|null}
  */
-export function nextCallDueAt(attempts) {
+export function nextCallDueAt(attempts, max = 5) {
   const n = attempts.length;
-  if (n === 0 || n >= 5) return null;
-  const daysAhead = n < 2 ? 0 : n < 4 ? 1 : 2;
+  if (n === 0 || n >= max) return null;
+  const daysAhead = Math.floor(n / 2);
   return endOfDayIn(daysAhead);
 }
 
@@ -345,7 +348,7 @@ export function validateCallDeadline(candidate, attempts, workSchedule) {
 
   const index = attempts.length;
 
-  if (index === 1 || index === 3) {
+  if (index % 2 === 1) {
     const prevAt = attempts[attempts.length - 1]?.at;
     const prevDate = prevAt?.toDate ? prevAt.toDate() : prevAt;
     if (prevDate && candidate.getTime() - prevDate.getTime() < MIN_GAP_BETWEEN_CALLS_MS) {

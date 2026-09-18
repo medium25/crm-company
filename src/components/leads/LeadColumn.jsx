@@ -138,7 +138,7 @@ function EditableStageTitle({ column, onEdit, open, onOpenChange }) {
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => onOpenChange(false)}
               className="rounded-field px-2.5 py-1.5 text-[12px] text-muted hover:bg-surface-alt"
             >
               Отмена
