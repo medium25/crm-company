@@ -270,9 +270,9 @@ function msOf(v) {
 function buildFullHistory(lead) {
   const items = [];
   (lead.stageHistory ?? []).forEach((h) => items.push({ type: 'stage', stage: h.stage, at: h.enteredAt }));
-  (lead.callAttempts ?? []).forEach((e) => items.push({ type: 'entry', source: 'calling', ...e }));
-  (lead.closingTouchLog ?? []).forEach((e) => items.push({ type: 'entry', source: 'closing', ...e }));
-  (lead.unreachableAttempts ?? []).forEach((e) => items.push({ type: 'entry', source: 'unreachable', ...e }));
+  (lead.callAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
+  (lead.closingTouchLog ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
+  (lead.unreachableAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
   (lead.operatorTransfers ?? []).forEach((e) => items.push({ type: 'operator', fromName: e.fromName, toName: e.toName, at: e.at }));
   items.sort((a, b) => {
     const diff = msOf(a.at) - msOf(b.at);
@@ -293,30 +293,44 @@ function buildFullHistory(lead) {
 // (result, крупным): task — это nextStep ПРЕДЫДУЩЕГО касания (что решили
 // сделать дальше тогда — это и есть задача, которую сейчас выполнили),
 // у самого первого касания задачи в данных нет — это всегда стартовый SLA.
-function buildTimelineNodes(history, pendingDueAt) {
+function buildTimelineNodes(history, pendingDueAt, currentStage) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const interactions = history.filter((item) => item.type === 'entry');
-  // Номер на кружке — счёт ВНУТРИ своего источника (Дозвон/Дожим/«Не
-  // выходит на связь» считаются отдельно), не сквозной по всей ленте —
-  // лента объединяет все стадии, а счётчик касаний на кнопке под ней
-  // (closingTouchNumber и т.п.) всегда про текущую стадию.
-  const stepBySource = {};
+  // Номер на кружке — счёт ВНУТРИ столбца, в котором касание реально
+  // произошло (по stageHistory, не по тому, в каком массиве оно хранится —
+  // «Не выходит на связь» пишет в один массив что на пробном, что в
+  // дожиме). Столбец касания — последний переход стадии НЕ ПОЗЖЕ его
+  // времени. Лента при этом по-прежнему показывает всю историю целиком.
+  const transitions = history.filter((item) => item.type === 'stage').sort((a, b) => msOf(a.at) - msOf(b.at));
+  const stageAt = (at) => {
+    let stage = transitions[0]?.stage ?? currentStage;
+    for (const t of transitions) {
+      if (msOf(t.at) > msOf(at)) break;
+      stage = t.stage;
+    }
+    return stage;
+  };
+  const stepByStage = {};
   const nodes = interactions.map((item, i) => {
     const timing = responseTiming(item, fallbackAt);
-    stepBySource[item.source] = (stepBySource[item.source] ?? 0) + 1;
+    const stage = stageAt(item.at);
+    stepByStage[stage] = (stepByStage[stage] ?? 0) + 1;
     return {
       type: 'entry',
       task: i === 0 ? 'Позвонить в первые 30 минут' : (interactions[i - 1].nextStep ?? null),
       result: timing ? timing.label : (item.outcome || 'Без задачи'),
       at: item.at,
-      step: stepBySource[item.source],
+      step: stepByStage[stage],
     };
   });
   // Последняя поставленная задача (nextStep последнего касания) ещё не
   // отработана — отдельный выделенный узел в конце ленты, не такой же
-  // серый пункт, как уже сделанные.
+  // серый пункт, как уже сделанные. Номер — следующий в счёте ТЕКУЩЕГО
+  // столбца (тот же счёт, что у кнопки касания под лентой).
   const pendingTask = interactions[interactions.length - 1]?.nextStep;
-  if (pendingTask) nodes.push({ type: 'pending', task: pendingTask, dueAt: pendingDueAt ?? null });
+  if (pendingTask) {
+    nodes.push({ type: 'pending', task: pendingTask, dueAt: pendingDueAt ?? null, step: (stepByStage[currentStage] ?? 0) + 1 });
+  }
   return nodes;
 }
 
@@ -341,7 +355,7 @@ function HistoryTimeline({ lead }) {
   const stage = lead.funnelStage ?? 'new';
   const pendingDueAt =
     stage === 'closing' ? lead.nextTouchAt : stage === 'trial_scheduled' ? lead.unreachableNextCallDueAt : lead.nextCallDueAt;
-  const nodes = buildTimelineNodes(buildFullHistory(lead), pendingDueAt);
+  const nodes = buildTimelineNodes(buildFullHistory(lead), pendingDueAt, stage);
 
   useEffect(() => {
     if (dateOpenAt === null) return undefined;
@@ -392,8 +406,8 @@ function HistoryTimeline({ lead }) {
             key={i}
             className="relative flex items-start gap-1.5 rounded-field border border-navy bg-navy/10 px-1.5 py-1"
           >
-            <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center bg-transparent">
-              <ClipboardCheck className="h-3.5 w-3.5 text-navy" />
+            <div className={`relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-navy bg-surface-alt text-[9px] font-bold ${ICON_TONE}`}>
+              {node.step}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-bold leading-tight text-navy">{node.task}</p>
