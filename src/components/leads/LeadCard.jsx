@@ -412,14 +412,11 @@ function HistoryTimeline({ lead }) {
       {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
       {nodes.map((node, i) =>
         node.type === 'pending' ? (
-          <div
-            key={i}
-            className="relative flex items-start gap-1.5 rounded-field border border-navy bg-navy/10 px-1.5 py-1"
-          >
+          <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
             <div className={`relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-navy bg-surface-alt text-[9px] font-bold ${ICON_TONE}`}>
               {node.step}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 rounded-field border border-navy bg-navy/10 px-1.5 py-1">
               <p className="text-[11px] font-bold leading-tight text-navy">{node.task}</p>
               {node.dueAt && <p className="text-[10px] leading-tight text-navy/70">{formatRelativeDeadline(node.dueAt)}</p>}
             </div>
