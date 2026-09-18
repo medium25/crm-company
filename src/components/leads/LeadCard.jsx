@@ -731,7 +731,14 @@ export function LeadCard({
 }) {
   const stage = lead.funnelStage ?? 'new';
   const isTerminal = stage === 'won' || stage === 'lost';
-  const attempts = lead.callAttempts ?? [];
+  // callAttempts общий на 'new'+'calling' (счёт не прерывается при
+  // автопереходе), но бейдж «Касание N/M» в «Дозвоне» должен считать
+  // только то, что случилось ПОСЛЕ входа в «Дозвон» — попытка, сделанная
+  // ещё в «Новом лиде», в счёт «Дозвона» не идёт.
+  const callingEnteredAt = (lead.stageHistory ?? []).filter((h) => h.stage === 'calling').at(-1)?.enteredAt;
+  const attempts = (lead.callAttempts ?? []).filter(
+    (a) => stage !== 'calling' || !callingEnteredAt || msOf(a.at) >= msOf(callingEnteredAt),
+  );
   const operatorLabel = operatorInitials(operatorName);
   // Раньше жил отдельным слотом слева в футере — теперь там кнопка
   // «Касание N», инициалы переехали в правую группу иконок, рядом с ⋮.
