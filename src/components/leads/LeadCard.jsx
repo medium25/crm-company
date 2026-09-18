@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, CircleDashed, AlertTriangle, Zap, Snowflake, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Zap, Snowflake, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -420,14 +420,11 @@ function HistoryTimeline({ lead }) {
  */
 function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
   const isCold = attempts.length === maxAttempts && attempts.every((a) => a.result === 'fail');
-  const exhausted = attempts.length >= maxAttempts;
   const deadlineLabel = !isCold && nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
 
   let pendingRow;
   if (isCold) {
     pendingRow = <TimelineRow icon={Snowflake} iconClass="text-danger" text={`Холодный лид — ${maxAttempts} неудачных попыток`} muted />;
-  } else if (exhausted) {
-    pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Касаний больше нет" time={deadlineLabel} muted />;
   } else {
     pendingRow = (
       <DropdownMenu
@@ -464,18 +461,15 @@ function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark, m
   const log = closingTouchLog ?? [];
   const deadlineLabel = count < maxTouches && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
 
-  const pendingRow =
-    count < maxTouches ? (
-      <TouchActionButton
-        text={`Касание ${count + 1}/${maxTouches}`}
-        time={deadlineLabel}
-        onClick={onMark}
-        ariaLabel={`Касание ${count + 1}: отметить`}
-        compact
-      />
-    ) : (
-      <TimelineRow icon={CheckCircle2} iconClass="text-success" text="Все касания сделаны" muted />
-    );
+  const pendingRow = (
+    <TouchActionButton
+      text={`Касание ${count + 1}/${maxTouches}`}
+      time={deadlineLabel}
+      onClick={onMark}
+      ariaLabel={`Касание ${count + 1}: отметить`}
+      compact
+    />
+  );
 
   return pendingRow;
 }
@@ -600,7 +594,6 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
 
   const rescheduleUsed = attempts.some((a) => a.result === 'reschedule');
   const failStreak = attempts.filter((a) => a.result === 'fail').length;
-  const exhausted = attempts.length >= UNREACHABLE_MAX_ATTEMPTS;
 
   // Задачу теперь всегда спрашивает markUnreachable (DeadlineModal) — тут
   // просто передаём результат + onReschedule дальше, сама запись/переход
@@ -620,8 +613,6 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
         Отказ
       </button>
     );
-  } else if (exhausted) {
-    pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Касаний больше нет" time={deadlineLabel} muted />;
   } else {
     pendingRow = (
       <DropdownMenu
