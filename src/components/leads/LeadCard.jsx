@@ -435,7 +435,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
         trigger={({ ref, toggle }) => (
           <TouchActionButton
             ref={ref}
-            text={`Касание ${attempts.length + 1}/${maxAttempts}`}
+            text={`Касание ${attempts.length}/${maxAttempts}`}
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
@@ -463,7 +463,7 @@ function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark, m
 
   const pendingRow = (
     <TouchActionButton
-      text={`Касание ${count + 1}/${maxTouches}`}
+      text={`Касание ${count}/${maxTouches}`}
       time={deadlineLabel}
       onClick={onMark}
       ariaLabel={`Касание ${count + 1}: отметить`}
