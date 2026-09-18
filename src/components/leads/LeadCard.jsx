@@ -217,6 +217,12 @@ function pluralMinutes(minutes) {
   return mod10 === 1 && mod100 !== 11 ? 'минуту' : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'минуты' : 'минут';
 }
 
+function pluralDays(days) {
+  const mod10 = days % 10;
+  const mod100 = days % 100;
+  return mod10 === 1 && mod100 !== 11 ? 'день' : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'дня' : 'дней';
+}
+
 /**
  * Насколько быстро отреагировали на entry — относительно дедлайна, что
  * стоял на лиде ДО этой отметки (entry.expectedBy, записывается в момент
@@ -237,6 +243,10 @@ function responseTiming(entry, fallbackAt) {
   }
   const hours = Math.round(minutes / 60);
   if (hours <= 0) return { tone: 'good', label: 'Обработано вовремя' };
+  if (hours > 24) {
+    const days = Math.round(hours / 24);
+    return { tone: 'bad', label: `Опоздали на ${days} ${pluralDays(days)}` };
+  }
   return { tone: 'bad', label: `Опоздали на ${hours} ${pluralHours(hours)}` };
 }
 
