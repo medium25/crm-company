@@ -329,7 +329,7 @@ function HistoryTimeline({ lead }) {
   const ICON_TONES = { overdue: 'text-danger', ontime: 'text-success', stage: 'text-navy', entry: 'text-success' };
 
   return (
-    <div className="relative max-h-[110px] flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
+    <div className="relative max-h-[110px] min-h-0 flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
       {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
       {nodes.map((node, i) => {
         const Icon = ICONS[node.type];
@@ -780,13 +780,13 @@ export function LeadCard({
       </div>
 
       {(stage === 'new' || stage === 'calling') && (
-        <div className="flex flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
         </div>
       )}
 
       {stage === 'trial_scheduled' && (
-        <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex min-h-0 flex-1 flex-col gap-2" onClick={(e) => e.stopPropagation()}>
           <span className="truncate text-[12px] text-muted">{trialScheduleLabel(lead)}</span>
           {!trialDay && lead.trialDate?.toDate && (
             <span className="text-[11px] text-muted">
@@ -798,13 +798,13 @@ export function LeadCard({
       )}
 
       {stage === 'trial_completed' && (
-        <div onClick={(e) => e.stopPropagation()}>
+        <div className="flex min-h-0 flex-1 flex-col" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
         </div>
       )}
 
       {stage === 'closing' && (
-        <div className="flex flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
           <UnreachableBlock
             lead={lead}
@@ -817,13 +817,13 @@ export function LeadCard({
       )}
 
       {stage === 'won' && (
-        <div onClick={(e) => e.stopPropagation()}>
+        <div className="flex min-h-0 flex-1 flex-col" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
         </div>
       )}
 
       {stage === 'lost' && (
-        <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           {lead.lostReason && (
             <p className="text-[12px] text-danger">
               Причина: {LOST_REASON_OPTIONS.find((o) => o.value === lead.lostReason)?.label ?? lead.lostReason}
