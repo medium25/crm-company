@@ -53,12 +53,15 @@ function ColumnSettingsButton({ onOpen }) {
 function EditableStageTitle({ column, onEdit, open, onOpenChange }) {
   const [label, setLabel] = useState(column.label);
   const [color, setColor] = useState(column.color);
+  const [maxTouches, setMaxTouches] = useState(column.maxTouches ?? '');
+  const hasMaxTouches = column.maxTouches !== undefined;
   const ref = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     setLabel(column.label);
     setColor(column.color);
+    setMaxTouches(column.maxTouches ?? '');
     const onClickOutside = (e) => {
       if (ref.current && !ref.current.contains(e.target)) onOpenChange(false);
     };
@@ -69,12 +72,17 @@ function EditableStageTitle({ column, onEdit, open, onOpenChange }) {
       document.removeEventListener('mousedown', onClickOutside);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, column.label, column.color, onOpenChange]);
+  }, [open, column.label, column.color, column.maxTouches, onOpenChange]);
 
   const save = () => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    onEdit({ label: trimmed, color });
+    const patch = { label: trimmed, color };
+    if (hasMaxTouches) {
+      const n = Number(maxTouches);
+      patch.maxTouches = Number.isFinite(n) && n > 0 ? Math.round(n) : column.maxTouches;
+    }
+    onEdit(patch);
     onOpenChange(false);
   };
 
@@ -114,6 +122,19 @@ function EditableStageTitle({ column, onEdit, open, onOpenChange }) {
               />
             ))}
           </div>
+          {hasMaxTouches && (
+            <label className="mb-3 block">
+              <span className="mb-1 block text-[12px] text-muted">Макс. рекомендуемых касаний</span>
+              <input
+                type="number"
+                min={1}
+                value={maxTouches}
+                onChange={(e) => setMaxTouches(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && save()}
+                className="h-9 w-full rounded-field border border-border-strong bg-white px-2.5 text-[13px] text-text focus:border-navy focus:outline-none"
+              />
+            </label>
+          )}
           <div className="flex justify-end gap-2">
             <button
               type="button"

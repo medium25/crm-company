@@ -422,7 +422,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
 
   let pendingRow;
   if (isCold) {
-    pendingRow = <TimelineRow icon={Snowflake} iconClass="text-danger" text="Холодный лид — 5 неудачных попыток" muted />;
+    pendingRow = <TimelineRow icon={Snowflake} iconClass="text-danger" text={`Холодный лид — ${MAX_ATTEMPTS} неудачных попыток`} muted />;
   } else if (exhausted) {
     pendingRow = <TimelineRow icon={CircleDashed} iconClass="text-muted" text="Касаний больше нет" time={deadlineLabel} muted />;
   } else {
@@ -435,7 +435,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
         trigger={({ ref, toggle }) => (
           <TouchActionButton
             ref={ref}
-            text={`Касание ${attempts.length + 1}`}
+            text={`Касание ${attempts.length + 1}/${MAX_ATTEMPTS}`}
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
@@ -449,17 +449,29 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
   return pendingRow;
 }
 
-/** Касания в «Дожиме» (ровно 2, см. LeadsPage.markTouch) — задача обязательна на каждом. */
-function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark }) {
+/**
+ * Касания в «Дожиме» — задача обязательна на каждом. Максимум
+ * рекомендуемых касаний (по умолчанию 2, см. columns.js) регулируется
+ * через ⚙ в шапке колонки «Дожим» — в отличие от «Дозвона», тут число не
+ * завязано на другую бизнес-логику (нет своей сетки дедлайнов/автопереноса),
+ * менять его безопасно.
+ */
+function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark, maxTouches }) {
   const count = closingTouchNumber ?? 0;
   const log = closingTouchLog ?? [];
-  const deadlineLabel = count < 2 && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
+  const deadlineLabel = count < maxTouches && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
 
   const pendingRow =
-    count < 2 ? (
-      <TouchActionButton text={`Касание ${count + 1}`} time={deadlineLabel} onClick={onMark} ariaLabel={`Касание ${count + 1}: отметить`} compact />
+    count < maxTouches ? (
+      <TouchActionButton
+        text={`Касание ${count + 1}/${maxTouches}`}
+        time={deadlineLabel}
+        onClick={onMark}
+        ariaLabel={`Касание ${count + 1}: отметить`}
+        compact
+      />
     ) : (
-      <TimelineRow icon={CheckCircle2} iconClass="text-success" text="Оба касания сделаны" muted />
+      <TimelineRow icon={CheckCircle2} iconClass="text-success" text="Все касания сделаны" muted />
     );
 
   return pendingRow;
@@ -888,6 +900,7 @@ export function LeadCard({
               nextTouchAt={lead.nextTouchAt}
               closingTouchLog={lead.closingTouchLog}
               onMark={() => onMarkTouch(lead)}
+              maxTouches={columns.find((c) => c.key === 'closing')?.maxTouches ?? 2}
             />
           ) : (
             <span />
