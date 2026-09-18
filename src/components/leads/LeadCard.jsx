@@ -829,13 +829,6 @@ export function LeadCard({
             </span>
           )}
           <HistoryTimeline lead={lead} />
-          <UnreachableBlock
-            lead={lead}
-            onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
-            onReschedule={() => onRescheduleTrial(lead)}
-            onDecline={() => onDecline(lead)}
-            nextAttemptDueAt={lead.unreachableNextCallDueAt}
-          />
         </div>
       )}
 
@@ -908,6 +901,14 @@ export function LeadCard({
               closingTouchLog={lead.closingTouchLog}
               onMark={() => onMarkTouch(lead)}
               maxTouches={columns.find((c) => c.key === 'closing')?.maxTouches ?? 2}
+            />
+          ) : stage === 'trial_scheduled' ? (
+            <UnreachableBlock
+              lead={lead}
+              onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
+              onReschedule={() => onRescheduleTrial(lead)}
+              onDecline={() => onDecline(lead)}
+              nextAttemptDueAt={lead.unreachableNextCallDueAt}
             />
           ) : (
             <span />
