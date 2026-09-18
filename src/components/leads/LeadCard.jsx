@@ -183,17 +183,19 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
  * реально кликабельное действие на этой стадии, должно выделяться, а не
  * теряться среди мелких строк истории.
  */
-function TouchActionButton({ ref, onClick, ariaLabel, text, time }) {
+function TouchActionButton({ ref, onClick, ariaLabel, text, time, compact }) {
   return (
     <button
       ref={ref}
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className="flex w-1/2 flex-col items-center justify-center gap-0.5 rounded-field bg-[#0088CC] py-1 text-[13px] font-bold leading-tight text-white hover:bg-[#0077B3]"
+      className={`flex flex-col items-center justify-center gap-0.5 rounded-field bg-[#0088CC] text-[13px] font-bold leading-tight text-white hover:bg-[#0077B3] ${
+        compact ? 'shrink-0 px-3 py-1.5' : 'w-1/2 py-1'
+      }`}
     >
       <span className="whitespace-nowrap">{text}</span>
-      {time && <span className="text-[10px] font-normal leading-tight opacity-80">{time}</span>}
+      {!compact && time && <span className="text-[10px] font-normal leading-tight opacity-80">{time}</span>}
     </button>
   );
 }
@@ -409,6 +411,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
+            compact
           />
         )}
       />
@@ -426,7 +429,7 @@ function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark })
 
   const pendingRow =
     count < 2 ? (
-      <TouchActionButton text={`Касание ${count + 1}`} time={deadlineLabel} onClick={onMark} ariaLabel={`Касание ${count + 1}: отметить`} />
+      <TouchActionButton text={`Касание ${count + 1}`} time={deadlineLabel} onClick={onMark} ariaLabel={`Касание ${count + 1}: отметить`} compact />
     ) : (
       <TimelineRow icon={CheckCircle2} iconClass="text-success" text="Оба касания сделаны" muted />
     );
@@ -646,6 +649,16 @@ export function LeadCard({
   const isTerminal = stage === 'won' || stage === 'lost';
   const attempts = lead.callAttempts ?? [];
   const operatorLabel = operatorInitials(operatorName);
+  // Раньше жил отдельным слотом слева в футере — теперь там кнопка
+  // «Касание N», инициалы переехали в правую группу иконок, рядом с ⋮.
+  const operatorBadge = operatorLabel ? (
+    <span
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+      style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
+    >
+      {operatorLabel}
+    </span>
+  ) : null;
   const [commentsOpen, setCommentsOpen] = useState(false);
   const hasComments = (lead.commentsCount ?? 0) > 0;
   const [checklistOpen, setChecklistOpen] = useState(false);
@@ -769,11 +782,6 @@ export function LeadCard({
       {(stage === 'new' || stage === 'calling') && (
         <div className="flex flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
-          <CallAttemptDots
-            attempts={attempts}
-            onMark={(result) => onMarkAttempt(lead, result)}
-            nextCallDueAt={lead.nextCallDueAt}
-          />
         </div>
       )}
 
@@ -798,12 +806,6 @@ export function LeadCard({
       {stage === 'closing' && (
         <div className="flex flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
-          <TouchDots
-            closingTouchNumber={lead.closingTouchNumber}
-            nextTouchAt={lead.nextTouchAt}
-            closingTouchLog={lead.closingTouchLog}
-            onMark={() => onMarkTouch(lead)}
-          />
           <UnreachableBlock
             lead={lead}
             onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
@@ -849,74 +851,79 @@ export function LeadCard({
           один — от соседнего пустого div модалки, см. выше). */}
       <div className="mt-auto flex flex-col gap-0.5">
         <div className="flex items-center justify-between border-t border-border pt-1" onClick={(e) => e.stopPropagation()}>
-          {operatorLabel ? (
-          <span
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
-            style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
-          >
-            {operatorLabel}
-          </span>
-        ) : (
-          <span />
-        )}
-        {stage === 'won' ? (
-          // «Оплачено» — карточка ведёт себя как уведомление: только
-          // посмотреть (клик по карточке) и скрыть с доски. Ни коммента, ни
-          // ⋮-меню с «Удалить навсегда» тут никогда не было и не будет —
-          // студент остаётся в системе, убирается только вид на доске
-          // (onDismissFromBoard, см. LeadsPage.boardHiddenAt).
-          <button
-            type="button"
-            onClick={() => onDismissFromBoard(lead)}
-            aria-label="Скрыть с доски"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        ) : (
-          <div className="flex shrink-0 items-center gap-0.5">
-            {(stage === 'new' || stage === 'calling') && (
-              <button
-                type="button"
-                onClick={() => setChecklistOpen((v) => !v)}
-                aria-label="Чек-лист"
-                className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-                  checklistOpen
-                    ? 'text-navy'
-                    : checklistChecked === 0
-                      ? 'text-muted'
-                      : checklistPct === 100
-                        ? 'text-success'
-                        : 'text-orange'
-                }`}
-              >
-                <ClipboardCheck className="h-4 w-4" />
-              </button>
-            )}
+          {stage === 'new' || stage === 'calling' ? (
+            <CallAttemptDots attempts={attempts} onMark={(result) => onMarkAttempt(lead, result)} nextCallDueAt={lead.nextCallDueAt} />
+          ) : stage === 'closing' ? (
+            <TouchDots
+              closingTouchNumber={lead.closingTouchNumber}
+              nextTouchAt={lead.nextTouchAt}
+              closingTouchLog={lead.closingTouchLog}
+              onMark={() => onMarkTouch(lead)}
+            />
+          ) : (
+            <span />
+          )}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {stage === 'won' ? (
+            // «Оплачено» — карточка ведёт себя как уведомление: только
+            // посмотреть (клик по карточке) и скрыть с доски. Ни коммента, ни
+            // ⋮-меню с «Удалить навсегда» тут никогда не было и не будет —
+            // студент остаётся в системе, убирается только вид на доске
+            // (onDismissFromBoard, см. LeadsPage.boardHiddenAt).
             <button
               type="button"
-              onClick={() => setCommentsOpen((v) => !v)}
-              aria-label="Комментарии"
-              className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-                hasComments ? 'text-navy' : 'text-muted'
-              }`}
+              onClick={() => onDismissFromBoard(lead)}
+              aria-label="Скрыть с доски"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
             >
-              <MessageSquareText className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
+              <X className="h-4 w-4" />
             </button>
-            {!isTerminal && (
+          ) : (
+            <div className="flex items-center gap-0.5">
+              {(stage === 'new' || stage === 'calling') && (
+                <button
+                  type="button"
+                  onClick={() => setChecklistOpen((v) => !v)}
+                  aria-label="Чек-лист"
+                  className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+                    checklistOpen
+                      ? 'text-navy'
+                      : checklistChecked === 0
+                        ? 'text-muted'
+                        : checklistPct === 100
+                          ? 'text-success'
+                          : 'text-orange'
+                  }`}
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => onOpenBooking(lead)}
-                aria-label="Свободные места в группе"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+                onClick={() => setCommentsOpen((v) => !v)}
+                aria-label="Комментарии"
+                className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
+                  hasComments ? 'text-navy' : 'text-muted'
+                }`}
               >
-                <Users className="h-4 w-4" />
+                <MessageSquareText className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
               </button>
-            )}
-            {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
-            <DropdownMenu items={menuItems} />
-          </div>
-        )}
+              {!isTerminal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenBooking(lead)}
+                  aria-label="Свободные места в группе"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-alt"
+                >
+                  <Users className="h-4 w-4" />
+                </button>
+              )}
+              {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
+              <DropdownMenu items={menuItems} />
+            </div>
+          )}
+          {operatorBadge}
+        </div>
       </div>
 
         {(stage === 'new' || stage === 'calling') && checklistOpen && (
