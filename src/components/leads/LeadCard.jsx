@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, CircleDashed, AlertTriangle, Zap, Snowflake, ArrowRight, PhoneOff, Info, MessageSquare, ListChecks, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, CircleDashed, AlertTriangle, Zap, Snowflake, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -153,11 +153,7 @@ const UNREACHABLE_MAX_ATTEMPTS = 3;
  * сделанного шага, что для предстоящего/кликабельного, поэтому весь блок
  * (см. TouchTimeline) не «плавает» в зависимости от текста.
  */
-function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabel, muted, tone }) {
-  // tone — лёгкая заливка строки цветом акцента КАРТОЧКИ (success/danger,
-  // тот же, что красит шапку карточки — overdue/«В норме»), не фиксированный
-  // оранжевый: строка выглядит частью той же карточки, а не чужеродной кнопкой.
-  const toneClass = tone === 'success' ? 'bg-success/10' : tone === 'danger' ? 'bg-danger/10' : '';
+function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabel, muted }) {
   const content = (
     <>
       <Icon className={`h-3.5 w-3.5 shrink-0 ${iconClass}`} />
@@ -166,7 +162,7 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
     </>
   );
   if (!onClick) {
-    return <div className={`flex h-[18px] items-center justify-center gap-1.5 rounded-field ${toneClass}`}>{content}</div>;
+    return <div className="flex h-[18px] items-center justify-center gap-1.5 rounded-field">{content}</div>;
   }
   return (
     <button
@@ -174,9 +170,30 @@ function TimelineRow({ ref, icon: Icon, iconClass, text, time, onClick, ariaLabe
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className={`flex h-[18px] w-full items-center justify-center gap-1.5 rounded-field hover:opacity-80 ${toneClass}`}
+      className="flex h-[18px] w-full items-center justify-center gap-1.5 rounded-field hover:opacity-80"
     >
       {content}
+    </button>
+  );
+}
+
+/**
+ * Главная кнопка следующего касания — под лентой истории, во всю ширину
+ * карточки, сплошной синий (телеграмный #0088CC), без иконки: единственное
+ * реально кликабельное действие на этой стадии, должно выделяться, а не
+ * теряться среди мелких строк истории.
+ */
+function TouchActionButton({ ref, onClick, ariaLabel, text, time }) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className="flex w-full items-center justify-center gap-1.5 rounded-field bg-[#0088CC] py-2 text-[13px] font-bold text-white hover:bg-[#0077B3]"
+    >
+      {text}
+      {time && <span className="text-[11px] font-normal opacity-80">{time}</span>}
     </button>
   );
 }
@@ -368,11 +385,10 @@ function HistoryTimeline({ lead }) {
  * ряд лежит у левого края узкой карточки в канбане, обычный absolute-попап
  * вылезал за край карточки и обрезался/наезжал на соседнюю колонку.
  */
-function CallAttemptDots({ attempts, onMark, nextCallDueAt, overdue }) {
+function CallAttemptDots({ attempts, onMark, nextCallDueAt }) {
   const isCold = attempts.length === MAX_ATTEMPTS && attempts.every((a) => a.result === 'fail');
   const exhausted = attempts.length >= MAX_ATTEMPTS;
   const deadlineLabel = !isCold && nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
-  const tone = overdue ? 'danger' : 'success';
 
   let pendingRow;
   if (isCold) {
@@ -387,15 +403,12 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt, overdue }) {
           { label: '✕ Не успешно', danger: true, onClick: () => onMark('fail') },
         ]}
         trigger={({ ref, toggle }) => (
-          <TimelineRow
+          <TouchActionButton
             ref={ref}
-            icon={CircleDashed}
-            iconClass={overdue ? 'text-danger' : 'text-success'}
             text={`Касание ${attempts.length + 1}`}
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
-            tone={tone}
           />
         )}
       />
@@ -406,22 +419,14 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt, overdue }) {
 }
 
 /** Касания в «Дожиме» (ровно 2, см. LeadsPage.markTouch) — задача обязательна на каждом. */
-function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark, overdue }) {
+function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark }) {
   const count = closingTouchNumber ?? 0;
   const log = closingTouchLog ?? [];
   const deadlineLabel = count < 2 && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
 
   const pendingRow =
     count < 2 ? (
-      <TimelineRow
-        icon={CircleDashed}
-        iconClass={overdue ? 'text-danger' : 'text-success'}
-        text={`Касание ${count + 1}`}
-        time={deadlineLabel}
-        onClick={onMark}
-        ariaLabel={`Касание ${count + 1}: отметить`}
-        tone={overdue ? 'danger' : 'success'}
-      />
+      <TouchActionButton text={`Касание ${count + 1}`} time={deadlineLabel} onClick={onMark} ariaLabel={`Касание ${count + 1}: отметить`} />
     ) : (
       <TimelineRow icon={CheckCircle2} iconClass="text-success" text="Оба касания сделаны" muted />
     );
@@ -531,7 +536,7 @@ function LeadInfoPopover({ items }) {
  * @param {() => void} onDecline
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
-function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt, overdue }) {
+function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt }) {
   const attempts = lead.unreachableAttempts ?? [];
   const [active, setActive] = useState(attempts.length > 0);
 
@@ -579,15 +584,12 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
           { label: 'Неуспешно', danger: true, onClick: () => pick('fail') },
         ]}
         trigger={({ ref, toggle }) => (
-          <TimelineRow
+          <TouchActionButton
             ref={ref}
-            icon={CircleDashed}
-            iconClass={overdue ? 'text-danger' : 'text-success'}
             text={`Касание ${attempts.length + 1}`}
             time={deadlineLabel}
             onClick={toggle}
             ariaLabel={`Касание ${attempts.length + 1}: связаться`}
-            tone={overdue ? 'danger' : 'success'}
           />
         )}
       />
@@ -771,7 +773,6 @@ export function LeadCard({
             attempts={attempts}
             onMark={(result) => onMarkAttempt(lead, result)}
             nextCallDueAt={lead.nextCallDueAt}
-            overdue={overdue}
           />
         </div>
       )}
@@ -802,7 +803,6 @@ export function LeadCard({
             nextTouchAt={lead.nextTouchAt}
             closingTouchLog={lead.closingTouchLog}
             onMark={() => onMarkTouch(lead)}
-            overdue={overdue}
           />
           <UnreachableBlock
             lead={lead}
@@ -810,7 +810,6 @@ export function LeadCard({
             onReschedule={() => {}}
             onDecline={() => onDecline(lead)}
             nextAttemptDueAt={lead.nextTouchAt}
-            overdue={overdue}
           />
         </div>
       )}
@@ -891,7 +890,7 @@ export function LeadCard({
                         : 'text-orange'
                 }`}
               >
-                <ListChecks className="h-4 w-4" />
+                <ClipboardCheck className="h-4 w-4" />
               </button>
             )}
             <button
@@ -899,10 +898,10 @@ export function LeadCard({
               onClick={() => setCommentsOpen((v) => !v)}
               aria-label="Комментарии"
               className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-                commentsOpen || hasComments ? 'text-navy' : 'text-muted'
+                hasComments ? 'text-navy' : 'text-muted'
               }`}
             >
-              <MessageSquare className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
+              <MessageSquareText className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
             </button>
             {!isTerminal && (
               <button
