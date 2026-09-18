@@ -319,8 +319,19 @@ function HistoryTimeline({ lead }) {
   // перестанут совпадать между рендерами (React бросит "Rendered fewer
   // hooks than expected").
   const [expanded, setExpanded] = useState(() => new Set());
+  const [dateOpenAt, setDateOpenAt] = useState(null);
+  const dateRef = useRef(null);
   const scrollRef = useRef(null);
   const nodes = buildTimelineNodes(buildFullHistory(lead));
+
+  useEffect(() => {
+    if (dateOpenAt === null) return undefined;
+    const onClickOutside = (e) => {
+      if (dateRef.current && !dateRef.current.contains(e.target)) setDateOpenAt(null);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [dateOpenAt]);
 
   // Лента отсортирована по возрастанию (старое сверху, новое снизу) —
   // без автоскролла окно по умолчанию открывалось на самой старой записи,
@@ -358,8 +369,26 @@ function HistoryTimeline({ lead }) {
       {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
       {nodes.map((node, i) => (
         <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
-          <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center bg-surface-alt">
-            <CheckCircle2 className={`h-3 w-3 ${ICON_TONE}`} />
+          <div
+            ref={dateOpenAt === i ? dateRef : null}
+            className="relative z-10 shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDateOpenAt((v) => (v === i ? null : i));
+            }}
+          >
+            <button
+              type="button"
+              aria-label="Дата и время"
+              className="flex h-4 w-4 items-center justify-center bg-surface-alt"
+            >
+              <CheckCircle2 className={`h-3 w-3 ${ICON_TONE}`} />
+            </button>
+            {dateOpenAt === i && (
+              <div className="absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded-field border border-border bg-surface px-2 py-1 text-[10px] text-muted shadow-hover">
+                {node.at ? formatDateTimeShort(node.at) : '—'}
+              </div>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             {node.task && <p className="text-[9px] leading-tight text-muted">{node.task}</p>}
@@ -372,7 +401,6 @@ function HistoryTimeline({ lead }) {
             >
               {node.result}
             </p>
-            <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
           </div>
         </div>
       ))}
