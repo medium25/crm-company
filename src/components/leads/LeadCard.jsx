@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, AlertTriangle, Zap, Snowflake, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -287,21 +287,24 @@ function buildFullHistory(lead) {
   return items;
 }
 
-// Просрочка/«вовремя» — отдельный узел таймлайна (как системное уведомление
-// в ленте активности), не текст, приклеенный поверх задачи следующей записи.
+// Только реальные взаимодействия (касания) — переходы стадий/передачи
+// оператору в ленту не попадают, это служебные события, не задачи.
+// Каждый узел — пара «какая задача стояла» (task, мелким) + «что вышло»
+// (result, крупным): task — это nextStep ПРЕДЫДУЩЕГО касания (что решили
+// сделать дальше тогда — это и есть задача, которую сейчас выполнили),
+// у самого первого касания задачи в данных нет — это всегда стартовый SLA.
 function buildTimelineNodes(history) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
-  const nodes = [];
-  history.forEach((item) => {
-    if (item.type === 'stage' || item.type === 'operator') {
-      nodes.push(item);
-      return;
-    }
+  const interactions = history.filter((item) => item.type === 'entry');
+  return interactions.map((item, i) => {
     const timing = responseTiming(item, fallbackAt);
-    if (timing) nodes.push({ type: timing.tone === 'good' ? 'ontime' : 'overdue', label: timing.label, at: item.at });
-    nodes.push({ type: 'entry', entry: item });
+    return {
+      type: 'entry',
+      task: i === 0 ? 'Позвонить в первые 30 минут' : (interactions[i - 1].nextStep ?? null),
+      result: timing ? timing.label : (item.outcome || 'Без задачи'),
+      at: item.at,
+    };
   });
-  return nodes;
 }
 
 /**
@@ -348,62 +351,31 @@ function HistoryTimeline({ lead }) {
   // Единый стиль для всех типов узлов — раньше цвет иконки менялся по типу
   // (красная просрочка/зелёное вовремя/навy переход/зелёное касание), теперь
   // все записи ленты выглядят однородно, различаются только иконкой-формой.
-  const ICONS = { overdue: AlertTriangle, ontime: Zap, stage: ArrowRight, entry: CheckCircle2, operator: Users };
   const ICON_TONE = 'text-navy';
 
   return (
     <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto rounded-field bg-surface-alt p-2">
       {nodes.length > 1 && <span className="absolute bottom-2 left-[16px] top-2 w-px bg-border-strong" />}
-      {nodes.map((node, i) => {
-        const Icon = ICONS[node.type];
-        return (
-          <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
-            <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center bg-surface-alt">
-              <Icon className={`h-3 w-3 ${ICON_TONE}`} />
-            </div>
-            {node.type === 'overdue' || node.type === 'ontime' ? (
-              <div className="min-h-[25px] min-w-0 flex-1">
-                <p className="text-[11px] leading-tight text-text">{node.label}</p>
-                <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
-              </div>
-            ) : node.type === 'operator' ? (
-              <div className="min-h-[25px] min-w-0 flex-1">
-                <p className="text-[11px] leading-tight text-text">
-                  Передан от «{node.fromName}» к «{node.toName}»
-                </p>
-                <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
-              </div>
-            ) : node.type === 'stage' ? (
-              <div className="min-w-0 flex-1">
-                <p
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggle(i);
-                  }}
-                  className={`cursor-pointer text-[11px] leading-tight text-navy ${expanded.has(i) ? '' : 'truncate'}`}
-                >
-                  {i === 0 ? 'Создан — ' : 'Переведён в '}«{COLUMNS.find((c) => c.key === node.stage)?.label ?? node.stage}»
-                </p>
-                <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
-              </div>
-            ) : (
-              <div className="min-w-0 flex-1">
-                <p
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggle(i);
-                  }}
-                  className={`cursor-pointer text-[11px] leading-tight text-text ${expanded.has(i) ? '' : 'truncate'}`}
-                >
-                  {node.entry.outcome || node.entry.task || 'Без задачи'}
-                  {node.entry.nextStep && <> &gt; {node.entry.nextStep}</>}
-                </p>
-                <p className="text-[9px] leading-tight text-muted">{node.entry.at ? formatDateTimeShort(node.entry.at) : '—'}</p>
-              </div>
-            )}
+      {nodes.map((node, i) => (
+        <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
+          <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center bg-surface-alt">
+            <CheckCircle2 className={`h-3 w-3 ${ICON_TONE}`} />
           </div>
-        );
-      })}
+          <div className="min-w-0 flex-1">
+            {node.task && <p className="text-[9px] leading-tight text-muted">{node.task}</p>}
+            <p
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle(i);
+              }}
+              className={`cursor-pointer text-[11px] leading-tight text-text ${expanded.has(i) ? '' : 'truncate'}`}
+            >
+              {node.result}
+            </p>
+            <p className="text-[9px] leading-tight text-muted">{node.at ? formatDateTimeShort(node.at) : '—'}</p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
