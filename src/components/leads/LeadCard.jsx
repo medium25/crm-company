@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
+import { XCircle, Snowflake, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -293,7 +293,7 @@ function buildFullHistory(lead) {
 // (result, крупным): task — это nextStep ПРЕДЫДУЩЕГО касания (что решили
 // сделать дальше тогда — это и есть задача, которую сейчас выполнили),
 // у самого первого касания задачи в данных нет — это всегда стартовый SLA.
-function buildTimelineNodes(history) {
+function buildTimelineNodes(history, pendingDueAt) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const interactions = history.filter((item) => item.type === 'entry');
   const nodes = interactions.map((item, i) => {
@@ -309,7 +309,7 @@ function buildTimelineNodes(history) {
   // отработана — отдельный выделенный узел в конце ленты, не такой же
   // серый пункт, как уже сделанные.
   const pendingTask = interactions[interactions.length - 1]?.nextStep;
-  if (pendingTask) nodes.push({ type: 'pending', task: pendingTask });
+  if (pendingTask) nodes.push({ type: 'pending', task: pendingTask, dueAt: pendingDueAt ?? null });
   return nodes;
 }
 
@@ -328,7 +328,13 @@ function HistoryTimeline({ lead }) {
   const [dateOpenAt, setDateOpenAt] = useState(null);
   const dateRef = useRef(null);
   const scrollRef = useRef(null);
-  const nodes = buildTimelineNodes(buildFullHistory(lead));
+  // Дедлайн ЕЩЁ не сделанной задачи — то же поле, что читает кнопка
+  // касания под лентой на этой стадии (CallAttemptDots/TouchDots/
+  // UnreachableBlock), просто показываем его тут же, рядом с текстом задачи.
+  const stage = lead.funnelStage ?? 'new';
+  const pendingDueAt =
+    stage === 'closing' ? lead.nextTouchAt : stage === 'trial_scheduled' ? lead.unreachableNextCallDueAt : lead.nextCallDueAt;
+  const nodes = buildTimelineNodes(buildFullHistory(lead), pendingDueAt);
 
   useEffect(() => {
     if (dateOpenAt === null) return undefined;
@@ -382,7 +388,10 @@ function HistoryTimeline({ lead }) {
             <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center bg-transparent">
               <ClipboardCheck className="h-3.5 w-3.5 text-navy" />
             </div>
-            <p className="min-w-0 flex-1 text-[11px] font-bold leading-tight text-navy">{node.task}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold leading-tight text-navy">{node.task}</p>
+              {node.dueAt && <p className="text-[10px] leading-tight text-navy/70">{formatRelativeDeadline(node.dueAt)}</p>}
+            </div>
           </div>
         ) : (
           <div key={i} className="relative flex items-start gap-1.5 pb-2 last:pb-0">
@@ -397,9 +406,9 @@ function HistoryTimeline({ lead }) {
               <button
                 type="button"
                 aria-label="Дата и время"
-                className="flex h-4 w-4 items-center justify-center bg-surface-alt"
+                className={`flex h-4 w-4 items-center justify-center rounded-full border border-navy bg-surface-alt text-[9px] font-bold ${ICON_TONE}`}
               >
-                <CheckCircle2 className={`h-3 w-3 ${ICON_TONE}`} />
+                {i + 1}
               </button>
               {dateOpenAt === i && (
                 <div className="absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded-field border border-border bg-surface px-2 py-1 text-[10px] text-muted shadow-hover">
