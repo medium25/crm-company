@@ -270,9 +270,9 @@ function msOf(v) {
 function buildFullHistory(lead) {
   const items = [];
   (lead.stageHistory ?? []).forEach((h) => items.push({ type: 'stage', stage: h.stage, at: h.enteredAt }));
-  (lead.callAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
-  (lead.closingTouchLog ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
-  (lead.unreachableAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
+  (lead.callAttempts ?? []).forEach((e) => items.push({ type: 'entry', source: 'calling', ...e }));
+  (lead.closingTouchLog ?? []).forEach((e) => items.push({ type: 'entry', source: 'closing', ...e }));
+  (lead.unreachableAttempts ?? []).forEach((e) => items.push({ type: 'entry', source: 'unreachable', ...e }));
   (lead.operatorTransfers ?? []).forEach((e) => items.push({ type: 'operator', fromName: e.fromName, toName: e.toName, at: e.at }));
   items.sort((a, b) => {
     const diff = msOf(a.at) - msOf(b.at);
@@ -296,13 +296,20 @@ function buildFullHistory(lead) {
 function buildTimelineNodes(history, pendingDueAt) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const interactions = history.filter((item) => item.type === 'entry');
+  // Номер на кружке — счёт ВНУТРИ своего источника (Дозвон/Дожим/«Не
+  // выходит на связь» считаются отдельно), не сквозной по всей ленте —
+  // лента объединяет все стадии, а счётчик касаний на кнопке под ней
+  // (closingTouchNumber и т.п.) всегда про текущую стадию.
+  const stepBySource = {};
   const nodes = interactions.map((item, i) => {
     const timing = responseTiming(item, fallbackAt);
+    stepBySource[item.source] = (stepBySource[item.source] ?? 0) + 1;
     return {
       type: 'entry',
       task: i === 0 ? 'Позвонить в первые 30 минут' : (interactions[i - 1].nextStep ?? null),
       result: timing ? timing.label : (item.outcome || 'Без задачи'),
       at: item.at,
+      step: stepBySource[item.source],
     };
   });
   // Последняя поставленная задача (nextStep последнего касания) ещё не
@@ -408,7 +415,7 @@ function HistoryTimeline({ lead }) {
                 aria-label="Дата и время"
                 className={`flex h-4 w-4 items-center justify-center rounded-full border border-navy bg-surface-alt text-[9px] font-bold ${ICON_TONE}`}
               >
-                {i + 1}
+                {node.step}
               </button>
               {dateOpenAt === i && (
                 <div className="absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded-field border border-border bg-surface px-2 py-1 text-[10px] text-muted shadow-hover">
