@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X, Settings } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X, Settings, ChevronUp, ChevronDown } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -102,10 +102,31 @@ export function LeadCommentsPanel({ leadId }) {
 function LeadChecklistPanel({ leadId, checklist, items, onEditItems }) {
   const [editing, setEditing] = useState(false);
   const [newLabel, setNewLabel] = useState('');
+  const [renamingKey, setRenamingKey] = useState(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const checked = checklistCheckedCount(checklist, items);
   const percent = checklistPercent(checklist, items);
 
   const removeItem = (key) => onEditItems?.(items.filter((i) => i.key !== key));
+
+  const startRename = (item) => {
+    setRenamingKey(item.key);
+    setRenameDraft(item.label);
+  };
+
+  const saveRename = () => {
+    const label = renameDraft.trim();
+    if (label) onEditItems?.(items.map((i) => (i.key === renamingKey ? { ...i, label } : i)));
+    setRenamingKey(null);
+  };
+
+  const moveItem = (index, delta) => {
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[index], next[target]] = [next[target], next[index]];
+    onEditItems?.(next);
+  };
 
   const addItem = () => {
     const label = newLabel.trim();
@@ -131,17 +152,48 @@ function LeadChecklistPanel({ leadId, checklist, items, onEditItems }) {
           </button>
         )}
       </div>
-      {items.map((item) => (
+      {items.map((item, index) => (
         <div key={item.key} className="flex items-start gap-1.5">
           {editing ? (
-            <button
-              type="button"
-              onClick={() => removeItem(item.key)}
-              aria-label={`Удалить пункт: ${item.label}`}
-              className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-danger hover:opacity-70"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            <>
+              <div className="mt-0.5 flex shrink-0 flex-col">
+                <button
+                  type="button"
+                  onClick={() => moveItem(index, -1)}
+                  disabled={index === 0}
+                  aria-label={`Переместить вверх: ${item.label}`}
+                  className="flex h-3.5 w-3.5 items-center justify-center text-muted hover:text-navy disabled:opacity-20"
+                >
+                  <ChevronUp className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveItem(index, 1)}
+                  disabled={index === items.length - 1}
+                  aria-label={`Переместить вниз: ${item.label}`}
+                  className="flex h-3.5 w-3.5 items-center justify-center text-muted hover:text-navy disabled:opacity-20"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </div>
+              <DropdownMenu
+                items={[
+                  { label: 'Переименовать', onClick: () => startRename(item) },
+                  { label: 'Удалить', danger: true, onClick: () => removeItem(item.key) },
+                ]}
+                trigger={({ ref, toggle }) => (
+                  <button
+                    ref={ref}
+                    type="button"
+                    onClick={toggle}
+                    aria-label={`Действия: ${item.label}`}
+                    className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-muted hover:text-navy"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              />
+            </>
           ) : (
             <input
               type="checkbox"
@@ -150,7 +202,19 @@ function LeadChecklistPanel({ leadId, checklist, items, onEditItems }) {
               onChange={(e) => updateDoc(doc(db, 'students', leadId), { [`checklist.${item.key}`]: e.target.checked })}
             />
           )}
-          <label className="cursor-pointer text-[12px] leading-tight text-text">{item.label}</label>
+          {renamingKey === item.key ? (
+            <input
+              autoFocus
+              type="text"
+              value={renameDraft}
+              onChange={(e) => setRenameDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && saveRename()}
+              onBlur={saveRename}
+              className="h-6 min-w-0 flex-1 rounded-field border border-navy bg-white px-1.5 text-[12px] text-text focus:outline-none"
+            />
+          ) : (
+            <label className="cursor-pointer text-[12px] leading-tight text-text">{item.label}</label>
+          )}
         </div>
       ))}
       {editing && (
