@@ -837,10 +837,11 @@ export function LeadCard({
       {/* Modal рендерится в document.body через портал, но события всплывают
           по React-дереву, не DOM — без stopPropagation клик внутри модалки
           (например, «Закрыть») доходил бы до onClick корня карточки и
-          открывал бы её (onOpen). Вынесен из футера (см. ниже) — иначе,
-          даже пустой (target=null), добавлял ещё один gap-промежуток между
-          рядом иконок и строкой даты/источника под ним. */}
-      <div onClick={(e) => e.stopPropagation()}>
+          открывал бы её (onOpen). `absolute` — вне потока: даже пустой
+          (target=null) div-обёртка как обычный flex-ребёнок карточки всё
+          равно получала свою пару gap-2.5 с обеих сторон (0 своей высоты,
+          но два зазора), раздваивая отступ вокруг себя. */}
+      <div className="absolute" onClick={(e) => e.stopPropagation()}>
         <LeadFormDataModal target={formDataOpen ? { lead } : null} onClose={() => setFormDataOpen(false)} />
       </div>
 
