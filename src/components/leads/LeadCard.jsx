@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { XCircle, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -447,23 +447,38 @@ function HistoryTimeline({ lead }) {
  */
 function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts }) {
   const deadlineLabel = nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
+  const [confirming, setConfirming] = useState(false);
+
+  if (confirming) {
+    return (
+      <div className="flex h-[30px] w-[84px] shrink-0 overflow-hidden rounded-field">
+        <button
+          type="button"
+          onClick={() => onMark('success')}
+          aria-label="Успешно"
+          className="flex flex-1 items-center justify-center bg-success text-white hover:opacity-90"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onMark('fail')}
+          aria-label="Не успешно"
+          className="flex flex-1 items-center justify-center bg-danger text-white hover:opacity-90"
+        >
+          <XCircle className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <DropdownMenu
-      items={[
-        { label: '✓ Успешно', onClick: () => onMark('success') },
-        { label: '✕ Не успешно', danger: true, onClick: () => onMark('fail') },
-      ]}
-      trigger={({ ref, toggle }) => (
-        <TouchActionButton
-          ref={ref}
-          text={`Касание ${attempts.length}/${maxAttempts}`}
-          time={deadlineLabel}
-          onClick={toggle}
-          ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
-          compact
-        />
-      )}
+    <TouchActionButton
+      text={`Касание ${attempts.length}/${maxAttempts}`}
+      time={deadlineLabel}
+      onClick={() => setConfirming(true)}
+      ariaLabel={`Касание ${attempts.length + 1}: отметить результат звонка`}
+      compact
     />
   );
 }
