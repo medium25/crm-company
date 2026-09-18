@@ -227,7 +227,11 @@ export function DeadlineModal({ target, onClose }) {
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit} loading={saving}>
+          <Button
+            onClick={handleSubmit}
+            loading={saving}
+            disabled={target.requireTask && (!outcome.trim() || !nextStep.trim())}
+          >
             Подтвердить
           </Button>
         </>
