@@ -418,7 +418,7 @@ function HistoryTimeline({ lead }) {
             </div>
             <div className="min-w-0 flex-1 rounded-field border border-navy bg-navy/10 px-1.5 py-1">
               <p className="text-[11px] font-bold leading-tight text-navy">{node.task}</p>
-              {node.dueAt && <p className="text-[10px] leading-tight text-navy/70">{formatRelativeDeadline(node.dueAt)}</p>}
+              {node.dueAt && <p className="text-[10px] leading-tight text-navy/70">до {formatRelativeDeadline(node.dueAt)}</p>}
             </div>
           </div>
         ) : (
