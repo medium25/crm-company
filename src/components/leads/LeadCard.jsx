@@ -829,6 +829,13 @@ export function LeadCard({
             </span>
           )}
           <HistoryTimeline lead={lead} />
+          <UnreachableBlock
+            lead={lead}
+            onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
+            onReschedule={() => onRescheduleTrial(lead)}
+            onDecline={() => onDecline(lead)}
+            nextAttemptDueAt={lead.unreachableNextCallDueAt}
+          />
         </div>
       )}
 
