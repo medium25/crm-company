@@ -237,7 +237,7 @@ function responseTiming(entry, fallbackAt) {
   }
   const hours = Math.round(minutes / 60);
   if (hours <= 0) return { tone: 'good', label: 'Обработано вовремя' };
-  return { tone: 'bad', label: `Задача была просрочена на ${hours} ${pluralHours(hours)}` };
+  return { tone: 'bad', label: `Опоздали на ${hours} ${pluralHours(hours)}` };
 }
 
 function msOf(v) {
