@@ -10,6 +10,7 @@ import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { Select } from '../components/ui/Select.jsx';
+import { GroupOptions } from '../components/ui/GroupOptions.jsx';
 import { DatePicker } from '../components/ui/DatePicker.jsx';
 import { Table } from '../components/ui/Table.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
@@ -347,12 +348,9 @@ export function PaymentsPage() {
           onChange={(e) => setDraft((d) => ({ ...d, q: e.target.value }))}
           onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
         />
-        <Select
-          label="Группа"
-          options={[{ value: '', label: 'Все' }, ...groups.map((g) => ({ value: g.id, label: g.code }))]}
-          value={draft.group}
-          onChange={(e) => setDraft((d) => ({ ...d, group: e.target.value }))}
-        />
+        <Select label="Группа" value={draft.group} onChange={(e) => setDraft((d) => ({ ...d, group: e.target.value }))}>
+          <GroupOptions items={groups} placeholder="Все" getLabel={(g) => g.code} />
+        </Select>
         <Select
           label="Курс"
           options={[{ value: '', label: 'Все' }, ...courses.map((c) => ({ value: c.id, label: c.name }))]}

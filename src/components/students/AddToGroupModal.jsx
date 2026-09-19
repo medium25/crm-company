@@ -14,6 +14,7 @@ import { notifySheetsExport } from '../../lib/sheetsExportHook.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Select.jsx';
+import { GroupOptions } from '../ui/GroupOptions.jsx';
 import { Input } from '../ui/Input.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
 
@@ -172,13 +173,9 @@ export function AddToGroupModal({ open, student, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Select
-          label="Группа"
-          required
-          options={[{ value: '', label: 'Выбрать' }, ...groups.map((g) => ({ value: g.id, label: `${g.code} · ${g.courseName}` }))]}
-          value={groupId}
-          onChange={(e) => handleGroupChange(e.target.value)}
-        />
+        <Select label="Группа" required value={groupId} onChange={(e) => handleGroupChange(e.target.value)}>
+          <GroupOptions items={groups} />
+        </Select>
         <Select label="Статус" options={STATUS_OPTIONS} value={status} onChange={(e) => setStatus(e.target.value)} />
         {missingLastName && (
           <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">

@@ -9,6 +9,7 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
+import { GroupOptions } from '../ui/GroupOptions.jsx';
 import { recomputeStudentAggregates } from '../../lib/students.js';
 
 // meta_target ставит только appsscript/SheetsSync.gs автоматически лидам
@@ -353,12 +354,9 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           </>
         )}
         {isTrialStatus && (
-          <Select
-            label="Группа"
-            options={[{ value: '', label: 'Не выбрана' }, ...groups.map((g) => ({ value: g.id, label: `${g.code} · ${g.courseName}` }))]}
-            value={form.groupId}
-            onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}
-          />
+          <Select label="Группа" value={form.groupId} onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}>
+            <GroupOptions items={groups} placeholder="Не выбрана" />
+          </Select>
         )}
       </form>
     </Modal>

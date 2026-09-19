@@ -9,8 +9,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { COLUMNS } from '../leads/columns.js';
 import { formatPhone, pluralize } from '../../lib/format.js';
 import { useSearchSource } from '../../lib/searchSource.js';
-
-const STUDENT_STATUS = { active: 'Активен', paused: 'Заморожен', trial: 'Пробный', left: 'Ушёл' };
+import { STUDENT_STATUS, locateLead } from '../../lib/leadLocation.js';
 
 // Стадии доски «Заявки», на которых человек ещё лид (а не студент).
 const LEAD_STAGES = COLUMNS.filter((c) => c.key !== 'won').map((c) => c.key);
@@ -28,22 +27,6 @@ function scopeOf(pathname) {
   if (pathname.startsWith('/trials')) return 'trials';
   if (['/teachers-groups', '/groups', '/teachers', '/courses', '/rooms'].some((p) => pathname.startsWith(p))) return 'groups';
   return 'students';
-}
-
-/**
- * Куда вести по клику на лида: на доску «Заявки», к его карточке (рамка,
- * раскрываются группы). «Оплачено» — уже ученик, ему страница ученика; лид,
- * которого нет на доске (скрыт крестиком или чужой у оператора без права
- * видеть всех), — тоже на страницу.
- */
-function locateLead(s, canSeeAllLeads, uid) {
-  const column = COLUMNS.find((c) => c.key === s.funnelStage);
-  if (column && column.key !== 'won') {
-    if (s.boardHiddenAt) return { path: `/students/${s.id}`, place: 'Заявки · скрыта с доски' };
-    if (!canSeeAllLeads && s.assignedOperator !== uid) return { path: `/students/${s.id}`, place: `Заявки · ${column.label} · у другого оператора` };
-    return { path: `/leads?highlight=${s.id}&t=${Date.now()}`, place: `Заявки · ${column.label}` };
-  }
-  return { path: `/students/${s.id}`, place: `Студенты · ${STUDENT_STATUS[s.status] ?? 'ученик'}` };
 }
 
 /**

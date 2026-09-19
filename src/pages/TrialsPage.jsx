@@ -22,6 +22,7 @@ import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
 import { advanceStage, firstTouchDueAt } from '../lib/leadFunnel.js';
 import { archiveStudent } from '../lib/students.js';
 import { formatPhone } from '../lib/format.js';
+import { locateLead } from '../lib/leadLocation.js';
 import { setSearchSource, clearSearchSource } from '../lib/searchSource.js';
 
 const TRIAL_SCHEDULED_COLOR = COLUMNS.find((c) => c.key === 'trial_scheduled').color;
@@ -39,8 +40,14 @@ function TrialColumnHeader({ label, count, color }) {
 }
 
 /** Свёрнутая/развёрнутая секция карточек — та же идея, что LeadGroup на «Заявки». */
-function TrialGroup({ title, leads, operatorByUid, renderCard, defaultOpen = false }) {
+function TrialGroup({ title, leads, operatorByUid, renderCard, highlightId, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
+
+  // Найденная поиском карточка лежит в свёрнутой секции — раскрываем её.
+  const holdsHighlight = Boolean(highlightId) && leads.some((l) => l.id === highlightId);
+  useEffect(() => {
+    if (holdsHighlight) setOpen(true);
+  }, [holdsHighlight]);
 
   return (
     <div className="rounded-field border border-border bg-surface-alt">
@@ -58,7 +65,11 @@ function TrialGroup({ title, leads, operatorByUid, renderCard, defaultOpen = fal
           ) : (
             leads.map((lead) => {
               const op = operatorByUid.get(lead.assignedOperator);
-              return <div key={lead.id}>{renderCard(lead, op)}</div>;
+              return (
+                <div key={lead.id} id={`trial-card-${lead.id}`} className={highlightId === lead.id ? 'rounded-xl ring-4 ring-navy ring-offset-2' : ''}>
+                  {renderCard(lead, op)}
+                </div>
+              );
             })
           )}
         </div>
@@ -86,9 +97,11 @@ function SearchField({ value, onChange, onFocus, placeholder, trailing }) {
   );
 }
 
-/** Поиск лида по всей базе (не только среди «Пробный назначен») — для ручной записи на пробный. */
+/** Поиск лида по всей базе (не только среди «Пробный назначен»): находит его карточку и выделяет её — на этой странице или на доске «Заявки». */
 function LeadSearch({ onPick, onManualAdd }) {
   const { activeBranchId } = useBranch();
+  const { user, staff } = useAuth();
+  const canSeeAllLeads = staff?.role === 'ceo' || staff?.role === 'manager' || staff?.role === 'test';
   const [active, setActive] = useState(false);
   const [q, setQ] = useState('');
 
@@ -125,21 +138,27 @@ function LeadSearch({ onPick, onManualAdd }) {
           {results.length === 0 ? (
             <p className="px-3 py-2 text-[13px] text-muted">Ничего не найдено</p>
           ) : (
-            results.map((lead) => (
-              <button
-                key={lead.id}
-                type="button"
-                onClick={() => {
-                  onPick(lead);
-                  setQ('');
-                  setActive(false);
-                }}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-[14px] hover:bg-surface-alt"
-              >
-                <span className="text-text">{lead.fullName}</span>
-                <span className="text-muted">{formatPhone(lead.phone)}</span>
-              </button>
-            ))
+            results.map((lead) => {
+              const where = locateLead(lead, canSeeAllLeads, user?.uid);
+              return (
+                <button
+                  key={lead.id}
+                  type="button"
+                  onClick={() => {
+                    onPick(lead, where);
+                    setQ('');
+                    setActive(false);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[14px] hover:bg-surface-alt"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-text">{lead.fullName}</span>
+                    <span className="block truncate text-[11px] text-muted">{where.place}</span>
+                  </span>
+                  <span className="shrink-0 text-muted">{formatPhone(lead.phone)}</span>
+                </button>
+              );
+            })
           )}
         </div>
       )}
@@ -155,7 +174,7 @@ function LeadSearch({ onPick, onManualAdd }) {
  */
 export function TrialsPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, staff } = useAuth();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
 
@@ -264,6 +283,34 @@ export function TrialsPage() {
   const isOddDayToday = [1, 3, 5].includes(new Date().getDay());
 
   const groups = useMemo(() => groupLeadsByTrialDay(scheduledLeads), [scheduledLeads]);
+
+  // Выбор лида в поиске «по всей базе» — только находим его карточку и выделяем рамкой:
+  // на этой странице, если лид среди пробных, иначе ведём на его место (доска «Заявки»
+  // или страница ученика). Окно записи на пробный само не открывается.
+  const [highlightId, setHighlightId] = useState(null);
+  const focusLead = (lead, where) => {
+    if (rawLeads.some((l) => l.id === lead.id)) setHighlightId(lead.id);
+    else navigate(where.path);
+  };
+  useEffect(() => {
+    if (!highlightId) return undefined;
+    let tries = 0;
+    const poll = setInterval(() => {
+      tries += 1;
+      const el = document.getElementById(`trial-card-${highlightId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        clearInterval(poll);
+      } else if (tries > 20) {
+        clearInterval(poll);
+      }
+    }, 150);
+    const clear = setTimeout(() => setHighlightId(null), 3500);
+    return () => {
+      clearInterval(poll);
+      clearTimeout(clear);
+    };
+  }, [highlightId]);
   const onOpen = (lead) => navigate(`/students/${lead.id}`);
 
   const handleManualCreated = async (id) => {
@@ -303,7 +350,7 @@ export function TrialsPage() {
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Записи" count={scheduledLeads.length} color={TRIAL_SCHEDULED_COLOR} />
           <LeadSearch
-            onPick={(lead) => setTrialTarget({ lead, mode: 'schedule' })}
+            onPick={focusLead}
             onManualAdd={() => setManualLeadTarget({})}
           />
           {groups.overdue.length > 0 && (
@@ -311,6 +358,7 @@ export function TrialsPage() {
               title="Просроченные"
               leads={groups.overdue}
               operatorByUid={operatorByUid}
+              highlightId={highlightId}
               defaultOpen
               renderCard={(lead, op) => (
                 <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
@@ -321,6 +369,7 @@ export function TrialsPage() {
             title="Сегодня"
             leads={groups.today}
             operatorByUid={operatorByUid}
+            highlightId={highlightId}
             defaultOpen
             renderCard={(lead, op) => (
               <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
@@ -330,6 +379,7 @@ export function TrialsPage() {
             title="Завтра"
             leads={groups.tomorrow}
             operatorByUid={operatorByUid}
+            highlightId={highlightId}
             renderCard={(lead, op) => (
               <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
             )}
@@ -338,6 +388,7 @@ export function TrialsPage() {
             title="Другой день"
             leads={groups.other}
             operatorByUid={operatorByUid}
+            highlightId={highlightId}
             renderCard={(lead, op) => (
               <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
             )}
@@ -366,6 +417,7 @@ export function TrialsPage() {
             title="Чётные"
             leads={completedLeadsByParity.even}
             operatorByUid={operatorByUid}
+            highlightId={highlightId}
             defaultOpen={!isOddDayToday}
             renderCard={(lead, op) => {
               const enrollment = enrollmentByStudent.get(lead.id);
@@ -390,6 +442,7 @@ export function TrialsPage() {
             title="Нечётные"
             leads={completedLeadsByParity.odd}
             operatorByUid={operatorByUid}
+            highlightId={highlightId}
             defaultOpen={isOddDayToday}
             renderCard={(lead, op) => {
               const enrollment = enrollmentByStudent.get(lead.id);

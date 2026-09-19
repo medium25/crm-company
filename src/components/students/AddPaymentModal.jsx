@@ -10,6 +10,7 @@ import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { MoneyInput } from '../ui/MoneyInput.jsx';
 import { Select } from '../ui/Select.jsx';
+import { GroupOptions } from '../ui/GroupOptions.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
 import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { formatMethod, formatMoney, PAYMENT_METHOD_OPTIONS } from '../../lib/format.js';
@@ -122,10 +123,11 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
             <Select
               label="Группа"
               required
-              options={[{ value: '', label: 'Выберите группу' }, ...activeEnrollments.map((en) => ({ value: en.groupId, label: en.groupCode }))]}
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
-            />
+            >
+              <GroupOptions items={activeEnrollments} placeholder="Выберите группу" getValue={(en) => en.groupId} getLabel={(en) => en.groupCode} />
+            </Select>
           )}
           <DatePicker label="Дата" required value={date} onChange={(e) => setDate(e.target.value)} />
           <Input label="Комментарий" value={comment} onChange={(e) => setComment(e.target.value)} />
