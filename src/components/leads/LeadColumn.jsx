@@ -429,11 +429,11 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
 
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 border-b-2 px-4 py-[5px]" style={{ borderBottomColor: column.color }}>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 border-b-2 px-4 py-[8px]" style={{ borderBottomColor: column.color }}>
         <span className="flex min-w-0 items-center gap-1.5 justify-self-start">
           {onEditColumn && <ColumnSettingsButton onOpen={() => setStageEditOpen(true)} />}
         </span>
-        <span className="flex min-w-0 flex-col items-center justify-self-center leading-[16px]">
+        <span className="flex min-w-0 flex-col items-center gap-[3px] justify-self-center leading-[16px]">
           {onEditColumn ? (
             <EditableStageTitle
               column={column}
