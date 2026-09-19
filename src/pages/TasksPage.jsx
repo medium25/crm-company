@@ -64,14 +64,14 @@ const PERIODS = [
   { key: 'year', label: 'Год' },
 ];
 
-function lerp(a, b, t) {
-  return Math.round(a + (b - a) * t);
-}
+// Палитра один в один с эталонным окном (снято с фото): четыре оттенка
+// синего от светлого к тёмному. Позиция квадрата в строке → ступень, так
+// что слева самые светлые, справа самые тёмные.
+const BLUE_STEPS = ['#8EABE5', '#6E93DE', '#4F7BD7', '#3865C9'];
+const EMPTY_SQUARE = '#DADAD9';
 
-// Светло-синий у первого квадрата → тёмно-синий у последнего (в каждой строке).
 function squareColor(i, n) {
-  const t = i / (n - 1);
-  return `rgb(${lerp(191, 31, t)},${lerp(211, 79, t)},${lerp(245, 191, t)})`;
+  return BLUE_STEPS[Math.min(BLUE_STEPS.length - 1, Math.floor((i / n) * BLUE_STEPS.length))];
 }
 
 /**
@@ -84,7 +84,7 @@ function squareColor(i, n) {
 function DoneStrip({ count }) {
   const rows = Math.min(Math.floor(count / DAILY_GOAL) + 1, 5);
   return (
-    <div className="mb-4 rounded-2xl bg-[#F0F0EE] p-4">
+    <div className="mb-4 rounded-2xl bg-[#F0F0EF] p-4">
       <p className="mb-3 text-[22px] font-bold leading-tight text-[#111]">
         Выполнено сегодня: {count} из {DAILY_GOAL}
         {count >= DAILY_GOAL && <span className="ml-2 text-[#1F4FBF]">— Доминатор</span>}
@@ -98,7 +98,7 @@ function DoneStrip({ count }) {
                 <div
                   key={i}
                   className="aspect-square flex-1 rounded-[3px]"
-                  style={{ background: i < filled ? squareColor(i, DAILY_GOAL) : '#DCDCDA' }}
+                  style={{ background: i < filled ? squareColor(i, DAILY_GOAL) : EMPTY_SQUARE }}
                 />
               ))}
             </div>
@@ -137,10 +137,10 @@ function ActivityChart({ counts }) {
   const total = bars.reduce((sum, b) => sum + b.value, 0);
 
   return (
-    <div className="mb-6 rounded-2xl bg-[#F0F0EE] p-4">
+    <div className="mb-6 rounded-2xl bg-[#F0F0EF] p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[15px] font-bold text-[#111]">Активность: {total} выполнено</p>
-        <div className="flex gap-1 rounded-full bg-[#DCDCDA] p-0.5">
+        <div className="flex gap-1 rounded-full bg-[#DADAD9] p-0.5">
           {PERIODS.map((p) => (
             <button
               key={p.key}
@@ -159,7 +159,7 @@ function ActivityChart({ counts }) {
             {(period !== 'month') && b.value > 0 && <span className="text-[10px] text-[#8a8a86]">{b.value}</span>}
             <div
               className="w-full rounded-t-[3px]"
-              style={{ height: `${Math.max(b.value > 0 ? 4 : 2, (b.value / max) * 88)}%`, background: b.value > 0 ? squareColor(i, bars.length) : '#DCDCDA' }}
+              style={{ height: `${Math.max(b.value > 0 ? 4 : 2, (b.value / max) * 88)}%`, background: b.value > 0 ? squareColor(i, bars.length) : EMPTY_SQUARE }}
             />
           </div>
         ))}
