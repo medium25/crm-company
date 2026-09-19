@@ -486,9 +486,10 @@ function HistoryTimeline({ lead }) {
 /**
  * Раскрывшийся выбор результата касания — зелёная галочка (успешно) и
  * красный крестик (не успешно) в одной кнопке-пилюле. Закрывается кликом
- * вне (onDismiss). Общий для «Дозвона» и «Дожима».
+ * вне (onDismiss). Общий для «Дозвона» и «Дожима». `size` — {width, height}
+ * кнопки «Касание», вместо которой встаёт пилюля: тот же размер, ничего не прыгает.
  */
-function ResultChoice({ onSuccess, onFail, onDismiss }) {
+function ResultChoice({ onSuccess, onFail, onDismiss, size }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -500,7 +501,7 @@ function ResultChoice({ onSuccess, onFail, onDismiss }) {
   }, [onDismiss]);
 
   return (
-    <div ref={ref} className="flex h-[30px] w-[84px] shrink-0 overflow-hidden rounded-field">
+    <div ref={ref} className="flex h-[30px] w-[84px] shrink-0 overflow-hidden rounded-field" style={size}>
       <button
         type="button"
         onClick={onSuccess}
@@ -535,17 +536,22 @@ function ResultChoice({ onSuccess, onFail, onDismiss }) {
 function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts, onOpenChecklist }) {
   const deadlineLabel = nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
   const [confirming, setConfirming] = useState(false);
+  const [size, setSize] = useState(null);
+  const btnRef = useRef(null);
   const dismiss = useCallback(() => setConfirming(false), []);
 
   if (confirming) {
-    return <ResultChoice onSuccess={() => onMark('success')} onFail={() => onMark('fail')} onDismiss={dismiss} />;
+    return <ResultChoice onSuccess={() => onMark('success')} onFail={() => onMark('fail')} onDismiss={dismiss} size={size} />;
   }
 
   return (
     <TouchActionButton
+      ref={btnRef}
       text={`Касание ${attempts.length}/${maxAttempts}`}
       time={deadlineLabel}
       onClick={() => {
+        const r = btnRef.current?.getBoundingClientRect();
+        if (r) setSize({ width: r.width, height: r.height });
         setConfirming(true);
         onOpenChecklist?.();
       }}
@@ -566,17 +572,22 @@ function TouchDots({ closingTouchNumber, nextTouchAt, onMark, onFail, maxTouches
   const count = closingTouchNumber ?? 0;
   const deadlineLabel = count < maxTouches && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
   const [confirming, setConfirming] = useState(false);
+  const [size, setSize] = useState(null);
+  const btnRef = useRef(null);
   const dismiss = useCallback(() => setConfirming(false), []);
 
   if (confirming) {
-    return <ResultChoice onSuccess={onMark} onFail={onFail} onDismiss={dismiss} />;
+    return <ResultChoice onSuccess={onMark} onFail={onFail} onDismiss={dismiss} size={size} />;
   }
 
   return (
     <TouchActionButton
+      ref={btnRef}
       text={`Касание ${count}/${maxTouches}`}
       time={deadlineLabel}
       onClick={() => {
+        const r = btnRef.current?.getBoundingClientRect();
+        if (r) setSize({ width: r.width, height: r.height });
         setConfirming(true);
         onPress?.();
       }}
