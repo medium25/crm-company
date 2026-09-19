@@ -53,11 +53,13 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
         </select>
       )}
 
-      {/* Логотип — в левом углу шапки (над меню, вдвое меньше, чем было; в узком меню — только знак).
+      {/* Логотип — в левом углу шапки, в такой же рамке, как поиск и профиль (в узком меню — только знак).
           Ширина блока — меню + отступ страницы минус промежуток flex (1rem). */}
       <div className={`hidden shrink-0 items-center pl-4 transition-[width] md:flex ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-[7.5rem]'}`}>
-        <img src={iconMark} alt="ICON" className="h-[15px] w-[15px] shrink-0" />
-        {!sidebarCollapsed && <img src={iconWordmark} alt="" className="ml-1 h-[11px] w-auto shrink-0" />}
+        <div className="flex h-9 items-center gap-1.5 rounded-field border border-border-strong bg-white px-3">
+          <img src={iconMark} alt="ICON" className="h-5 w-5 shrink-0" />
+          {!sidebarCollapsed && <img src={iconWordmark} alt="" className="h-3.5 w-auto shrink-0" />}
+        </div>
       </div>
       {/* Поиск — по центру шапки, 16rem (было 20rem, −20%); на телефоне остаётся в потоке слева. */}
       <div className="flex min-w-0 flex-1 sm:absolute sm:left-1/2 sm:top-1/2 sm:w-64 sm:flex-none sm:-translate-x-1/2 sm:-translate-y-1/2">
