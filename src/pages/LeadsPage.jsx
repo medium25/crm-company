@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Moon, Sun } from 'lucide-react';
-import { collection, doc, query, where, orderBy, onSnapshot, updateDoc, setDoc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, onSnapshot, getCountFromServer, updateDoc, setDoc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -103,13 +103,56 @@ export function LeadsPage() {
             collection(db, 'students'),
             where('branchId', '==', activeBranchId),
             where('isArchived', '==', false),
-            where('funnelStage', 'in', COLUMNS.map((c) => c.key)),
+            where('funnelStage', 'in', COLUMNS.filter((c) => c.key !== 'lost').map((c) => c.key)),
             orderBy('createdAt', 'desc'),
           )
         : null,
     [activeBranchId],
   );
-  const { data: allLeads } = useCollection(leadsQuery);
+  const { data: activeLeads, loading: activeLoading } = useCollection(leadsQuery);
+
+  // «Отказ» — больше половины всех документов доски (сотни лидов, почти не
+  // меняются), а на доске виден только заголовком с числом. Поэтому его
+  // документы НЕ читаются, пока колонку не раскроют кнопкой «Показать
+  // отказы» (или пока не понадобится конкретный лид из поиска): экономит
+  // сотни чтений Firestore на каждом первом заходе. Число в шапке до этого
+  // берётся серверным счётчиком (≈1 чтение вместо сотен).
+  const [lostRequested, setLostRequested] = useState(false);
+  const [lostLeads, setLostLeads] = useState([]);
+  const [lostReady, setLostReady] = useState(false);
+  const [lostCount, setLostCount] = useState(null);
+  useEffect(() => {
+    setLostRequested(false);
+  }, [activeBranchId]);
+  const lostQuery = useMemo(
+    () =>
+      db && activeBranchId && lostRequested
+        ? query(
+            collection(db, 'students'),
+            where('branchId', '==', activeBranchId),
+            where('isArchived', '==', false),
+            where('funnelStage', '==', 'lost'),
+            orderBy('createdAt', 'desc'),
+          )
+        : null,
+    [activeBranchId, lostRequested],
+  );
+  useEffect(() => {
+    if (!lostQuery) {
+      setLostLeads([]);
+      setLostReady(false);
+      return undefined;
+    }
+    return onSnapshot(
+      lostQuery,
+      (snap) => {
+        setLostLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLostReady(true);
+      },
+      () => setLostReady(true),
+    );
+  }, [lostQuery]);
+  const allLeads = useMemo(() => [...activeLeads, ...lostLeads], [activeLeads, lostLeads]);
 
   // Звук нового лида — играет только тем, у кого сейчас открыта эта
   // страница, при появлении лида в «Новый лид» (вручную или из синка
@@ -179,6 +222,31 @@ export function LeadsPage() {
       : operatorFilter === 'all'
         ? null
         : operatorFilter;
+
+  // Число отказов для шапки, пока колонка не раскрыта. Пересчитывается при смене
+  // фильтра оператора и когда меняется набор живых лидов (лид мог уехать в отказ).
+  useEffect(() => {
+    if (!db || !activeBranchId || lostRequested) return undefined;
+    let cancelled = false;
+    const constraints = [where('branchId', '==', activeBranchId), where('isArchived', '==', false), where('funnelStage', '==', 'lost')];
+    if (scopedOperatorUid) constraints.push(where('assignedOperator', '==', scopedOperatorUid));
+    getCountFromServer(query(collection(db, 'students'), ...constraints))
+      .then((snap) => {
+        if (!cancelled) setLostCount(snap.data().count);
+      })
+      .catch(() => {
+        if (!cancelled) setLostCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranchId, lostRequested, scopedOperatorUid, activeLeads.length]);
+
+  // Лид из поиска / со страницы «Задачи» может лежать в «Отказе» — если его нет среди живых, догружаем отказы.
+  useEffect(() => {
+    if (!highlightLeadId || lostRequested || activeLoading) return;
+    if (!activeLeads.some((l) => l.id === highlightLeadId)) setLostRequested(true);
+  }, [highlightLeadId, highlightNonce, activeLoading, activeLeads, lostRequested]);
 
   // Лид из поиска может принадлежать другому оператору, чем выбран в фильтре
   // (ceo/manager) — сбрасываем на «Все», иначе карточки на доске просто нет.
@@ -645,6 +713,16 @@ export function LeadsPage() {
             key={column.key}
             column={column}
             leads={byColumn[column.key]}
+            lazy={
+              column.key === 'lost'
+                ? {
+                    loaded: lostReady,
+                    loading: lostRequested && !lostReady,
+                    onLoad: () => setLostRequested(true),
+                    count: lostReady ? byColumn.lost.length : lostCount,
+                  }
+                : undefined
+            }
             operatorByUid={operatorByUid}
             onAdd={column.key === 'new' ? openAddForm : undefined}
             onEditColumn={editStageColumn}

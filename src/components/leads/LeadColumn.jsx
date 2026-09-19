@@ -402,12 +402,13 @@ function humanizeReasonKey(key) {
  * @param {Object} props
  * @param {{key: string, label: string, color: string, hint?: {summary: string, steps: Array<string>}}} props.column
  * @param {Array<Object>} props.leads лиды этой колонки, уже отфильтрованные
+ * @param {{loaded: boolean, loading: boolean, onLoad: () => void, count: number|null}} [props.lazy] колонка грузится по кнопке («Отказ»): до этого лидов нет, число берётся из `count`
  * @param {Map<string, {color?: string, name: string}>} props.operatorByUid
  * @param {() => void} props.onAdd
  * @param {(leadId: string, columnKey: string) => void} props.onDropLead
  * @param {(columnKey: string, patch: {label: string, color: string}) => void} props.onEditColumn
  */
-export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, onEditColumn, columns, ...cardActions }) {
+export function LeadColumn({ column, leads, lazy, operatorByUid, onAdd, onDropLead, onEditColumn, columns, ...cardActions }) {
   const [dragOver, setDragOver] = useState(false);
   const [stageEditOpen, setStageEditOpen] = useState(false);
   const isTrialScheduled = column.key === 'trial_scheduled';
@@ -426,6 +427,8 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
   // (CallAttemptDots в LeadCard.jsx, только счёт продолжается после
   // переезда) — но max у каждой стадии свой, регулируется независимо.
   const maxTouchesColumn = (columns ?? []).find((c) => c.key === column.key) ?? column;
+  // Число в шапке: у лениво грузимой колонки до раскрытия — заранее посчитанное, иначе по загруженным.
+  const columnCount = lazy && !lazy.loaded ? lazy.count : leads.length;
 
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
@@ -447,7 +450,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
             <span className="truncate text-[15px] font-bold uppercase tracking-wide text-text">{column.label}</span>
           )}
           <span className="block whitespace-nowrap text-center text-[11px] font-semibold leading-[13px] text-muted">
-            {leads.length} {pluralize(leads.length, ['сделка', 'сделки', 'сделок'])} · {formatSum(leads.length * LEAD_VALUE_UZS)}
+            {columnCount == null ? '…' : `${columnCount} ${pluralize(columnCount, ['сделка', 'сделки', 'сделок'])} · ${formatSum(columnCount * LEAD_VALUE_UZS)}`}
           </span>
         </span>
         <span className="flex items-center gap-3 justify-self-end">
@@ -477,7 +480,24 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
         }}
         className={`flex-1 space-y-2 border-t px-3 py-3 ${dragOver ? 'border-navy bg-orange-soft/30' : 'border-transparent'}`}
       >
-        {leads.length === 0 ? (
+        {lazy && !lazy.loaded ? (
+          <button
+            type="button"
+            onClick={lazy.onLoad}
+            disabled={lazy.loading}
+            className="flex min-h-[215px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card px-3.5 py-4 text-center shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-navy/15 disabled:cursor-wait"
+          >
+            <span className={`flex h-14 w-14 items-center justify-center rounded-full ${TONE_MUTED}`}>
+              <XCircle className="h-6 w-6" />
+            </span>
+            <span className="text-[17px] font-extrabold text-text">{lazy.loading ? 'Загрузка…' : 'Показать отказы'}</span>
+            {lazy.count != null && (
+              <span className="text-[13px] font-semibold text-muted">
+                {lazy.count} {pluralize(lazy.count, ['отказ', 'отказа', 'отказов'])}
+              </span>
+            )}
+          </button>
+        ) : leads.length === 0 ? (
           <p className="py-4 text-center text-[14px] text-muted">Пусто</p>
         ) : groups ? (
           <>
