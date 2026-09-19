@@ -78,10 +78,10 @@ export function RevenueOverviewChart({ comparison, monthly }) {
               <Line
                 type="monotone"
                 dataKey="amount"
-                stroke="#E8695A"
+                stroke="#3C4656"
                 strokeWidth={2}
-                dot={{ stroke: '#E8695A', strokeWidth: 2, fill: '#FFFFFF', r: 5 }}
-                activeDot={{ stroke: '#E8695A', strokeWidth: 2, fill: '#FFFFFF', r: 6 }}
+                dot={{ stroke: '#3C4656', strokeWidth: 2, fill: '#FFFFFF', r: 5 }}
+                activeDot={{ stroke: '#3C4656', strokeWidth: 2, fill: '#FFFFFF', r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>
