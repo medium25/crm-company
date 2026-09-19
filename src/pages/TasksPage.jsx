@@ -3,7 +3,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isToday, isTomorrow } from 'date-fns';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import { AlertTriangle, Clock, CalendarDays, Flame } from 'lucide-react';
+import { AlertTriangle, Clock, CalendarDays } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -178,17 +178,11 @@ export function TasksPage() {
                   buckets[bucket.key].map(({ lead, deadline, priority }) => (
                     <div
                       key={lead.id}
-                      className={`flex items-center justify-between gap-3 rounded-field border border-border bg-surface p-3 ${
-                        priority ? 'border-l-4 border-l-orange' : ''
+                      className={`flex items-center justify-between gap-3 rounded-field border bg-surface p-3 ${
+                        priority ? 'border-orange' : 'border-border'
                       }`}
                     >
                       <div className="min-w-0">
-                        {priority && (
-                          <span className="mb-1 inline-flex items-center gap-1 rounded-badge bg-orange/15 px-1.5 py-0.5 text-[10px] font-bold text-orange">
-                            <Flame className="h-3 w-3" />
-                            Новый лид — приоритет
-                          </span>
-                        )}
                         <p className="text-[13px] font-bold leading-snug text-text">{pendingTaskText(lead)}</p>
                         <p className={`mt-0.5 text-[11px] ${bucket.key === 'overdue' ? 'font-bold text-danger' : 'text-muted'}`}>
                           {priority ? 'сегодня' : formatRelativeDeadline(deadline)}
