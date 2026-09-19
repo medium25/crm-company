@@ -29,9 +29,9 @@ const STORAGE_KEY = 'icon-crm:sidebar-collapsed';
  */
 const ITEMS = [
   { key: 'dashboard', to: '/', label: 'Дашборд', icon: LayoutGrid },
+  { key: 'tasks', to: '/tasks', label: 'Задачи', icon: ListChecks },
   { key: 'leads', to: '/leads', label: 'Заявки', icon: Inbox },
   { key: 'trials', to: '/trials', label: 'Пробные', icon: CalendarCheck },
-  { key: 'tasks', to: '/tasks', label: 'Задачи', icon: ListChecks },
   { key: 'students', to: '/students', label: 'Студенты', icon: CircleUserRound },
   { key: 'teachersGroups', to: '/teachers-groups', label: 'Учителя и группы', icon: GraduationCap },
   { key: 'payments', to: '/payments', label: 'Финансы', icon: Coins },
