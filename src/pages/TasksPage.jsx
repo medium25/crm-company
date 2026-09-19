@@ -13,7 +13,7 @@ import { useToast } from '../components/ui/Toast.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS } from '../components/leads/columns.js';
 import { stageDeadline, overdueReasonLabel } from '../lib/leadFunnel.js';
-import { formatRelativeDeadline } from '../lib/format.js';
+import { formatRelativeDeadline, pluralize } from '../lib/format.js';
 
 const msOf = (v) => (v?.toDate ? v.toDate().getTime() : v instanceof Date ? v.getTime() : 0);
 
@@ -142,6 +142,13 @@ function ActivityChart({ counts }) {
   const [period, setPeriod] = useState('week');
   const [daysOff, setDaysOff] = useState(loadDaysOff);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+
+  // Выбранная точка относится к конкретному набору точек — при смене
+  // периода/выходных индекс указывал бы уже на другую.
+  useEffect(() => {
+    setSelected(null);
+  }, [period, daysOff]);
 
   const toggleDayOff = (day) => {
     setDaysOff((prev) => {
@@ -288,10 +295,31 @@ function ActivityChart({ counts }) {
             ))}
             <path d={path} fill="none" stroke="#3865C9" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
             {bars.map((b, i) => (
-              <circle key={`c${i}`} cx={x(i)} cy={y(b.value)} r="4.5" fill="#F0F0EF" stroke="#3865C9" strokeWidth="2">
-                <title>{`${b.title}: ${b.value}`}</title>
-              </circle>
+              <g key={`c${i}`} onClick={() => setSelected((cur) => (cur === i ? null : i))} className="cursor-pointer">
+                <circle cx={x(i)} cy={y(b.value)} r="11" fill="transparent" />
+                <circle
+                  cx={x(i)}
+                  cy={y(b.value)}
+                  r={selected === i ? 6 : 4.5}
+                  fill={selected === i ? '#3865C9' : '#F0F0EF'}
+                  stroke="#3865C9"
+                  strokeWidth="2"
+                />
+              </g>
             ))}
+            {selected !== null && bars[selected] && (() => {
+              const b = bars[selected];
+              const text = `${b.title}: ${b.value} ${pluralize(b.value, ['задача', 'задачи', 'задач'])}`;
+              const w = text.length * 6 + 16;
+              const cx = Math.min(Math.max(x(selected), w / 2 + 2), width - w / 2 - 2);
+              const cy = Math.max(y(b.value) - 30, 2);
+              return (
+                <g pointerEvents="none">
+                  <rect x={cx - w / 2} y={cy} width={w} height={22} rx="6" fill="#111" />
+                  <text x={cx} y={cy + 15} textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff">{text}</text>
+                </g>
+              );
+            })()}
             {bars.map((b, i) =>
               b.label ? (
                 <text key={`l${i}`} x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill="#8a8a86">{b.label}</text>
