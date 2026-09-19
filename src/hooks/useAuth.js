@@ -1,6 +1,6 @@
 import { createContext, createElement, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
 import { auth, db } from '../firebase.js';
 import { phoneToAuthEmail, isPhoneIdentifier } from '../lib/auth.js';
 
@@ -69,7 +69,19 @@ export function AuthProvider({ children }) {
     loading,
     login: (identifier, password) =>
       signInWithEmailAndPassword(auth, isPhoneIdentifier(identifier) ? phoneToAuthEmail(identifier) : identifier, password),
-    logout: () => signOut(auth),
+    // Постоянный кэш Firestore (см. firebase.js) хранит данные на диске браузера —
+    // при выходе стираем его, чтобы на общем компьютере следующий вход не видел
+    // чужих данных, и перезагружаем страницу на экран входа.
+    logout: async () => {
+      await signOut(auth);
+      try {
+        await terminate(db);
+        await clearIndexedDbPersistence(db);
+      } catch {
+        // кэша нет или уже очищен — не мешаем выходу
+      }
+      window.location.reload();
+    },
   };
 
   return createElement(AuthContext.Provider, { value }, children);

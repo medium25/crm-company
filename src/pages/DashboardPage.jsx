@@ -21,11 +21,11 @@ import { loadDashboardStats, getDailyRevenueComparison, getMonthlyRevenue, fetch
  * индикатор, своя ошибка и «Повторить» — одна упавшая/зависшая выборка
  * больше не оставляет на серых заглушках весь дашборд. Последние цифры
  * кэшируются в браузере: страница показывает их сразу, а Firestore
- * опрашивается только если кэшу больше минуты (то есть повторные заходы
+ * опрашивается только если кэшу больше 3 минут (то есть повторные заходы
  * подряд не читают базу вовсе). Платежи месяца читаются один раз на обе
  * части, когда обновляются обе.
  */
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 180_000;
 const LOAD_TIMEOUT_MS = 20_000;
 const cacheKey = (branchId, churnPeriod) => `icon-crm:dashboard:${branchId}:${churnPeriod}`;
 
