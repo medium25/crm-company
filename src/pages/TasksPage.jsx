@@ -16,6 +16,7 @@ import { overdueReasonLabel } from '../lib/leadFunnel.js';
 import { priorityLevel, taskPlacement } from '../lib/leadTasks.js';
 import { formatRelativeDeadline, pluralize } from '../lib/format.js';
 import { pickGreeting } from '../lib/greeting.js';
+import { setSearchSource, clearSearchSource } from '../lib/searchSource.js';
 
 const msOf = (v) => (v?.toDate ? v.toDate().getTime() : v instanceof Date ? v.getTime() : 0);
 
@@ -469,6 +470,12 @@ export function TasksPage() {
     [activeBranchId],
   );
   const { data: allLeads, loading } = useCollection(leadsQuery);
+
+  // Поиск в шапке ищет по этим же уже загруженным лидам (без своей подписки).
+  useEffect(() => {
+    setSearchSource('leads', { items: allLeads });
+  }, [allLeads]);
+  useEffect(() => () => clearSearchSource('leads'), []);
 
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),

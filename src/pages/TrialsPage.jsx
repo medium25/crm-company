@@ -1,5 +1,5 @@
 // src/pages/TrialsPage.jsx
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, getDoc, query, where } from 'firebase/firestore';
 import { ChevronDown, ChevronRight, Search, Plus } from 'lucide-react';
@@ -22,6 +22,7 @@ import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
 import { advanceStage, firstTouchDueAt } from '../lib/leadFunnel.js';
 import { archiveStudent } from '../lib/students.js';
 import { formatPhone } from '../lib/format.js';
+import { setSearchSource, clearSearchSource } from '../lib/searchSource.js';
 
 const TRIAL_SCHEDULED_COLOR = COLUMNS.find((c) => c.key === 'trial_scheduled').color;
 const TRIAL_COMPLETED_COLOR = COLUMNS.find((c) => c.key === 'trial_completed').color;
@@ -171,6 +172,12 @@ export function TrialsPage() {
     [activeBranchId],
   );
   const { data: rawLeads } = useCollection(leadsQuery);
+
+  // Поиск в шапке ищет по этим же уже загруженным пробным (без своей подписки).
+  useEffect(() => {
+    setSearchSource('trials', { items: rawLeads });
+  }, [rawLeads]);
+  useEffect(() => () => clearSearchSource('trials'), []);
 
   const sorted = useMemo(
     () => [...rawLeads].sort((a, b) => (a.trialDate?.toMillis?.() ?? 0) - (b.trialDate?.toMillis?.() ?? 0)),

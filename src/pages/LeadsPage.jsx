@@ -23,6 +23,7 @@ import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { checklistPercent, DEFAULT_CHECKLIST_ITEMS } from '../lib/leadChecklist.js';
 import { taskSnapshot } from '../lib/leadTasks.js';
+import { setSearchSource, clearSearchSource } from '../lib/searchSource.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
 
@@ -263,6 +264,12 @@ export function LeadsPage() {
       return true;
     });
   }, [allLeads, scopedOperatorUid]);
+
+  // Поиск в шапке на этой странице ищет по уже загруженным лидам доски (без своей подписки).
+  useEffect(() => {
+    setSearchSource('leads', { items: leads, lost: { loaded: lostReady, count: lostCount, load: () => setLostRequested(true) } });
+  }, [leads, lostReady, lostCount]);
+  useEffect(() => () => clearSearchSource('leads'), []);
 
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
