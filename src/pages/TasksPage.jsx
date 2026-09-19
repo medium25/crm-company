@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { isToday, isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import { AlertTriangle, Clock, CalendarDays } from 'lucide-react';
+import { AlertTriangle, Clock, CalendarDays, Settings } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -109,30 +109,73 @@ function DoneStrip({ count }) {
   );
 }
 
-/** График активности по выполненным задачам: неделя (7 дней) / месяц (30 дней) / год (12 месяцев). */
+const WEEKDAYS = [
+  { day: 1, label: 'Пн' },
+  { day: 2, label: 'Вт' },
+  { day: 3, label: 'Ср' },
+  { day: 4, label: 'Чт' },
+  { day: 5, label: 'Пт' },
+  { day: 6, label: 'Сб' },
+  { day: 0, label: 'Вс' },
+];
+const DAYS_OFF_KEY = 'icon-crm:activity-days-off';
+
+// Выходные для графика — личная настройка браузера (getDay(): 0 — вс … 6 — сб);
+// по умолчанию воскресенье. Не влияет на саму полосу «выполнено сегодня» и
+// на список задач — только на график ниже.
+function loadDaysOff() {
+  try {
+    const raw = localStorage.getItem(DAYS_OFF_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // нет localStorage / битое значение — дефолт ниже
+  }
+  return [0];
+}
+
+/**
+ * График активности по выполненным задачам. Неделя — столбики (7 дней),
+ * месяц (30 дней) и год (12 месяцев) — линия с точками. Выходные дни
+ * (см. daysOff) не рисуются и не входят в сумму.
+ */
 function ActivityChart({ counts }) {
   const [period, setPeriod] = useState('week');
+  const [daysOff, setDaysOff] = useState(loadDaysOff);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const toggleDayOff = (day) => {
+    setDaysOff((prev) => {
+      const next = prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day];
+      try {
+        localStorage.setItem(DAYS_OFF_KEY, JSON.stringify(next));
+      } catch {
+        // настройка живёт только до перезагрузки — не критично
+      }
+      return next;
+    });
+  };
+
   const bars = useMemo(() => {
     const now = new Date();
     if (period === 'year') {
       const byMonth = new Map();
-      for (const [key, n] of counts) byMonth.set(key.slice(0, 7), (byMonth.get(key.slice(0, 7)) ?? 0) + n);
+      for (const [key, n] of counts) {
+        if (daysOff.includes(new Date(`${key}T00:00:00`).getDay())) continue;
+        byMonth.set(key.slice(0, 7), (byMonth.get(key.slice(0, 7)) ?? 0) + n);
+      }
       return Array.from({ length: 12 }, (_, i) => {
         const d = subMonths(startOfMonth(now), 11 - i);
         return { label: format(d, 'LLL', { locale: ru }), value: byMonth.get(format(d, 'yyyy-MM')) ?? 0, title: format(d, 'LLLL yyyy', { locale: ru }) };
       });
     }
     const days = period === 'week' ? 7 : 30;
-    return Array.from({ length: days }, (_, i) => {
-      const d = subDays(now, days - 1 - i);
-      const showLabel = period === 'week' || i % 5 === 0 || i === days - 1;
-      return {
-        label: showLabel ? format(d, period === 'week' ? 'EEEEEE' : 'd', { locale: ru }) : '',
-        value: counts.get(format(d, 'yyyy-MM-dd')) ?? 0,
-        title: format(d, 'd MMMM', { locale: ru }),
-      };
-    });
-  }, [counts, period]);
+    const list = Array.from({ length: days }, (_, i) => subDays(now, days - 1 - i)).filter((d) => !daysOff.includes(d.getDay()));
+    return list.map((d, i) => ({
+      label: period === 'week' || i % 5 === 0 || i === list.length - 1 ? format(d, period === 'week' ? 'EEEEEE' : 'd', { locale: ru }) : '',
+      value: counts.get(format(d, 'yyyy-MM-dd')) ?? 0,
+      title: format(d, 'd MMMM', { locale: ru }),
+    }));
+  }, [counts, period, daysOff]);
   const total = bars.reduce((sum, b) => sum + b.value, 0);
 
   // Ширину SVG берём из контейнера — иначе viewBox растягивал бы кружки в
@@ -168,42 +211,94 @@ function ActivityChart({ counts }) {
     <div className="mb-6 rounded-2xl bg-[#F0F0EF] p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[15px] font-bold text-[#111]">Активность: {total} выполнено</p>
-        <div className="flex gap-1 rounded-full bg-[#DADAD9] p-0.5">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => setPeriod(p.key)}
-              className={`rounded-full px-3 py-1 text-[12px] font-bold ${period === p.key ? 'bg-white text-[#111]' : 'text-[#8a8a86]'}`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((v) => !v)}
+            aria-label="Выходные дни для графика"
+            title="Выходные дни для графика"
+            className={`flex h-7 w-7 items-center justify-center rounded-full ${settingsOpen ? 'bg-white text-[#111]' : 'text-[#8a8a86] hover:bg-[#DADAD9]'}`}
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+          <div className="flex gap-1 rounded-full bg-[#DADAD9] p-0.5">
+            {PERIODS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPeriod(p.key)}
+                className={`rounded-full px-3 py-1 text-[12px] font-bold ${period === p.key ? 'bg-white text-[#111]' : 'text-[#8a8a86]'}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+      {settingsOpen && (
+        <div className="mb-3">
+          <p className="mb-1.5 text-[12px] text-[#8a8a86]">Выходные — не показываются в графике и не входят в сумму:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {WEEKDAYS.map((w) => (
+              <button
+                key={w.day}
+                type="button"
+                onClick={() => toggleDayOff(w.day)}
+                className={`rounded-full px-3 py-1 text-[12px] font-bold ${daysOff.includes(w.day) ? 'bg-[#3865C9] text-white' : 'bg-[#DADAD9] text-[#8a8a86]'}`}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div ref={wrapRef} className="w-full">
-        <svg width={width} height={H} role="img" aria-label="График активности по выполненным задачам">
-          {ticks.map((t) => (
-            <g key={t}>
-              <line x1={padL} x2={width - padR} y1={y(t)} y2={y(t)} stroke="#DADAD9" strokeWidth="1" />
-              <text x={padL - 6} y={y(t) + 3.5} textAnchor="end" fontSize="10" fill="#8a8a86">{t}</text>
-            </g>
-          ))}
-          {bars.map((b, i) => (
-            <line key={`v${i}`} x1={x(i)} x2={x(i)} y1={padT} y2={H - padB} stroke="#E4E4E3" strokeWidth="1" />
-          ))}
-          <path d={path} fill="none" stroke="#3865C9" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-          {bars.map((b, i) => (
-            <circle key={`c${i}`} cx={x(i)} cy={y(b.value)} r="4.5" fill="#F0F0EF" stroke="#3865C9" strokeWidth="2">
-              <title>{`${b.title}: ${b.value}`}</title>
-            </circle>
-          ))}
-          {bars.map((b, i) =>
-            b.label ? (
-              <text key={`l${i}`} x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill="#8a8a86">{b.label}</text>
-            ) : null,
-          )}
-        </svg>
+        {period === 'week' ? (
+          <div>
+            <div className="flex h-40 items-end gap-2">
+              {bars.map((b, i) => (
+                <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${b.title}: ${b.value}`}>
+                  {b.value > 0 && <span className="text-[11px] text-[#8a8a86]">{b.value}</span>}
+                  <div
+                    className="w-full rounded-t-[4px]"
+                    style={{
+                      height: `${Math.max(b.value > 0 ? 4 : 2, (b.value / maxValue) * 84)}%`,
+                      background: b.value > 0 ? squareColor(i, bars.length) : EMPTY_SQUARE,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-1 flex gap-2">
+              {bars.map((b, i) => (
+                <span key={i} className="flex-1 text-center text-[11px] text-[#8a8a86]">{b.label}</span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <svg width={width} height={H} role="img" aria-label="График активности по выполненным задачам">
+            {ticks.map((t) => (
+              <g key={t}>
+                <line x1={padL} x2={width - padR} y1={y(t)} y2={y(t)} stroke="#DADAD9" strokeWidth="1" />
+                <text x={padL - 6} y={y(t) + 3.5} textAnchor="end" fontSize="10" fill="#8a8a86">{t}</text>
+              </g>
+            ))}
+            {bars.map((b, i) => (
+              <line key={`v${i}`} x1={x(i)} x2={x(i)} y1={padT} y2={H - padB} stroke="#E4E4E3" strokeWidth="1" />
+            ))}
+            <path d={path} fill="none" stroke="#3865C9" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            {bars.map((b, i) => (
+              <circle key={`c${i}`} cx={x(i)} cy={y(b.value)} r="4.5" fill="#F0F0EF" stroke="#3865C9" strokeWidth="2">
+                <title>{`${b.title}: ${b.value}`}</title>
+              </circle>
+            ))}
+            {bars.map((b, i) =>
+              b.label ? (
+                <text key={`l${i}`} x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill="#8a8a86">{b.label}</text>
+              ) : null,
+            )}
+          </svg>
+        )}
       </div>
     </div>
   );
