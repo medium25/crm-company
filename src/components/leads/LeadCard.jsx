@@ -895,12 +895,9 @@ export function LeadCard({
         highlighted ? 'ring-4 ring-navy ring-offset-2' : ''
       }`}
     >
-      {/* Шапка одного цвета у всех карточек (серо-голубая заливка + линия
-          под ней); статус — просрочка/«В норме» — читается по бейджу рядом
-          с именем. Отрицательные margin/rounded-t повторяют скругление
-          карточки, растягивая заливку до самых краёв поверх её собственного
-          p-3.5. */}
-      <div className="-mx-3.5 -mt-3.5 flex items-center justify-between gap-2 rounded-t-xl border-b border-card-head-border bg-card-head px-3.5 pb-1.5 pt-2">
+      {/* Шапка без заливки — только тонкая линия под ней; статус (просрочка/
+          «В норме») читается по бейджу рядом с именем. */}
+      <div className="flex items-center justify-between gap-2 border-b border-border pb-1.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
           {overdue ? (
