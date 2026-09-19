@@ -11,7 +11,26 @@ import { useAuth } from '../hooks/useAuth.js';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS } from '../components/leads/columns.js';
 import { stageDeadline, overdueReasonLabel } from '../lib/leadFunnel.js';
-import { formatRelativeDeadline, formatOverdueBy, formatPhone } from '../lib/format.js';
+import { formatRelativeDeadline } from '../lib/format.js';
+
+const msOf = (v) => (v?.toDate ? v.toDate().getTime() : v instanceof Date ? v.getTime() : 0);
+
+/**
+ * Что именно поставлено сделать — текст «Следующий шаг» (иначе «Что
+ * произошло?») из ПОСЛЕДНЕЙ отметки касания по этому лиду (callAttempts/
+ * closingTouchLog/unreachableAttempts — какая позже). Нет ни одной отметки
+ * (свежий лид) — стандартное «Позвонить в первые 30 минут», тот же текст,
+ * что на самой карточке; иначе запасной вариант — причина просрочки по
+ * стадии (overdueReasonLabel).
+ */
+function pendingTaskText(lead) {
+  const entries = [...(lead.callAttempts ?? []), ...(lead.closingTouchLog ?? []), ...(lead.unreachableAttempts ?? [])];
+  const last = entries.sort((a, b) => msOf(b.at) - msOf(a.at))[0];
+  const text = last?.nextStep || last?.outcome;
+  if (text) return text;
+  if (!last && (lead.funnelStage ?? 'new') === 'new') return 'Позвонить в первые 30 минут';
+  return overdueReasonLabel(lead);
+}
 
 const BUCKETS = [
   { key: 'overdue', title: 'Просроченные задачи', accent: '#E11D48', icon: AlertTriangle },
@@ -68,11 +87,6 @@ export function TasksPage() {
     [activeBranchId],
   );
   const { data: staffList } = useCollection(staffQuery);
-  const operatorByUid = useMemo(() => {
-    const map = new Map();
-    for (const s of staffList) map.set(s.id, s.fullName);
-    return map;
-  }, [staffList]);
   const operatorOptions = useMemo(
     () => staffList.filter((s) => s.role === 'admin').sort((a, b) => a.fullName.localeCompare(b.fullName)),
     [staffList],
@@ -151,29 +165,20 @@ export function TasksPage() {
                   <p className="py-6 text-center text-[13px] text-muted">Пусто</p>
                 ) : (
                   buckets[bucket.key].map(({ lead, deadline }) => (
-                    <div key={lead.id} className="rounded-field border border-border bg-surface p-3">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-bold text-muted">
-                          {bucket.key === 'overdue'
-                            ? `Опоздание ${formatOverdueBy(deadline)}`
-                            : formatRelativeDeadline(deadline)}
-                        </span>
-                        {operatorByUid.get(lead.assignedOperator) && (
-                          <span className="truncate text-[11px] text-muted">{operatorByUid.get(lead.assignedOperator)}</span>
-                        )}
+                    <div key={lead.id} className="flex items-center justify-between gap-3 rounded-field border border-border bg-surface p-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold leading-snug text-text">{pendingTaskText(lead)}</p>
+                        <p className={`mt-0.5 text-[11px] ${bucket.key === 'overdue' ? 'font-bold text-danger' : 'text-muted'}`}>
+                          {formatRelativeDeadline(deadline)}
+                        </p>
                       </div>
-                      <p className="truncate text-[13px] font-bold text-text">{lead.fullName}</p>
-                      <p className="mb-2 text-[12px] leading-snug text-muted">{overdueReasonLabel(lead)}</p>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[11px] text-link">{formatPhone(lead.phone)}</span>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/leads?highlight=${lead.id}`)}
-                          className="shrink-0 rounded-field bg-navy px-3 py-1.5 text-[12px] font-bold text-white hover:bg-navy-hover"
-                        >
-                          Выполнить
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/leads?highlight=${lead.id}`)}
+                        className="shrink-0 rounded-field bg-navy px-3 py-1.5 text-[12px] font-bold text-white hover:bg-navy-hover"
+                      >
+                        Выполнить
+                      </button>
                     </div>
                   ))
                 )}
