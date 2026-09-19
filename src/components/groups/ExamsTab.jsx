@@ -75,7 +75,7 @@ export function ExamsTab({ group, enrollments }) {
 
       {!loading &&
         exams.map((exam) => (
-          <div key={exam.id} className="rounded-card border border-border p-4">
+          <div key={exam.id} className="rounded-card border border-border-strong p-4">
             <div className="mb-3 flex items-center justify-between">
               <p className="font-bold text-text">{exam.name}</p>
               <p className="text-[13px] text-muted">

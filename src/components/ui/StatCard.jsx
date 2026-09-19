@@ -12,7 +12,7 @@ export function StatCard({ icon: Icon, label, value, onClick }) {
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`flex w-full flex-col items-center rounded-card border border-border bg-card p-6 text-center shadow-card transition-shadow ${
+      className={`flex w-full flex-col items-center rounded-card border border-border-strong bg-card p-6 text-center shadow-card transition-shadow ${
         onClick ? 'cursor-pointer hover:shadow-hover' : ''
       }`}
     >

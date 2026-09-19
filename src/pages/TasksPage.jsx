@@ -88,7 +88,7 @@ function squareColor(i, n) {
 function DoneStrip({ count, name, compact = false }) {
   const rows = Math.min(Math.floor(count / DAILY_GOAL) + 1, 5);
   return (
-    <div className={`rounded-2xl bg-[#F0F0EF] p-4 ${compact ? 'mb-3' : 'mb-4'}`}>
+    <div className={`rounded-2xl border border-border-strong bg-[#F0F0EF] p-4 ${compact ? 'mb-3' : 'mb-4'}`}>
       <p className={`font-bold leading-tight text-[#111] ${compact ? 'mb-2 text-[15px]' : 'mb-3 text-[22px]'}`}>
         {name ? `${name} — ` : ''}
         {name ? 'выполнено' : 'Выполнено'} сегодня: {count} из {DAILY_GOAL}
@@ -231,7 +231,7 @@ function ActivityChart({ counts, label }) {
   const path = bars.map((b, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(b.value).toFixed(1)}`).join(' ');
 
   return (
-    <div className="mb-6 rounded-2xl bg-[#F0F0EF] p-4">
+    <div className="mb-6 rounded-2xl border border-border-strong bg-[#F0F0EF] p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[15px] font-bold text-[#111]">Активность{label ? ` · ${label}` : ''}: {total} выполнено</p>
         <div className="flex items-center gap-2">
@@ -667,7 +667,7 @@ export function TasksPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {BUCKETS.map((bucket) => (
-            <div key={bucket.key} className="flex flex-col rounded-card bg-surface-alt">
+            <div key={bucket.key} className="flex flex-col rounded-card border border-border-strong bg-surface-alt">
               <div className="border-b-2 px-4 py-3" style={{ borderBottomColor: bucket.accent }}>
                 <span className="flex items-center gap-1.5 text-[14px] font-bold uppercase tracking-wide text-text">
                   <bucket.icon className="h-4 w-4 shrink-0" style={{ color: bucket.accent }} />
