@@ -3,7 +3,7 @@ import { isToday, isTomorrow, isSameMonth, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ChevronDown, ChevronRight, Settings, Plus, CheckCircle2, XCircle, AlertTriangle, Sun, Clock, Calendar } from 'lucide-react';
 import { LeadCard } from './LeadCard.jsx';
-import { STAGE_COLOR_SWATCHES } from './columns.js';
+import { STAGE_COLOR_SWATCHES, LEAD_VALUE_UZS } from './columns.js';
 import { stageDeadline, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { pluralize } from '../../lib/format.js';
 
@@ -11,6 +11,9 @@ import { pluralize } from '../../lib/format.js';
 // для won/lost («Оплачено»/«Отказ» по месяцам) и «Пробный назначен» по дню.
 // Малиновый (не стандартный danger-токен) — тот же оттенок, что уже
 // используется на LeadCard для просрочки, сознательно другой цвет.
+// «12 410 000 сум» — неразрывные пробелы между разрядами, чтобы сумма не переносилась по строкам.
+const formatSum = (n) => `${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')} сум`;
+
 const TONE_SUCCESS = 'bg-success/15 text-success';
 const TONE_DANGER = 'bg-[rgba(190,18,60,0.13)] text-[#BE123C] dark:bg-[rgba(253,164,175,0.15)] dark:text-[#FDA4AF]';
 const TONE_ORANGE = 'bg-orange/15 text-orange';
@@ -443,9 +446,11 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
           ) : (
             <span className="truncate text-[15px] font-bold uppercase tracking-wide text-text">{column.label}</span>
           )}
+          <span className="mt-0.5 block whitespace-nowrap text-center text-[11px] font-bold text-muted">
+            {leads.length} {pluralize(leads.length, ['сделка', 'сделки', 'сделок'])} · {formatSum(leads.length * LEAD_VALUE_UZS)}
+          </span>
         </span>
         <span className="flex items-center gap-3 justify-self-end">
-          <span className="text-[13px] font-bold text-muted">{leads.length}</span>
           {onAdd && (
             <button
               type="button"
