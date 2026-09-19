@@ -3,7 +3,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isToday, isTomorrow } from 'date-fns';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import { AlertTriangle, Clock, CalendarDays } from 'lucide-react';
+import { AlertTriangle, Clock, CalendarDays, Flame } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -108,12 +108,23 @@ export function TasksPage() {
       if (scopedOperatorUid && lead.assignedOperator !== scopedOperatorUid) continue;
       const deadline = stageDeadline(lead);
       if (!deadline) continue;
-      const item = { lead, deadline };
+      // Свежий лид (стадия «Новый лид» — первого касания ещё не было) —
+      // всегда задача «на сегодня» и в приоритете, даже если SLA-дедлайн
+      // уже прошёл или лид пришёл вчера — иначе он тонул бы среди сотен
+      // старых просрочек. Как только оператор сделает первое касание,
+      // лид уходит из «Новый лид» и задача считается по обычному дедлайну.
+      if ((lead.funnelStage ?? 'new') === 'new') {
+        result.today.push({ lead, deadline, priority: true });
+        continue;
+      }
+      const item = { lead, deadline, priority: false };
       if (deadline.getTime() < now.getTime()) result.overdue.push(item);
       else if (isToday(deadline)) result.today.push(item);
       else if (isTomorrow(deadline)) result.tomorrow.push(item);
     }
-    for (const key of Object.keys(result)) result[key].sort((a, b) => a.deadline - b.deadline);
+    for (const key of Object.keys(result)) {
+      result[key].sort((a, b) => Number(b.priority) - Number(a.priority) || a.deadline - b.deadline);
+    }
     return result;
   }, [allLeads, scopedOperatorUid]);
 
@@ -164,12 +175,23 @@ export function TasksPage() {
                 {buckets[bucket.key].length === 0 ? (
                   <p className="py-6 text-center text-[13px] text-muted">Пусто</p>
                 ) : (
-                  buckets[bucket.key].map(({ lead, deadline }) => (
-                    <div key={lead.id} className="flex items-center justify-between gap-3 rounded-field border border-border bg-surface p-3">
+                  buckets[bucket.key].map(({ lead, deadline, priority }) => (
+                    <div
+                      key={lead.id}
+                      className={`flex items-center justify-between gap-3 rounded-field border border-border bg-surface p-3 ${
+                        priority ? 'border-l-4 border-l-orange' : ''
+                      }`}
+                    >
                       <div className="min-w-0">
+                        {priority && (
+                          <span className="mb-1 inline-flex items-center gap-1 rounded-badge bg-orange/15 px-1.5 py-0.5 text-[10px] font-bold text-orange">
+                            <Flame className="h-3 w-3" />
+                            Новый лид — приоритет
+                          </span>
+                        )}
                         <p className="text-[13px] font-bold leading-snug text-text">{pendingTaskText(lead)}</p>
                         <p className={`mt-0.5 text-[11px] ${bucket.key === 'overdue' ? 'font-bold text-danger' : 'text-muted'}`}>
-                          {formatRelativeDeadline(deadline)}
+                          {priority ? 'сегодня' : formatRelativeDeadline(deadline)}
                         </p>
                       </div>
                       <button
