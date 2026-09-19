@@ -382,8 +382,8 @@ function buildFullHistory(lead) {
 
 // Только реальные взаимодействия (касания) — переходы стадий/передачи
 // оператору в ленту не попадают, это служебные события, не задачи.
-// Каждый узел — пара «какая задача стояла» (task, мелким) + «что вышло»
-// (result, крупным): task — это nextStep ПРЕДЫДУЩЕГО касания (что решили
+// Каждый узел — пара «какая задача стояла» (task, мелким) + «что вышло →
+// следующий шаг» (result, крупным): task — это nextStep ПРЕДЫДУЩЕГО касания (что решили
 // сделать дальше тогда — это и есть задача, которую сейчас выполнили),
 // у самого первого касания задачи в данных нет — это всегда стартовый SLA.
 function buildTimelineNodes(history, pendingDueAt, currentStage) {
@@ -408,10 +408,15 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
     const timing = responseTiming(item, fallbackAt);
     const stage = stageAt(item.at);
     stepByStage[stage] = (stepByStage[stage] ?? 0) + 1;
+    // Крупная строка — «что произошло → следующий шаг» этого касания; мелкая —
+    // какая задача стояла + вовремя ли её сделали. Старые записи без текста
+    // показывают вместо строки только оценку срока.
+    const line = [item.outcome, item.nextStep].filter(Boolean).join(' → ');
+    const standingTask = i === 0 ? 'Позвонить в первые 30 минут' : (interactions[i - 1].nextStep ?? null);
     return {
       type: 'entry',
-      task: i === 0 ? 'Позвонить в первые 30 минут' : (interactions[i - 1].nextStep ?? null),
-      result: timing ? timing.label : (item.outcome || 'Без задачи'),
+      task: [standingTask, line ? timing?.label : null].filter(Boolean).join(' · ') || null,
+      result: line || timing?.label || 'Без задачи',
       at: item.at,
       step: stepByStage[stage],
     };

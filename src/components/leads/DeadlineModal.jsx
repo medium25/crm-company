@@ -152,16 +152,13 @@ export function DeadlinePicker({ value, onChange, error }) {
  * в stageDeadline), оператор может поправить перед сохранением — тихого
  * автовычисления без подтверждения больше нет ни в одном из этих мест.
  * @param {Object} props
- * @param {{lead: Object, title: string, suggestedDate?: Date, onConfirm: (date: Date|null, outcome: string, nextStep: string) => Promise<void>, noDate?: boolean, requireTask?: boolean, validate?: (date: Date) => string|null}|null} props.target
+ * @param {{lead: Object, title: string, suggestedDate?: Date, onConfirm: (date: Date|null, outcome: string, nextStep: string) => Promise<void>, noDate?: boolean, requireTask?: boolean}|null} props.target
  *   Дата дедлайна всегда свободная — `suggestedDate` только предзаполняет.
  *   `noDate` — без поля дедлайна вообще (терминальные/бездедлайновые
  *   отметки — холодный лид, финальное касание «Дожима»); `onConfirm`
  *   получает `date: null`. `requireTask` — два обязательных коротких поля,
  *   «Что произошло?» и «Следующий шаг» — значение отображается на карточке
  *   (см. LeadCard.jsx) — каждое касание обязано их нести.
- *   `validate` — доп. проверка выбранного времени (напр. рабочие часы
- *   оператора) — при ошибке возвращает текст, «Подтвердить» её показывает
- *   и не сохраняет.
  * @param {() => void} props.onClose
  */
 export function DeadlineModal({ target, onClose }) {
@@ -193,13 +190,12 @@ export function DeadlineModal({ target, onClose }) {
     }
     const candidate = target.noDate ? null : deadline;
     if (!target.noDate) {
-      if (candidate && candidate > endOfDay(addDays(new Date(), MAX_DEADLINE_DAYS))) {
-        setError(`Дедлайн — не дальше чем через ${MAX_DEADLINE_DAYS} дней.`);
+      if (!candidate || Number.isNaN(candidate.getTime())) {
+        setError('Укажи дедлайн.');
         return;
       }
-      const validationError = target.validate?.(candidate);
-      if (validationError) {
-        setError(validationError);
+      if (candidate > endOfDay(addDays(new Date(), MAX_DEADLINE_DAYS))) {
+        setError(`Дедлайн — не дальше чем через ${MAX_DEADLINE_DAYS} дней.`);
         return;
       }
     }
@@ -226,7 +222,7 @@ export function DeadlineModal({ target, onClose }) {
           <Button
             onClick={handleSubmit}
             loading={saving}
-            disabled={target.requireTask && (!outcome.trim() || !nextStep.trim())}
+            disabled={(target.requireTask && (!outcome.trim() || !nextStep.trim())) || (!target.noDate && !deadline)}
           >
             Подтвердить
           </Button>
@@ -238,6 +234,7 @@ export function DeadlineModal({ target, onClose }) {
           <>
             <Input
               label="Что произошло?"
+              placeholder="не поднял трубку"
               required
               value={outcome}
               onChange={(e) => {
@@ -247,6 +244,7 @@ export function DeadlineModal({ target, onClose }) {
             />
             <Input
               label="Следующий шаг"
+              placeholder="перезвоню через 30 минут"
               required
               value={nextStep}
               onChange={(e) => {

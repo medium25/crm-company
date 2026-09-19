@@ -23,7 +23,7 @@ import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { checklistPercent, DEFAULT_CHECKLIST_ITEMS } from '../lib/leadChecklist.js';
 import { taskSnapshot } from '../lib/leadTasks.js';
-import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt, validateCallDeadline } from '../lib/leadFunnel.js';
+import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
 
 /**
@@ -324,9 +324,9 @@ export function LeadsPage() {
       columnKeyOf(lead) === 'new'
         ? { funnelStage: 'calling', stageHistory: [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: at }] }
         : {};
-    // Превью без outcome/nextStep — только чтобы посчитать следующий дедлайн/
-    // провалидировать его ДО того, как задача введена (nextCallDueAt/
-    // validateCallDeadline читают только length/result).
+    // Превью без outcome/nextStep — только чтобы посчитать предлагаемый
+    // дедлайн ДО того, как задача введена (nextCallDueAt читает только
+    // length/result).
     const preview = [...attempts, { result }];
 
     // «Успешно»/«Не успешно» ведут через одну и ту же простую модалку
@@ -365,7 +365,6 @@ export function LeadsPage() {
         const at = new Date();
         commitCallAttempt(lead, buildAttempts(outcome, nextStep, at), result, { dueDate, stageFields: buildStageFields(at) });
       },
-      validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
 
@@ -404,7 +403,6 @@ export function LeadsPage() {
         title: 'Следующая задача:',
         suggestedDate: nextCallDueAt(lead.callAttempts ?? [], callMaxAttempts),
         onConfirm: (dueDate) => commit({ nextCallDueAt: dueDate }),
-        validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }
@@ -414,7 +412,6 @@ export function LeadsPage() {
         title: 'Дедлайн первого касания в «Дожиме»',
         suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
         onConfirm: (dueDate) => commit({ closingTouchNumber: 0, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: [] }),
-        validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }
@@ -453,7 +450,6 @@ export function LeadsPage() {
             { closingTouchNumber: nextNumber, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: buildLog(outcome, nextStep) },
             `Касание ${nextNumber} отмечено.`,
           ),
-        validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }
@@ -468,7 +464,6 @@ export function LeadsPage() {
           { closingTouchNumber: nextNumber, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: buildLog(outcome, nextStep) },
           `Касание ${nextNumber} отмечено.`,
         ),
-      validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
 
@@ -502,7 +497,6 @@ export function LeadsPage() {
           suggestedDate: unreachableCallDueAt(),
           requireTask: true,
           onConfirm: (dueDate, outcome, nextStep) => patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), nextTouchAt: dueDate }),
-          validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
         });
         return;
       }
@@ -512,7 +506,6 @@ export function LeadsPage() {
         suggestedDate: unreachableCallDueAt(),
         requireTask: true,
         onConfirm: (dueDate, outcome, nextStep) => patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), nextTouchAt: dueDate }),
-        validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }
@@ -521,10 +514,10 @@ export function LeadsPage() {
       setDeadlineTarget({
         lead,
         title: 'Задача — перенос пробного',
-        noDate: true,
+        suggestedDate: unreachableCallDueAt(),
         requireTask: true,
-        onConfirm: async (_date, outcome, nextStep) => {
-          await patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep) });
+        onConfirm: async (dueDate, outcome, nextStep) => {
+          await patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), unreachableNextCallDueAt: dueDate });
           onRescheduleCb?.();
         },
       });
@@ -533,11 +526,11 @@ export function LeadsPage() {
     if (attemptsExhausted) {
       setDeadlineTarget({
         lead,
-        title: 'Задача — попытка связаться',
-        noDate: true,
+        title: 'Дедлайн следующего звонка',
+        suggestedDate: unreachableCallDueAt(),
         requireTask: true,
-        onConfirm: (_date, outcome, nextStep) =>
-          patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), unreachableNextCallDueAt: null }),
+        onConfirm: (dueDate, outcome, nextStep) =>
+          patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), unreachableNextCallDueAt: dueDate }),
       });
       return;
     }

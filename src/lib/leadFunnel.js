@@ -324,19 +324,6 @@ export function isOperatorWorkingAt(workSchedule, date) {
 }
 
 /**
- * Проверка дедлайна — единственное правило: он должен попадать в рабочее
- * время назначенного оператора (в остальном день и час свободные, сетка
- * «2 звонка сегодня/2 завтра/1 послезавтра» — только подсказка для
- * предзаполнения, см. nextCallDueAt).
- * @param {Date} candidate выбранный дедлайн
- * @param {Array<{start: string, end: string}|null>|undefined} workSchedule расписание назначенного оператора
- * @returns {string|null} текст ошибки или null, если дедлайн допустим
- */
-export function validateCallDeadline(candidate, workSchedule) {
-  return isOperatorWorkingAt(workSchedule, candidate) ? null : 'Дедлайн должен быть в рабочее время оператора.';
-}
-
-/**
  * Операторы из списка, у которых сейчас рабочее время — приоритетное
  * подмножество для назначения лида (см. assignOperatorForLead).
  * @param {Array<{id: string, workSchedule?: Array}>} operators

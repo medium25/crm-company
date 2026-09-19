@@ -402,8 +402,10 @@ function CompletedTaskCard({ lead, taskText, entries }) {
           <p className={`text-[12px] leading-snug ${struck}`}>{taskText}</p>
           {entries.map((e, i) => (
             <div key={i} className="mt-1.5 border-t border-border pt-1.5">
-              <p className={`text-[11px] leading-snug ${struck}`}>{timeOf(e)}{e.outcome ? ` · ${e.outcome}` : ''}</p>
-              {e.nextStep && <p className={`text-[11px] leading-snug ${struck}`}>Следующий шаг: {e.nextStep}</p>}
+              <p className={`text-[11px] leading-snug ${struck}`}>
+                {timeOf(e)}
+                {[e.outcome, e.nextStep].some(Boolean) ? ` · ${[e.outcome, e.nextStep].filter(Boolean).join(' → ')}` : ''}
+              </p>
             </div>
           ))}
         </div>
