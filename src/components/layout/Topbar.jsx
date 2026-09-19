@@ -55,7 +55,7 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
 
       {/* Логотип — в левом углу шапки, в такой же рамке, как поиск и профиль (в узком меню — только знак).
           Ширина блока — меню + отступ страницы минус промежуток flex (1rem). */}
-      <div className={`hidden shrink-0 items-center pl-4 transition-[width] md:flex ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-[7.5rem]'}`}>
+      <div className={`hidden shrink-0 items-center pl-2.5 transition-[width] md:flex ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-[7.5rem]'}`}>
         <div className="flex h-9 items-center gap-1.5 rounded-field border border-border-strong bg-white px-3">
           <img src={iconMark} alt="ICON" className="h-5 w-5 shrink-0" />
           {!sidebarCollapsed && <img src={iconWordmark} alt="" className="h-3.5 w-auto shrink-0" />}
