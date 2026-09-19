@@ -178,10 +178,13 @@ export function TasksPage() {
                   buckets[bucket.key].map(({ lead, deadline, priority }) => (
                     <div
                       key={lead.id}
-                      className={`flex items-center justify-between gap-3 rounded-field border bg-surface p-3 ${
+                      className={`relative flex items-center justify-between gap-3 rounded-field border bg-surface p-3 ${
                         priority ? 'border-orange' : 'border-border'
                       }`}
                     >
+                      {priority && (
+                        <span className="absolute -top-[5px] right-2.5 bg-surface px-1 text-[9px] leading-none text-orange">приоритет</span>
+                      )}
                       <div className="min-w-0">
                         <p className="text-[13px] font-bold leading-snug text-text">{pendingTaskText(lead)}</p>
                         <p className={`mt-0.5 text-[11px] ${bucket.key === 'overdue' ? 'font-bold text-danger' : 'text-muted'}`}>
