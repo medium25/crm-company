@@ -429,11 +429,11 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
 
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 border-b-2 px-4 py-3" style={{ borderBottomColor: column.color }}>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 border-b-2 px-4 py-[5px]" style={{ borderBottomColor: column.color }}>
         <span className="flex min-w-0 items-center gap-1.5 justify-self-start">
           {onEditColumn && <ColumnSettingsButton onOpen={() => setStageEditOpen(true)} />}
         </span>
-        <span className="min-w-0 justify-self-center">
+        <span className="flex min-w-0 flex-col items-center justify-self-center leading-[16px]">
           {onEditColumn ? (
             <EditableStageTitle
               column={column}
@@ -446,7 +446,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
           ) : (
             <span className="truncate text-[15px] font-bold uppercase tracking-wide text-text">{column.label}</span>
           )}
-          <span className="mt-0.5 block whitespace-nowrap text-center text-[11px] font-bold text-muted">
+          <span className="block whitespace-nowrap text-center text-[11px] font-semibold leading-[13px] text-muted">
             {leads.length} {pluralize(leads.length, ['сделка', 'сделки', 'сделок'])} · {formatSum(leads.length * LEAD_VALUE_UZS)}
           </span>
         </span>
