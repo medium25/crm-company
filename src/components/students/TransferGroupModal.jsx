@@ -45,6 +45,26 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
   );
   const { data: allGroups } = useCollection(groupsQuery);
   const groups = useMemo(() => allGroups.filter((g) => g.id !== enrollment?.groupId), [allGroups, enrollment]);
+  // Список для выбора — по учителям (по алфавиту), внутри учителя: нечётные/чётные дни, затем по времени.
+  const groupsByTeacher = useMemo(() => {
+    const byTeacher = new Map();
+    for (const g of groups) {
+      const key = g.teacherName || 'Без учителя';
+      byTeacher.set(key, [...(byTeacher.get(key) ?? []), g]);
+    }
+    const dayOrder = { odd: 0, even: 1 };
+    return [...byTeacher.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([teacher, items]) => ({
+        teacher,
+        items: [...items].sort(
+          (x, y) =>
+            (dayOrder[x.schedule?.type] ?? 2) - (dayOrder[y.schedule?.type] ?? 2) ||
+            String(x.schedule?.time).localeCompare(String(y.schedule?.time)) ||
+            x.code.localeCompare(y.code),
+        ),
+      }));
+  }, [groups]);
 
   const [groupId, setGroupId] = useState('');
   const [price, setPrice] = useState('');
@@ -277,13 +297,18 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
           Студент <b>{enrollment?.studentName}</b> покинет группу <b>{enrollment?.groupCode}</b> и будет добавлен в
           выбранную группу с тем же статусом (<b>{enrollment?.statusLabel}</b>).
         </p>
-        <Select
-          label="Новая группа"
-          required
-          options={[{ value: '', label: 'Выбрать' }, ...groups.map((g) => ({ value: g.id, label: `${g.code} · ${g.courseName}` }))]}
-          value={groupId}
-          onChange={(e) => handleGroupChange(e.target.value)}
-        />
+        <Select label="Новая группа" required value={groupId} onChange={(e) => handleGroupChange(e.target.value)}>
+          <option value="">Выбрать</option>
+          {groupsByTeacher.map(({ teacher, items }) => (
+            <optgroup key={teacher} label={teacher}>
+              {items.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.code} · {g.courseName} · {g.schedule?.time}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </Select>
         <Input
           label="Стоимость для студента"
           type="number"
