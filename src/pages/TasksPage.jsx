@@ -15,6 +15,7 @@ import { COLUMNS } from '../components/leads/columns.js';
 import { overdueReasonLabel } from '../lib/leadFunnel.js';
 import { priorityLevel, taskPlacement } from '../lib/leadTasks.js';
 import { formatRelativeDeadline, pluralize } from '../lib/format.js';
+import { pickGreeting } from '../lib/greeting.js';
 
 const msOf = (v) => (v?.toDate ? v.toDate().getTime() : v instanceof Date ? v.getTime() : 0);
 
@@ -441,6 +442,10 @@ export function TasksPage() {
   // операторов сразу (с фильтром), admin/teacher — только свои задачи.
   const canSeeAllTasks = staff?.role === 'ceo' || staff?.role === 'manager' || staff?.role === 'test';
   const [operatorFilter, setOperatorFilter] = useState('all');
+  // Приветствие выбирается один раз при открытии страницы (фиксированный seed —
+  // не меняется при перерисовках, но подхватывает имя, когда профиль догрузится).
+  const greetingSeed = useRef(Math.random());
+  const greeting = useMemo(() => pickGreeting(staff?.fullName, new Date(), () => greetingSeed.current), [staff?.fullName]);
 
   // Дедлайны утекают сами по себе — без форс-тика задача «на сегодня» не
   // переедет в «просроченные» сама, пока не перерендерится по другой причине.
@@ -623,9 +628,7 @@ export function TasksPage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-[22px] font-bold text-text">
-          Задач на сегодня: {loading ? '…' : buckets.overdue.length + buckets.today.length}
-        </h1>
+        <h1 className="text-[22px] font-bold text-text">{greeting}</h1>
         {canSeeAllTasks && (
           <DropdownMenu
             items={[
