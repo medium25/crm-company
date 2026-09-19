@@ -363,7 +363,7 @@ export function LeadsPage() {
         const at = new Date();
         commitCallAttempt(lead, buildAttempts(outcome, nextStep, at), result, { dueDate, stageFields: buildStageFields(at) });
       },
-      validate: (candidate) => validateCallDeadline(candidate, preview, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
+      validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
 
@@ -402,7 +402,7 @@ export function LeadsPage() {
         title: 'Следующая задача:',
         suggestedDate: nextCallDueAt(lead.callAttempts ?? [], callMaxAttempts),
         onConfirm: (dueDate) => commit({ nextCallDueAt: dueDate }),
-        validate: (candidate) => validateCallDeadline(candidate, lead.callAttempts ?? [], branchSettings?.operatorSchedules?.[lead.assignedOperator]),
+        validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }
@@ -412,7 +412,7 @@ export function LeadsPage() {
         title: 'Дедлайн первого касания в «Дожиме»',
         suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
         onConfirm: (dueDate) => commit({ closingTouchNumber: 0, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: [] }),
-        lockDate: true,
+        validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }
@@ -425,8 +425,9 @@ export function LeadsPage() {
   };
 
   // Дожим — ровно 2 касания (см. firstTouchDueAt/secondTouchDueAt): первое
-  // за день до второго урока, второе — в день второго урока. Оба дня
-  // фиксированы датой пробного, оператору выбирать нечего (lockDate).
+  // за день до второго урока, второе — в день второго урока. Даты —
+  // только подсказка для предзаполнения, оператор ставит любое время в
+  // рабочих часах.
   // Задача обязательна на КАЖДОМ касании, включая финальное (2-е) — там
   // дедлайну взяться неоткуда (noDate), но что сделано/сказано — фиксируем.
   const markTouch = (lead) => {
@@ -463,7 +464,7 @@ export function LeadsPage() {
           { closingTouchNumber: nextNumber, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: buildLog(outcome, nextStep) },
           `Касание ${nextNumber} отмечено.`,
         ),
-      lockDate: true,
+      validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
     });
   };
 

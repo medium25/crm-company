@@ -27,8 +27,8 @@ export const COLUMNS = [
     key: 'calling',
     label: 'Дозвон',
     color: '#E5842B',
-    // Регулируется через ⚙ в шапке колонки — тот же maxTouches, что читают
-    // nextCallDueAt/validateCallDeadline (leadFunnel.js, сетка «по 2
+    // Регулируется через ⚙ в шапке колонки — тот же maxTouches, что читает
+    // nextCallDueAt (leadFunnel.js, сетка «по 2
     // попытки в день» подстраивается под любое значение) и markAttempt/
     // порог автопереноса в «Холодный лид» (LeadsPage.jsx).
     maxTouches: 5,

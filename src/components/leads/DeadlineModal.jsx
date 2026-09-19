@@ -24,10 +24,9 @@ const QUICK_DAYS = [
  * @param {Object} props
  * @param {Date|null} props.value
  * @param {(date: Date) => void} props.onChange
- * @param {boolean} [props.lockDate] день менять нельзя, только время (см. DeadlineModal)
  * @param {string} [props.error]
  */
-export function DeadlinePicker({ value, onChange, lockDate, error }) {
+export function DeadlinePicker({ value, onChange, error }) {
   const [open, setOpen] = useState(false);
   const [style, setStyle] = useState(null);
   const triggerRef = useRef(null);
@@ -108,29 +107,22 @@ export function DeadlinePicker({ value, onChange, lockDate, error }) {
             style={style ?? { position: 'fixed', top: -9999, left: -9999 }}
             className="z-[60] flex flex-col gap-3 rounded-field border border-border bg-surface p-3 shadow-hover"
           >
-            {lockDate ? (
-              <p className="text-[12px] text-muted">
-                День дозвона фиксирован — 2 звонка сегодня, 2 завтра, 1 послезавтра. Можно поправить только время.
-              </p>
-            ) : (
-              <div className="flex gap-1.5">
-                {QUICK_DAYS.map((q) => (
-                  <button
-                    key={q.label}
-                    type="button"
-                    onClick={() => pickDay(q.offset)}
-                    className="flex-1 rounded-field border border-border-strong px-2 py-1.5 text-[13px] font-bold text-text hover:bg-surface-alt"
-                  >
-                    {q.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="flex gap-1.5">
+              {QUICK_DAYS.map((q) => (
+                <button
+                  key={q.label}
+                  type="button"
+                  onClick={() => pickDay(q.offset)}
+                  className="flex-1 rounded-field border border-border-strong px-2 py-1.5 text-[13px] font-bold text-text hover:bg-surface-alt"
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-2">
               <DatePicker
                 value={value ? format(value, 'yyyy-MM-dd') : ''}
                 onChange={(e) => setDateStr(e.target.value)}
-                disabled={lockDate}
                 className="h-10"
               />
               <Input type="time" value={value ? format(value, 'HH:mm') : ''} onChange={(e) => setTimeStr(e.target.value)} className="h-10 w-28" />
@@ -157,11 +149,8 @@ export function DeadlinePicker({ value, onChange, lockDate, error }) {
  * в stageDeadline), оператор может поправить перед сохранением — тихого
  * автовычисления без подтверждения больше нет ни в одном из этих мест.
  * @param {Object} props
- * @param {{lead: Object, title: string, suggestedDate?: Date, onConfirm: (date: Date|null, outcome: string, nextStep: string) => Promise<void>, lockDate?: boolean, noDate?: boolean, requireTask?: boolean, validate?: (date: Date) => string|null}|null} props.target
- *   `lockDate` — день менять нельзя (только время); используется там, где
- *   день дедлайна жёстко привязан к дате пробного («Дожим») — у дозвона
- *   день теперь свободный, только предзаполнен подсказкой (2 сегодня/2
- *   завтра/1 послезавтра), оператор может поправить под реальный график.
+ * @param {{lead: Object, title: string, suggestedDate?: Date, onConfirm: (date: Date|null, outcome: string, nextStep: string) => Promise<void>, noDate?: boolean, requireTask?: boolean, validate?: (date: Date) => string|null}|null} props.target
+ *   Дата дедлайна всегда свободная — `suggestedDate` только предзаполняет.
  *   `noDate` — без поля дедлайна вообще (терминальные/бездедлайновые
  *   отметки — холодный лид, финальное касание «Дожима»); `onConfirm`
  *   получает `date: null`. `requireTask` — два обязательных коротких поля,
@@ -267,7 +256,6 @@ export function DeadlineModal({ target, onClose }) {
               setDeadline(d);
               setError('');
             }}
-            lockDate={target.lockDate}
             error={error}
           />
         )}

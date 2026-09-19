@@ -269,7 +269,6 @@ export function TrialsPage() {
       lead,
       title: 'Дедлайн первого касания в «Дожиме»',
       suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
-      lockDate: true,
       onConfirm: (dueDate) =>
         advanceStage(db, lead, 'closing', { closingTouchNumber: 0, nextTouchAt: dueDate, unreachableAttempts: [] }, user).catch(() =>
           showToast('Не удалось перенести оплату.', { type: 'error' }),

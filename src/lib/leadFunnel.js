@@ -114,8 +114,8 @@ export function nextCallDueAt(attempts, max = 5) {
  * считаем первым; лид ещё не записан в конкретную группу, поэтому второй
  * урок — trialDate + 2 дня, стандартный шаг занятия через день). Первое
  * касание — за день до второго урока, второе — в день второго урока. Оба
- * дедлайна фиксированы (DeadlineModal.lockDate) — оператор не выбирает
- * день, только время в пределах него.
+ * дедлайна — только подсказка для предзаполнения, оператор может поставить
+ * любое время в рабочих часах.
  * @param {Date} [trialDate]
  * @returns {Date}
  */
@@ -323,40 +323,17 @@ export function isOperatorWorkingAt(workSchedule, date) {
   return hhmm >= today.start && hhmm < today.end;
 }
 
-const MIN_GAP_BETWEEN_CALLS_MS = 60 * 60 * 1000;
-
 /**
- * Проверка дедлайна дозвона — сетка 2 звонка сегодня/2 завтра/1 послезавтра
- * (см. nextCallDueAt), внутри пары день делится на «первый» и «второй»
- * звонок (индекс попытки, для которой ставим этот дедлайн, — 0/2 первый в
- * паре, 1/3 второй, 4 — одиночный послезавтра). Правила:
- * — дедлайн должен попадать в рабочее время оператора;
- * — первому в паре нельзя вплотную к концу рабочего дня — не успеет
- *   сделать второй звонок (мин. час до конца дня);
- * — второй в паре должен отстоять минимум на час от момента, когда
- *   реально сделан первый звонок (attempts — уже сделанные попытки,
- *   последняя из них и есть «первый звонок» этой пары).
+ * Проверка дедлайна — единственное правило: он должен попадать в рабочее
+ * время назначенного оператора (в остальном день и час свободные, сетка
+ * «2 звонка сегодня/2 завтра/1 послезавтра» — только подсказка для
+ * предзаполнения, см. nextCallDueAt).
  * @param {Date} candidate выбранный дедлайн
- * @param {Array<{result: string, at: Date|import('firebase/firestore').Timestamp}>} attempts попытки, сделанные до этого дедлайна
  * @param {Array<{start: string, end: string}|null>|undefined} workSchedule расписание назначенного оператора
  * @returns {string|null} текст ошибки или null, если дедлайн допустим
  */
-export function validateCallDeadline(candidate, attempts, workSchedule) {
-  if (!isOperatorWorkingAt(workSchedule, candidate)) {
-    return 'Дедлайн должен быть в рабочее время оператора.';
-  }
-
-  const index = attempts.length;
-
-  if (index % 2 === 1) {
-    const prevAt = attempts[attempts.length - 1]?.at;
-    const prevDate = prevAt?.toDate ? prevAt.toDate() : prevAt;
-    if (prevDate && candidate.getTime() - prevDate.getTime() < MIN_GAP_BETWEEN_CALLS_MS) {
-      return 'Между звонками должен быть минимум час.';
-    }
-  }
-
-  return null;
+export function validateCallDeadline(candidate, workSchedule) {
+  return isOperatorWorkingAt(workSchedule, candidate) ? null : 'Дедлайн должен быть в рабочее время оператора.';
 }
 
 /**
