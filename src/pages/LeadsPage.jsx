@@ -380,9 +380,9 @@ export function LeadsPage() {
   };
 
   // Пока по лиду не отмечен ни один пункт чек-листа первого разговора (см.
-  // src/lib/leadChecklist.js) — некуда переносить в «Отказ» (moveLead,
-  // onDecline). «Пробный назначен» из-под этого гейта убран по просьбе —
-  // туда можно без отметок в чек-листе.
+  // src/lib/leadChecklist.js) — нельзя переносить дальше по воронке
+  // (moveLead). «Пробный назначен» и «Отказ» из-под этого гейта убраны по
+  // просьбе — туда можно без отметок в чек-листе.
   const checklistBlocksLeaving = (lead) =>
     (columnKeyOf(lead) === 'new' || columnKeyOf(lead) === 'calling') &&
     checklistPercent(lead.checklist, resolvedChecklistItems) === 0;
@@ -393,7 +393,7 @@ export function LeadsPage() {
       showToast('Нельзя вернуть лида на предыдущую стадию.', { type: 'error' });
       return;
     }
-    if (stageKey !== 'calling' && stageKey !== 'trial_scheduled' && checklistBlocksLeaving(lead)) {
+    if (stageKey !== 'calling' && stageKey !== 'trial_scheduled' && stageKey !== 'lost' && checklistBlocksLeaving(lead)) {
       showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
       return;
     }
@@ -565,18 +565,8 @@ export function LeadsPage() {
   const cardActions = {
     onOpen: (lead) => navigate(`/students/${lead.id}`),
     onEdit: (lead) => setFormLead(lead),
-    // Гейт чек-листа — тут же, а не только в moveLead: карточка сама строит
-    // «Перенести в колонку» (moveItems в LeadCard.jsx) и для lost/
-    // trial_scheduled вызывает onDecline/onScheduleTrial напрямую, минуя
-    // moveLead целиком (см. markAttempt для того же гейта на исходе
-    // успешного звонка).
-    onDecline: (lead) => {
-      if (checklistBlocksLeaving(lead)) {
-        showToast('Сначала отметь хотя бы пункт чек-листа разговора.', { type: 'error' });
-        return;
-      }
-      setDeclineTarget(lead);
-    },
+    // Отказ — без гейта чек-листа: причину отказа можно указать в любой момент.
+    onDecline: (lead) => setDeclineTarget(lead),
     onDelete: (lead) => setDeleteTarget(lead),
     onResetToNew: (lead) => setResetTarget(lead),
     onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
