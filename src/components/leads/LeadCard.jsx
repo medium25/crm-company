@@ -1075,7 +1075,7 @@ export function LeadCard({
               attempts={attempts}
               onMark={(result) => onMarkAttempt(lead, result)}
               nextCallDueAt={lead.nextCallDueAt}
-              maxAttempts={columns.find((c) => c.key === 'calling')?.maxTouches ?? 5}
+              maxAttempts={columns.find((c) => c.key === stage)?.maxTouches ?? 5}
               onOpenChecklist={() => setChecklistOpen(true)}
             />
           ) : stage === 'closing' ? (
