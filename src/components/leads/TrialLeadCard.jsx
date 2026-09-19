@@ -1,9 +1,9 @@
 import { formatPhone, formatDateTimeShort, formatSource } from '../../lib/format.js';
-import { operatorInitials, trialScheduleLabel } from './LeadCard.jsx';
+import { operatorInitials, trialScheduleLabel, HistoryTimeline } from './LeadCard.jsx';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 
 /**
- * Карточка лида на странице «Пробные» — просмотр + комментарии, перенос
+ * Карточка лида на странице «Пробные» — просмотр + вся история касаний, перенос
  * даты пробного (⋮) и «Создать студента» (открывает «Добавить в группу»,
  * см. TrialsPage), после чего лид у оператора на «Заявки» переходит в
  * «Пробный проведён».
@@ -24,7 +24,7 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
       tabIndex={0}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className="flex min-h-[215px] cursor-pointer flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md"
+      className="flex h-[300px] cursor-pointer flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 pb-[3px] shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md"
     >
       <div className="-mx-3.5 -mt-3.5 flex items-center justify-between gap-2 rounded-t-xl bg-card-head px-3.5 pb-2 pt-2.5">
         <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
@@ -33,17 +33,11 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
         </a>
       </div>
       <span className="truncate text-[12px] text-muted">{trialScheduleLabel(lead)}</span>
-      <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-        {operatorLabel ? (
-          <span
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
-            style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
-          >
-            {operatorLabel}
-          </span>
-        ) : (
-          <span />
-        )}
+      {/* Вся история взаимодействий — та же лента, что на карточке в «Заявках». */}
+      <div className="flex min-h-0 flex-1 flex-col empty:hidden">
+        <HistoryTimeline lead={lead} />
+      </div>
+      <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
         <div className="flex shrink-0 items-center gap-0.5">
           <DropdownMenu items={[{ label: 'Перенести пробный', onClick: () => onReschedule(lead) }]} />
         </div>
@@ -57,10 +51,21 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
           Создать студента
         </button>
       </div>
-      <span className="-mt-1.5 text-[10px] text-muted">
-        {formatDateTimeShort(lead.createdAt)}
-        {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
-      </span>
+      {/* Дата/источник слева, инициалы оператора — в правом нижнем углу, как на карточках «Заявок». */}
+      <div className="-mt-1.5 flex items-end justify-between">
+        <span className="text-[10px] text-muted">
+          {formatDateTimeShort(lead.createdAt)}
+          {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
+        </span>
+        {operatorLabel && (
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+            style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
+          >
+            {operatorLabel}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

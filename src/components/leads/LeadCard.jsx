@@ -370,7 +370,7 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
  * карточку числом записей). Рядом с ней (ниже, вне ленты) каждый трекер
  * рисует свой «следующий шаг» (CallAttemptDots/TouchDots/UnreachableBlock).
  */
-function HistoryTimeline({ lead }) {
+export function HistoryTimeline({ lead }) {
   // useState/useRef/useEffect ДО early return — иначе при первом же
   // появлении истории (0 записей → 1) хуки в этом инстансе компонента
   // перестанут совпадать между рендерами (React бросит "Rendered fewer
