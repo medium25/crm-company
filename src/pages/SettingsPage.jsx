@@ -8,6 +8,8 @@ import { DirectoriesTab } from '../components/settings/DirectoriesTab.jsx';
 import { SmsTemplatesTab } from '../components/settings/SmsTemplatesTab.jsx';
 import { BillingHistoryTab } from '../components/settings/BillingHistoryTab.jsx';
 import { OperatorScoringCriteriaTab } from '../components/settings/OperatorScoringCriteriaTab.jsx';
+import { FirebaseUsageTab } from '../components/settings/FirebaseUsageTab.jsx';
+import { useAuth } from '../hooks/useAuth.js';
 
 const TABS = [
   { key: 'branch', label: 'Филиал' },
@@ -18,14 +20,18 @@ const TABS = [
   { key: 'sms', label: 'Шаблоны SMS' },
   { key: 'billing', label: 'Биллинг' },
 ];
+// Расход Firebase видят только CEO и менеджер (правила доступа к usage — то же).
+const USAGE_TAB = { key: 'firebase', label: 'Расход Firebase' };
 
 export function SettingsPage() {
+  const { staff } = useAuth();
   const [tab, setTab] = useState('branch');
+  const tabs = staff?.role === 'ceo' || staff?.role === 'manager' ? [...TABS, USAGE_TAB] : TABS;
 
   return (
     <>
       <PageHeader title="Настройки" />
-      <Tabs tabs={TABS} activeKey={tab} onChange={setTab} />
+      <Tabs tabs={tabs} activeKey={tab} onChange={setTab} />
       <div className="mt-6">
         {tab === 'branch' && <BranchSettingsTab />}
         {tab === 'staff' && <StaffSettingsTab />}
@@ -34,6 +40,7 @@ export function SettingsPage() {
         {tab === 'directories' && <DirectoriesTab />}
         {tab === 'sms' && <SmsTemplatesTab />}
         {tab === 'billing' && <BillingHistoryTab />}
+        {tab === 'firebase' && <FirebaseUsageTab />}
       </div>
     </>
   );

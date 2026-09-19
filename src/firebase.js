@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { initUsageMeter } from './lib/usageMeter.js';
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FB_API_KEY,
@@ -47,4 +48,5 @@ function createFirestore() {
   }
 }
 export const db = safeInit(createFirestore, 'Firestore');
+if (db) initUsageMeter(db);
 export const storage = safeInit(() => getStorage(app), 'Storage');
