@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
@@ -557,6 +557,44 @@ function HistoryTimeline({ lead }) {
 }
 
 /**
+ * Раскрывшийся выбор результата касания — зелёная галочка (успешно) и
+ * красный крестик (не успешно) в одной кнопке-пилюле. Закрывается кликом
+ * вне (onDismiss). Общий для «Дозвона» и «Дожима».
+ */
+function ResultChoice({ onSuccess, onFail, onDismiss }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onDismiss();
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [onDismiss]);
+
+  return (
+    <div ref={ref} className="flex h-[30px] w-[84px] shrink-0 overflow-hidden rounded-field">
+      <button
+        type="button"
+        onClick={onSuccess}
+        aria-label="Успешно"
+        className="flex flex-1 items-center justify-center bg-success text-white hover:opacity-90"
+      >
+        <CheckCircle2 className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onFail}
+        aria-label="Не успешно"
+        className="flex flex-1 items-center justify-center bg-danger text-white hover:opacity-90"
+      >
+        <XCircle className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+/**
  * Попытки дозвона, см. 2026-08-12-lead-card-call-attempts-design.md.
  * Меню выбора результата — через DropdownMenu (портал, `position: fixed`) —
  * ряд лежит у левого края узкой карточки в канбане, обычный absolute-попап
@@ -570,38 +608,10 @@ function HistoryTimeline({ lead }) {
 function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts, onOpenChecklist }) {
   const deadlineLabel = nextCallDueAt ? formatRelativeDeadline(nextCallDueAt) : null;
   const [confirming, setConfirming] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!confirming) return undefined;
-    const onClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setConfirming(false);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [confirming]);
+  const dismiss = useCallback(() => setConfirming(false), []);
 
   if (confirming) {
-    return (
-      <div ref={ref} className="flex h-[30px] w-[84px] shrink-0 overflow-hidden rounded-field">
-        <button
-          type="button"
-          onClick={() => onMark('success')}
-          aria-label="Успешно"
-          className="flex flex-1 items-center justify-center bg-success text-white hover:opacity-90"
-        >
-          <CheckCircle2 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onMark('fail')}
-          aria-label="Не успешно"
-          className="flex flex-1 items-center justify-center bg-danger text-white hover:opacity-90"
-        >
-          <XCircle className="h-4 w-4" />
-        </button>
-      </div>
-    );
+    return <ResultChoice onSuccess={() => onMark('success')} onFail={() => onMark('fail')} onDismiss={dismiss} />;
   }
 
   return (
@@ -625,22 +635,25 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts, onOpenC
  * завязано на другую бизнес-логику (нет своей сетки дедлайнов/автопереноса),
  * менять его безопасно.
  */
-function TouchDots({ closingTouchNumber, nextTouchAt, closingTouchLog, onMark, maxTouches }) {
+function TouchDots({ closingTouchNumber, nextTouchAt, onMark, onFail, maxTouches }) {
   const count = closingTouchNumber ?? 0;
-  const log = closingTouchLog ?? [];
   const deadlineLabel = count < maxTouches && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
+  const [confirming, setConfirming] = useState(false);
+  const dismiss = useCallback(() => setConfirming(false), []);
 
-  const pendingRow = (
+  if (confirming) {
+    return <ResultChoice onSuccess={onMark} onFail={onFail} onDismiss={dismiss} />;
+  }
+
+  return (
     <TouchActionButton
       text={`Касание ${count}/${maxTouches}`}
       time={deadlineLabel}
-      onClick={onMark}
-      ariaLabel={`Касание ${count + 1}: отметить`}
+      onClick={() => setConfirming(true)}
+      ariaLabel={`Касание ${count + 1}: отметить результат`}
       compact
     />
   );
-
-  return pendingRow;
 }
 
 /**
@@ -732,9 +745,9 @@ function LeadInfoPopover({ items }) {
 }
 
 /**
- * «Не выходит на связь» — необязательный трекер, общий для «Пробный
- * назначен» и «Дожим» (тот же сценарий на обеих стадиях). Кнопка-
- * переключатель; открывшись, показывает до 3 попыток связаться. Каждая
+ * «Не выходит на связь» — трекер стадии «Пробный назначен» (в «Дожиме»
+ * его больше нет: там неуспешное касание — крестик у «Касание N/M»).
+ * Кнопка «Касание» показывает до 3 попыток связаться. Каждая
  * попытка — «Перенос» (разрешено один раз за цикл — на пробном сдвигает
  * дату через TrialFormModal, в дожиме сразу просит новый дедлайн касания
  * тут же в onMark) или «Неуспешно»; на 3-й неуспешной подряд открывается
@@ -745,21 +758,8 @@ function LeadInfoPopover({ items }) {
  * @param {() => void} onDecline
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
-function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt, alwaysActive }) {
+function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt }) {
   const attempts = lead.unreachableAttempts ?? [];
-  const [active, setActive] = useState(alwaysActive || attempts.length > 0);
-
-  if (!active) {
-    return (
-      <button
-        type="button"
-        onClick={() => setActive(true)}
-        className="self-start text-[12px] text-muted underline decoration-dotted underline-offset-2 hover:text-text"
-      >
-        Не выходит на связь
-      </button>
-    );
-  }
 
   const rescheduleUsed = attempts.some((a) => a.result === 'reschedule');
   const failStreak = attempts.filter((a) => a.result === 'fail').length;
@@ -1026,13 +1026,6 @@ export function LeadCard({
       {stage === 'closing' && (
         <div className="flex min-h-0 flex-1 flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
           <HistoryTimeline lead={lead} />
-          <UnreachableBlock
-            lead={lead}
-            onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
-            onReschedule={() => {}}
-            onDecline={() => onDecline(lead)}
-            nextAttemptDueAt={lead.nextTouchAt}
-          />
         </div>
       )}
 
@@ -1084,8 +1077,8 @@ export function LeadCard({
             <TouchDots
               closingTouchNumber={lead.closingTouchNumber}
               nextTouchAt={lead.nextTouchAt}
-              closingTouchLog={lead.closingTouchLog}
               onMark={() => onMarkTouch(lead)}
+              onFail={() => onMarkUnreachable(lead, 'fail', () => {})}
               maxTouches={columns.find((c) => c.key === 'closing')?.maxTouches ?? 2}
             />
           ) : stage === 'trial_scheduled' ? (
@@ -1095,7 +1088,6 @@ export function LeadCard({
               onReschedule={() => onRescheduleTrial(lead)}
               onDecline={() => onDecline(lead)}
               nextAttemptDueAt={lead.unreachableNextCallDueAt}
-              alwaysActive
             />
           ) : (
             <span />
