@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, addDoc, updateDoc, doc, writeBatch, increment, serverTimestamp, query, where, Timestamp } from 'firebase/firestore';
 import { addMonths, format } from 'date-fns';
 import { db } from '../../firebase.js';
@@ -7,6 +7,7 @@ import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { generateLessons } from '../../lib/schedule.js';
+import { groupCodeFor } from '../../lib/groupCode.js';
 import { logActivity } from '../../lib/activityLog.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -83,8 +84,28 @@ export function GroupFormModal({ group, onClose }) {
   );
   const { data: rooms } = useCollection(roomsQuery);
 
+  // Код по правилу (язык + чётность + имя учителя + час, см. groupCode.js) — из
+  // выбранных курса/учителя/расписания. У новой группы подставляется сам, пока
+  // код не правили руками; у существующей — кнопкой под полем.
+  const codeTouched = useRef(false);
+  const suggestedCode = useMemo(
+    () =>
+      groupCodeFor({
+        courseName: courses.find((c) => c.id === form.courseId)?.name,
+        scheduleType: form.scheduleType,
+        teacherName: teachers.find((t) => t.id === form.teacherId)?.displayName,
+        time: form.time,
+      }),
+    [courses, teachers, form.courseId, form.teacherId, form.scheduleType, form.time],
+  );
+  const isNewGroup = Boolean(group) && !group.id;
+  useEffect(() => {
+    if (isNewGroup && !codeTouched.current && suggestedCode) setForm((f) => (f.code === suggestedCode ? f : { ...f, code: suggestedCode }));
+  }, [isNewGroup, suggestedCode]);
+
   useEffect(() => {
     if (!group) return;
+    codeTouched.current = false;
     if (group.id) {
       setForm({
         code: group.code,
@@ -242,7 +263,29 @@ export function GroupFormModal({ group, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Input label="Код группы" required value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} />
+        <div>
+          <Input
+            label="Код группы"
+            required
+            value={form.code}
+            onChange={(e) => {
+              codeTouched.current = true;
+              setForm((f) => ({ ...f, code: e.target.value }));
+            }}
+          />
+          {suggestedCode && suggestedCode !== form.code.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                codeTouched.current = false;
+                setForm((f) => ({ ...f, code: suggestedCode }));
+              }}
+              className="mt-1 text-[12px] font-bold text-navy hover:text-navy-hover"
+            >
+              Применить по правилу: {suggestedCode}
+            </button>
+          )}
+        </div>
         <Select
           label="Курс"
           required
