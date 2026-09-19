@@ -21,7 +21,7 @@
  */
 :root {
   --color-bg: 244 245 247;
-  --color-surface: 240 240 239;
+  --color-surface: 255 255 255;
   --color-surface-alt: 250 251 252;
   --color-border: 233 235 239;
   --color-border-strong: 214 218 225;
