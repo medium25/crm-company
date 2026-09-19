@@ -725,7 +725,7 @@ export function TasksPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/leads?highlight=${lead.id}`)}
-                        className="shrink-0 rounded-field bg-[#0088CC] px-3 py-1.5 text-[12px] font-bold text-white hover:bg-[#0077B3]"
+                        className="shrink-0 rounded-field bg-navy px-3 py-1.5 text-[12px] font-bold text-white hover:bg-navy-hover"
                       >
                         Выполнить
                       </button>

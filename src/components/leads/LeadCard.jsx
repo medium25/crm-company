@@ -271,7 +271,7 @@ const UNREACHABLE_MAX_ATTEMPTS = 3;
 
 /**
  * Главная кнопка следующего касания — под лентой истории, во всю ширину
- * карточки, сплошной синий (телеграмный #0088CC), без иконки: единственное
+ * карточки, сплошной синий (цвет системы (navy)), без иконки: единственное
  * реально кликабельное действие на этой стадии, должно выделяться, а не
  * теряться среди мелких строк истории.
  */
@@ -282,7 +282,7 @@ function TouchActionButton({ ref, onClick, ariaLabel, text, time, compact }) {
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className={`flex flex-col items-center justify-center gap-0.5 rounded-field bg-[#0088CC] text-[13px] font-bold leading-tight text-white hover:bg-[#0077B3] ${
+      className={`flex flex-col items-center justify-center gap-0.5 rounded-field bg-navy text-[13px] font-bold leading-tight text-white hover:bg-navy-hover ${
         compact ? 'shrink-0 px-3 py-1.5' : 'w-1/2 py-1'
       }`}
     >
