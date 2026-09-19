@@ -996,7 +996,7 @@ export function LeadCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {trialConfirmAtRisk && <PhoneOff className="h-3.5 w-3.5 text-orange" aria-label="Не берёт трубку — подтверждение пробного" />}
+          {trialConfirmAtRisk && <PhoneOff className="h-3.5 w-3.5 text-[#E5842B]" aria-label="Не берёт трубку — подтверждение пробного" />}
           {infoItems.length > 0 && <LeadInfoPopover items={infoItems} />}
           <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="truncate text-[12px] text-link">
             {formatPhone(lead.phone)}
@@ -1125,7 +1125,7 @@ export function LeadCard({
                       ? 'text-muted'
                       : checklistPct === 100
                         ? 'text-success'
-                        : 'text-orange'
+                        : 'text-[#E5842B]'
                 }`}
               >
                 <ClipboardCheck className="h-4 w-4" />

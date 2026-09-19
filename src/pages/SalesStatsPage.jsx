@@ -18,12 +18,12 @@ import { DEFAULT_OPERATOR_SCORE_CRITERIA, gradeRate, gradeOverdue, gradeLeadsVol
 
 const GRADE_BADGE = {
   good: 'bg-success/10 text-success',
-  warn: 'bg-orange-soft text-orange',
+  warn: 'bg-[#FDF0E3] text-[#E5842B]',
   bad: 'bg-danger/10 text-danger',
 };
 const CONV_BADGE = {
   good: 'bg-success/10 text-success',
-  warn: 'bg-orange-soft text-orange',
+  warn: 'bg-[#FDF0E3] text-[#E5842B]',
   bad: 'bg-danger/10 text-danger',
 };
 // Один и тот же светофор везде — полосы воронки, конверсия между шагами,

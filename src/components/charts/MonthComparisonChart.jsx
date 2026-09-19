@@ -38,10 +38,10 @@ export function MonthComparisonChart({ data, currentMonth, prevMonth }) {
             type="monotone"
             dataKey="current"
             name={formatMonth(currentMonth)}
-            stroke="#E5842B"
+            stroke="#3C4656"
             strokeWidth={2}
             dot={false}
-            activeDot={{ stroke: '#E5842B', strokeWidth: 2, fill: '#FFFFFF', r: 5 }}
+            activeDot={{ stroke: '#3C4656', strokeWidth: 2, fill: '#FFFFFF', r: 5 }}
             connectNulls={false}
           />
           <Line
