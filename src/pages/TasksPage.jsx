@@ -1,6 +1,6 @@
 // src/pages/TasksPage.jsx
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, query, where, orderBy } from 'firebase/firestore';
@@ -362,13 +362,13 @@ const timeOf = (e) => format(new Date(msOf(e.at)), 'HH:mm');
  * имя, задача и «Выполнено»; по клику карточка переворачивается: на
  * обороте все записи зачёркнуты.
  */
-function CompletedTaskCard({ lead, taskText, entries }) {
+function CompletedTaskCard({ lead, taskText, entries, focused }) {
   const [flipped, setFlipped] = useState(false);
   const face = 'col-start-1 row-start-1 [backface-visibility:hidden]';
   const struck = 'text-muted line-through';
   const last = entries[entries.length - 1];
   return (
-    <div style={{ perspective: '900px' }}>
+    <div id={`task-done-${lead.id}`} className={focused ? 'rounded-field ring-4 ring-navy ring-offset-2' : ''} style={{ perspective: '900px' }}>
       <div
         className="grid transition-transform duration-500"
         style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'none' }}
@@ -632,6 +632,35 @@ export function TasksPage() {
     return result;
   }, [buckets, completed]);
 
+  // Возврат с доски «Заявки» (кнопка «← К задачам», ?focus=leadId) — открываем ту
+  // задачу, над которой только что работали: выполненную (она стоит до конца дня)
+  // или, если отметки не было, ту же невыполненную. Прокручиваем к карточке и
+  // на пару секунд обводим рамкой.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusId = searchParams.get('focus');
+  const [focusKey, setFocusKey] = useState(null);
+  useEffect(() => {
+    if (!focusId || loading) return undefined;
+    const all = Object.values(columnItems).flat();
+    const target = all.find((i) => i.done && i.lead.id === focusId) ?? all.find((i) => !i.done && i.lead.id === focusId);
+    if (!target) {
+      // Задача может быть у другого оператора, чем выбран в фильтре, — покажем всех.
+      if (canSeeAllTasks && operatorFilter !== 'all') setOperatorFilter('all');
+      return undefined;
+    }
+    const key = `${target.done ? 'done' : 'open'}-${focusId}`;
+    setFocusKey(key);
+    const scrollTimer = setTimeout(() => document.getElementById(`task-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+    const clearTimer = setTimeout(() => {
+      setFocusKey(null);
+      setSearchParams({}, { replace: true });
+    }, 3500);
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [focusId, loading, columnItems, canSeeAllTasks, operatorFilter, setSearchParams]);
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -688,16 +717,17 @@ export function TasksPage() {
                 ) : (
                   columnItems[bucket.key].map((item) => {
                     if (item.done) {
-                      return <CompletedTaskCard key={`done-${item.lead.id}`} lead={item.lead} entries={item.entries} taskText={item.taskText} />;
+                      return <CompletedTaskCard key={`done-${item.lead.id}`} lead={item.lead} entries={item.entries} taskText={item.taskText} focused={focusKey === `done-${item.lead.id}`} />;
                     }
                     const { lead, deadline, level, pinnedToday } = item;
                     const mark = PRIORITY_STYLES[level];
                     return (
                     <div
                       key={lead.id}
+                      id={`task-open-${lead.id}`}
                       className={`relative flex items-center justify-between gap-3 rounded-field border bg-card p-3 ${
                         mark ? '' : 'border-border'
-                      }`}
+                      } ${focusKey === `open-${lead.id}` ? 'ring-4 ring-navy ring-offset-2' : ''}`}
                       style={mark ? { borderColor: mark.color } : undefined}
                     >
                       {mark && (

@@ -668,7 +668,7 @@ export function LeadsPage() {
           без этого состояния). */}
       {highlightLeadId && fromTasks && (
         <Link
-          to="/tasks"
+          to={`/tasks?focus=${highlightLeadId}`}
           className="fixed bottom-4 left-4 z-10 flex items-center gap-1 rounded-full bg-navy px-4 py-2 text-[13px] font-bold text-white shadow-hover hover:bg-navy-hover"
         >
           ← К задачам
