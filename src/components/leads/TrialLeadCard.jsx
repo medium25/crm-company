@@ -26,7 +26,7 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
       className="flex min-h-[215px] cursor-pointer flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-md"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-border pb-2.5">
+      <div className="-mx-3.5 -mt-3.5 flex items-center justify-between gap-2 rounded-t-xl bg-card-head px-3.5 pb-2 pt-2.5">
         <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
         <a href={`tel:+${lead.phone}`} onClick={(e) => e.stopPropagation()} className="truncate text-[12px] text-link">
           {formatPhone(lead.phone)}
