@@ -299,14 +299,14 @@ export function PaymentsPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
         <div className="flex flex-col gap-4">
-          <Card className="border-l-4 border-l-navy">
+          <Card>
             <p className="text-[13px] text-muted">Всего платежей</p>
             <p className="text-[28px] font-bold text-navy-num">{formatMoney(totalPayments)}</p>
             <p className="text-[13px] text-muted">
               {formatDate(Timestamp.fromDate(new Date(dateFrom)))} — {formatDate(Timestamp.fromDate(new Date(dateTo)))}
             </p>
           </Card>
-          <Card className="border-l-4 border-l-navy">
+          <Card>
             <p className="text-[13px] text-muted">Чистая прибыль</p>
             <p className="text-[28px] font-bold text-navy-num">{formatMoney(totalPayments)}</p>
             <button type="button" onClick={() => setDetailsOpen((v) => !v)} className="mt-1 flex items-center gap-1 text-[13px] text-link">
