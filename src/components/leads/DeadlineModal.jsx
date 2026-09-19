@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { format, addDays, startOfDay } from 'date-fns';
+import { format, addDays, startOfDay, endOfDay } from 'date-fns';
 import { Calendar } from 'lucide-react';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -9,6 +9,8 @@ import { DatePicker } from '../ui/DatePicker.jsx';
 import { formatRelativeDeadline } from '../../lib/format.js';
 
 const MARGIN = 8;
+// Любой дедлайн — не дальше чем через 7 дней (до конца седьмого дня).
+const MAX_DEADLINE_DAYS = 7;
 const QUICK_DAYS = [
   { label: 'Сегодня', offset: 0 },
   { label: 'Завтра', offset: 1 },
@@ -123,6 +125,7 @@ export function DeadlinePicker({ value, onChange, error }) {
               <DatePicker
                 value={value ? format(value, 'yyyy-MM-dd') : ''}
                 onChange={(e) => setDateStr(e.target.value)}
+                max={format(addDays(new Date(), MAX_DEADLINE_DAYS), 'yyyy-MM-dd')}
                 className="h-10"
               />
               <Input type="time" value={value ? format(value, 'HH:mm') : ''} onChange={(e) => setTimeStr(e.target.value)} className="h-10 w-28" />
@@ -190,6 +193,10 @@ export function DeadlineModal({ target, onClose }) {
     }
     const candidate = target.noDate ? null : deadline;
     if (!target.noDate) {
+      if (candidate && candidate > endOfDay(addDays(new Date(), MAX_DEADLINE_DAYS))) {
+        setError(`Дедлайн — не дальше чем через ${MAX_DEADLINE_DAYS} дней.`);
+        return;
+      }
       const validationError = target.validate?.(candidate);
       if (validationError) {
         setError(validationError);

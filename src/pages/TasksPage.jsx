@@ -1,7 +1,7 @@
 // src/pages/TasksPage.jsx
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isToday, isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
+import { isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { AlertTriangle, Clock, CalendarDays, Settings, Check } from 'lucide-react';
@@ -12,7 +12,8 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS } from '../components/leads/columns.js';
-import { stageDeadline, overdueReasonLabel } from '../lib/leadFunnel.js';
+import { overdueReasonLabel } from '../lib/leadFunnel.js';
+import { priorityLevel, taskPlacement } from '../lib/leadTasks.js';
 import { formatRelativeDeadline, pluralize } from '../lib/format.js';
 
 const msOf = (v) => (v?.toDate ? v.toDate().getTime() : v instanceof Date ? v.getTime() : 0);
@@ -41,37 +42,23 @@ const allEntriesOf = (lead) =>
 
 /**
  * Что было поставлено ДО отметки `entry` — «Следующий шаг» предыдущей
- * отметки (или «Что произошло?», если шага нет). Первая отметка по лиду —
- * стандартное «Позвонить в первые 30 минут», как на карточке нового лида.
+ * отметки (или «Что произошло?», если шага нет). Предыдущей отметки нет —
+ * стандартный текст стадии, как на самой карточке (новый лид — «Позвонить в
+ * первые 30 минут»).
  */
-function taskTextBefore(all, entry) {
+function taskTextBefore(all, entry, wasStage) {
   const prev = all[all.indexOf(entry) - 1];
-  if (!prev) return 'Позвонить в первые 30 минут';
-  return prev.nextStep || prev.outcome || 'Задача';
+  if (prev) return prev.nextStep || prev.outcome || 'Задача';
+  return wasStage === 'new' ? 'Позвонить в первые 30 минут' : overdueReasonLabel({ funnelStage: wasStage });
 }
 
-/**
- * Уровни приоритета задач — с чего начинать (1 — самое срочное):
- * 1 «Дожим» и «Пробный проведён» (лид вот-вот заплатит, каждая задержка
- * стоит денег), 2 «Пробный назначен», 3 новый лид, 4 просроченная задача
- * на остальных стадиях, 5 всё прочее. Стадия сильнее просрочки: просроченный
- * «Дожим» — уровень 1, не 4. Метка (цвет рамки + «приоритет N» на линии
- * рамки) только у 1–4; у 5 карточка без пометок.
- */
+/** Метка приоритета (цвет рамки + «приоритет N» на линии рамки) — только у 1–4; у 5 карточка без пометок. Сами уровни — priorityLevel, leadTasks.js. */
 const PRIORITY_STYLES = {
   1: { color: '#C0392B', label: 'приоритет 1' },
   2: { color: '#E5842B', label: 'приоритет 2' },
   3: { color: '#D4A017', label: 'приоритет 3' },
   4: { color: '#7C5CBF', label: 'приоритет 4' },
 };
-
-function priorityLevel(lead, isOverdue) {
-  const stage = lead.funnelStage ?? 'new';
-  if (stage === 'closing' || stage === 'trial_completed') return 1;
-  if (stage === 'trial_scheduled') return 2;
-  if (stage === 'new') return 3;
-  return isOverdue ? 4 : 5;
-}
 
 const DAILY_GOAL = 40;
 const PERIODS = [
@@ -568,30 +555,36 @@ export function TasksPage() {
       );
       if (mine.length === 0) continue;
       const first = mine[0];
-      const expected = msOf(first.expectedBy);
-      let bucket = 'today';
-      if (all[0] !== first && expected) {
-        if (expected < msOf(first.at)) bucket = 'overdue';
-        else if (isTomorrow(new Date(expected))) bucket = 'tomorrow';
+      // Место задачи до отметки. Новые записи несут снимок (wasBucket/
+      // wasLevel/wasDeadline, см. taskSnapshot) — берём как есть. У старых
+      // восстанавливаем: стадия на момент отметки — по stageHistory (первая
+      // отметка по лиду сама по себе ещё не значит «Новый лид» — лид мог
+      // прийти сразу в «Дожим»), колонка — по expectedBy.
+      const before = (lead.stageHistory ?? [])
+        .filter((h) => msOf(h.enteredAt) && msOf(h.enteredAt) < msOf(first.at))
+        .sort((x, y) => msOf(x.enteredAt) - msOf(y.enteredAt))
+        .at(-1)?.stage;
+      const wasStage = first.wasStage ?? before ?? (['new', 'calling'].includes(lead.funnelStage ?? 'new') ? 'new' : lead.funnelStage);
+      let bucket = first.wasBucket;
+      let level = first.wasLevel;
+      let deadlineMs = first.wasDeadline;
+      if (!bucket || !level) {
+        const expected = msOf(first.expectedBy);
+        bucket = 'today';
+        if (wasStage !== 'new' && expected) {
+          if (expected < msOf(first.at)) bucket = 'overdue';
+          else if (isTomorrow(new Date(expected))) bucket = 'tomorrow';
+        }
+        level = priorityLevel({ funnelStage: wasStage }, bucket === 'overdue');
+        deadlineMs = expected || msOf(first.at);
       }
-      // Приоритет и дедлайн — какими были до отметки, чтобы карточка осталась
-      // на том же месте среди невыполненных (стадия — по stageHistory на момент
-      // отметки; первая отметка по лиду — он был «Новым лидом»).
-      const wasStage =
-        all[0] === first
-          ? 'new'
-          : ((lead.stageHistory ?? [])
-              .filter((h) => msOf(h.enteredAt) && msOf(h.enteredAt) < msOf(first.at))
-              .sort((x, y) => msOf(x.enteredAt) - msOf(y.enteredAt))
-              .at(-1)?.stage ?? lead.funnelStage ?? 'new');
-      const wasOverdue = bucket === 'overdue';
       result[bucket].push({
         done: true,
         lead,
         entries: mine,
-        taskText: taskTextBefore(all, first),
-        level: priorityLevel({ funnelStage: wasStage }, wasOverdue),
-        deadlineMs: expected || msOf(first.at),
+        taskText: taskTextBefore(all, first, wasStage),
+        level,
+        deadlineMs: deadlineMs || msOf(first.at),
       });
     }
     return result;
@@ -603,22 +596,8 @@ export function TasksPage() {
     for (const lead of allLeads) {
       if (lead.boardHiddenAt) continue;
       if (scopedOperatorUid && lead.assignedOperator !== scopedOperatorUid) continue;
-      const deadline = stageDeadline(lead);
-      if (!deadline) continue;
-      // Свежий лид (стадия «Новый лид» — первого касания ещё не было) —
-      // всегда задача «на сегодня», даже если SLA-дедлайн уже прошёл или лид
-      // пришёл вчера — иначе он тонул бы среди сотен старых просрочек. Как
-      // только оператор сделает первое касание, лид уходит из «Новый лид» и
-      // задача считается по обычному дедлайну.
-      if ((lead.funnelStage ?? 'new') === 'new') {
-        result.today.push({ lead, deadline, level: priorityLevel(lead, false), pinnedToday: true });
-        continue;
-      }
-      const isOverdue = deadline.getTime() < now.getTime();
-      const item = { lead, deadline, level: priorityLevel(lead, isOverdue), pinnedToday: false };
-      if (isOverdue) result.overdue.push(item);
-      else if (isToday(deadline)) result.today.push(item);
-      else if (isTomorrow(deadline)) result.tomorrow.push(item);
+      const placement = taskPlacement(lead, now);
+      if (placement) result[placement.bucket].push({ lead, ...placement });
     }
     for (const key of Object.keys(result)) {
       result[key].sort((a, b) => a.level - b.level || a.deadline - b.deadline);

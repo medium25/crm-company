@@ -22,6 +22,7 @@ import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { checklistPercent, DEFAULT_CHECKLIST_ITEMS } from '../lib/leadChecklist.js';
+import { taskSnapshot } from '../lib/leadTasks.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt, validateCallDeadline } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
 
@@ -291,6 +292,7 @@ export function LeadsPage() {
   };
 
   const markAttempt = (lead, result) => {
+    const snapshot = taskSnapshot(lead);
     const attempts = lead.callAttempts ?? [];
     if (attempts.length >= callMaxAttempts) return;
     // expectedBy — дедлайн, действовавший НА МОМЕНТ этой попытки (тот, что
@@ -313,7 +315,7 @@ export function LeadsPage() {
     // оказывался РАНЬШЕ самой попытки, что его вызвала.
     const buildAttempts = (outcome, nextStep, at) => [
       ...attempts,
-      { result, at, expectedBy: lead.nextCallDueAt ?? null, outcome, nextStep, by: user.uid },
+      { result, at, expectedBy: lead.nextCallDueAt ?? null, outcome, nextStep, by: user.uid, ...snapshot },
     ];
     // Автопереход 'new' → 'calling' по первой же отметке — тем же `at`, что
     // и у самой попытки (см. выше), иначе переход в истории «обгонял» бы
@@ -431,12 +433,13 @@ export function LeadsPage() {
   // Задача обязательна на КАЖДОМ касании, включая финальное (2-е) — там
   // дедлайну взяться неоткуда (noDate), но что сделано/сказано — фиксируем.
   const markTouch = (lead) => {
+    const snapshot = taskSnapshot(lead);
     const nextNumber = (lead.closingTouchNumber ?? 0) + 1;
     const isFinal = nextNumber >= 2;
     // closingTouchLog — параллельно counter'у closingTouchNumber, только
     // для разбора отклонений при отказе (leadDeviationAnalysis.js): сам
     // счётчик не хранит, КОГДА было касание и был ли дедлайн, лог хранит.
-    const buildLog = (outcome, nextStep) => [...(lead.closingTouchLog ?? []), { at: new Date(), expectedBy: lead.nextTouchAt ?? null, outcome, nextStep, by: user.uid }];
+    const buildLog = (outcome, nextStep) => [...(lead.closingTouchLog ?? []), { at: new Date(), expectedBy: lead.nextTouchAt ?? null, outcome, nextStep, by: user.uid, ...snapshot }];
 
     if (isFinal) {
       setDeadlineTarget({
@@ -481,12 +484,13 @@ export function LeadsPage() {
   // вызывается ПОСЛЕ того, как задача сохранена, а не раньше — иначе
   // TrialFormModal открылся бы поверх ещё не закрытой DeadlineModal.
   const markUnreachable = (lead, result, onRescheduleCb) => {
+    const snapshot = taskSnapshot(lead);
     // expectedBy — тот же смысл, что у markAttempt: дедлайн, действовавший
     // до этой попытки (для «Дожима» — nextTouchAt, на «Пробном» —
     // unreachableNextCallDueAt), нужен разбору отклонений при отказе.
     const expectedBy = (lead.funnelStage === 'closing' ? lead.nextTouchAt : lead.unreachableNextCallDueAt) ?? null;
     const priorAttempts = lead.unreachableAttempts ?? [];
-    const buildAttempts = (outcome, nextStep) => [...priorAttempts, { result, at: new Date(), expectedBy, outcome, nextStep, by: user.uid }];
+    const buildAttempts = (outcome, nextStep) => [...priorAttempts, { result, at: new Date(), expectedBy, outcome, nextStep, by: user.uid, ...snapshot }];
     const attemptsExhausted = priorAttempts.length + 1 >= 3;
 
     if (lead.funnelStage === 'closing') {
