@@ -32,6 +32,29 @@ function pendingTaskText(lead) {
   return overdueReasonLabel(lead);
 }
 
+/**
+ * Уровни приоритета задач — с чего начинать (1 — самое срочное):
+ * 1 «Дожим» и «Пробный проведён» (лид вот-вот заплатит, каждая задержка
+ * стоит денег), 2 «Пробный назначен», 3 новый лид, 4 просроченная задача
+ * на остальных стадиях, 5 всё прочее. Стадия сильнее просрочки: просроченный
+ * «Дожим» — уровень 1, не 4. Метка (цвет рамки + «приоритет N» на линии
+ * рамки) только у 1–4; у 5 карточка без пометок.
+ */
+const PRIORITY_STYLES = {
+  1: { color: '#C0392B', label: 'приоритет 1' },
+  2: { color: '#E5842B', label: 'приоритет 2' },
+  3: { color: '#D4A017', label: 'приоритет 3' },
+  4: { color: '#7C5CBF', label: 'приоритет 4' },
+};
+
+function priorityLevel(lead, isOverdue) {
+  const stage = lead.funnelStage ?? 'new';
+  if (stage === 'closing' || stage === 'trial_completed') return 1;
+  if (stage === 'trial_scheduled') return 2;
+  if (stage === 'new') return 3;
+  return isOverdue ? 4 : 5;
+}
+
 const BUCKETS = [
   { key: 'overdue', title: 'Просроченные задачи', accent: '#E11D48', icon: AlertTriangle },
   { key: 'today', title: 'Задачи на сегодня', accent: '#2F6FE4', icon: Clock },
@@ -109,21 +132,22 @@ export function TasksPage() {
       const deadline = stageDeadline(lead);
       if (!deadline) continue;
       // Свежий лид (стадия «Новый лид» — первого касания ещё не было) —
-      // всегда задача «на сегодня» и в приоритете, даже если SLA-дедлайн
-      // уже прошёл или лид пришёл вчера — иначе он тонул бы среди сотен
-      // старых просрочек. Как только оператор сделает первое касание,
-      // лид уходит из «Новый лид» и задача считается по обычному дедлайну.
+      // всегда задача «на сегодня», даже если SLA-дедлайн уже прошёл или лид
+      // пришёл вчера — иначе он тонул бы среди сотен старых просрочек. Как
+      // только оператор сделает первое касание, лид уходит из «Новый лид» и
+      // задача считается по обычному дедлайну.
       if ((lead.funnelStage ?? 'new') === 'new') {
-        result.today.push({ lead, deadline, priority: true });
+        result.today.push({ lead, deadline, level: priorityLevel(lead, false), pinnedToday: true });
         continue;
       }
-      const item = { lead, deadline, priority: false };
-      if (deadline.getTime() < now.getTime()) result.overdue.push(item);
+      const isOverdue = deadline.getTime() < now.getTime();
+      const item = { lead, deadline, level: priorityLevel(lead, isOverdue), pinnedToday: false };
+      if (isOverdue) result.overdue.push(item);
       else if (isToday(deadline)) result.today.push(item);
       else if (isTomorrow(deadline)) result.tomorrow.push(item);
     }
     for (const key of Object.keys(result)) {
-      result[key].sort((a, b) => Number(b.priority) - Number(a.priority) || a.deadline - b.deadline);
+      result[key].sort((a, b) => a.level - b.level || a.deadline - b.deadline);
     }
     return result;
   }, [allLeads, scopedOperatorUid]);
@@ -175,21 +199,29 @@ export function TasksPage() {
                 {buckets[bucket.key].length === 0 ? (
                   <p className="py-6 text-center text-[13px] text-muted">Пусто</p>
                 ) : (
-                  buckets[bucket.key].map(({ lead, deadline, priority }) => (
+                  buckets[bucket.key].map(({ lead, deadline, level, pinnedToday }) => {
+                    const mark = PRIORITY_STYLES[level];
+                    return (
                     <div
                       key={lead.id}
                       className={`relative flex items-center justify-between gap-3 rounded-field border bg-surface p-3 ${
-                        priority ? 'border-orange' : 'border-border'
+                        mark ? '' : 'border-border'
                       }`}
+                      style={mark ? { borderColor: mark.color } : undefined}
                     >
-                      {priority && (
-                        <span className="absolute -top-[5px] right-2.5 bg-surface px-1 text-[9px] leading-none text-orange">приоритет</span>
+                      {mark && (
+                        <span
+                          className="absolute -top-[5px] right-2.5 bg-surface px-1 text-[9px] leading-none"
+                          style={{ color: mark.color }}
+                        >
+                          {mark.label}
+                        </span>
                       )}
                       <div className="min-w-0">
                         <p className="truncate text-[13px] font-bold leading-snug text-text">{lead.fullName}</p>
                         <p className="text-[12px] leading-snug text-text">{pendingTaskText(lead)}</p>
                         <p className={`mt-0.5 text-[11px] ${bucket.key === 'overdue' ? 'font-bold text-danger' : 'text-muted'}`}>
-                          {priority ? 'сегодня' : formatRelativeDeadline(deadline)}
+                          {pinnedToday ? 'сегодня' : formatRelativeDeadline(deadline)}
                         </p>
                       </div>
                       <button
@@ -200,7 +232,8 @@ export function TasksPage() {
                         Выполнить
                       </button>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
