@@ -54,17 +54,13 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
       )}
 
       {/* Логотип — в левом углу шапки (над меню, вдвое меньше, чем было; в узком меню — только знак).
-          Ширина блока = меню + отступ страницы минус промежуток flex (1rem): поиск ниже начинается
-          у левого края содержимого, а не над меню. */}
+          Ширина блока — меню + отступ страницы минус промежуток flex (1rem). */}
       <div className={`hidden shrink-0 items-center pl-4 transition-[width] md:flex ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-[7.5rem]'}`}>
         <img src={iconMark} alt="ICON" className="h-[15px] w-[15px] shrink-0" />
         {!sidebarCollapsed && <img src={iconWordmark} alt="" className="ml-1 h-[11px] w-auto shrink-0" />}
       </div>
-      <div
-        className={`flex min-w-0 max-w-[20rem] flex-1 ${
-          sidebarCollapsed ? 'md:max-w-[min(20rem,calc(50%-9.3rem))]' : 'md:max-w-[min(20rem,calc(50%-12.3rem))]'
-        }`}
-      >
+      {/* Поиск — по центру шапки, 16rem (было 20rem, −20%); на телефоне остаётся в потоке слева. */}
+      <div className="flex min-w-0 flex-1 sm:absolute sm:left-1/2 sm:top-1/2 sm:w-64 sm:flex-none sm:-translate-x-1/2 sm:-translate-y-1/2">
         <GlobalSearch />
       </div>
 
