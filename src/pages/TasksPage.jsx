@@ -1,5 +1,5 @@
 // src/pages/TasksPage.jsx
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isToday, isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -133,8 +133,36 @@ function ActivityChart({ counts }) {
       };
     });
   }, [counts, period]);
-  const max = Math.max(1, ...bars.map((b) => b.value));
   const total = bars.reduce((sum, b) => sum + b.value, 0);
+
+  // Ширину SVG берём из контейнера — иначе viewBox растягивал бы кружки в
+  // овалы. Высота фиксированная.
+  const wrapRef = useRef(null);
+  const [width, setWidth] = useState(600);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return undefined;
+    const update = () => setWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const H = 200;
+  const padL = 32;
+  const padR = 12;
+  const padT = 12;
+  const padB = 26;
+  const maxValue = Math.max(1, ...bars.map((b) => b.value));
+  const rawStep = maxValue / 4;
+  const mag = 10 ** Math.floor(Math.log10(rawStep));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((v) => v >= rawStep) ?? mag * 10;
+  const ticks = Array.from({ length: 5 }, (_, i) => i * step);
+  const top = ticks[ticks.length - 1];
+  const x = (i) => padL + (bars.length === 1 ? 0 : (i / (bars.length - 1)) * (width - padL - padR));
+  const y = (v) => padT + (1 - v / top) * (H - padT - padB);
+  const path = bars.map((b, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(b.value).toFixed(1)}`).join(' ');
 
   return (
     <div className="mb-6 rounded-2xl bg-[#F0F0EF] p-4">
@@ -153,21 +181,29 @@ function ActivityChart({ counts }) {
           ))}
         </div>
       </div>
-      <div className="flex h-32 items-end gap-[3px]">
-        {bars.map((b, i) => (
-          <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${b.title}: ${b.value}`}>
-            {(period !== 'month') && b.value > 0 && <span className="text-[10px] text-[#8a8a86]">{b.value}</span>}
-            <div
-              className="w-full rounded-t-[3px]"
-              style={{ height: `${Math.max(b.value > 0 ? 4 : 2, (b.value / max) * 88)}%`, background: b.value > 0 ? squareColor(i, bars.length) : EMPTY_SQUARE }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 flex gap-[3px]">
-        {bars.map((b, i) => (
-          <span key={i} className="flex-1 text-center text-[10px] text-[#8a8a86]">{b.label}</span>
-        ))}
+      <div ref={wrapRef} className="w-full">
+        <svg width={width} height={H} role="img" aria-label="График активности по выполненным задачам">
+          {ticks.map((t) => (
+            <g key={t}>
+              <line x1={padL} x2={width - padR} y1={y(t)} y2={y(t)} stroke="#DADAD9" strokeWidth="1" />
+              <text x={padL - 6} y={y(t) + 3.5} textAnchor="end" fontSize="10" fill="#8a8a86">{t}</text>
+            </g>
+          ))}
+          {bars.map((b, i) => (
+            <line key={`v${i}`} x1={x(i)} x2={x(i)} y1={padT} y2={H - padB} stroke="#E4E4E3" strokeWidth="1" />
+          ))}
+          <path d={path} fill="none" stroke="#3865C9" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          {bars.map((b, i) => (
+            <circle key={`c${i}`} cx={x(i)} cy={y(b.value)} r="4.5" fill="#F0F0EF" stroke="#3865C9" strokeWidth="2">
+              <title>{`${b.title}: ${b.value}`}</title>
+            </circle>
+          ))}
+          {bars.map((b, i) =>
+            b.label ? (
+              <text key={`l${i}`} x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill="#8a8a86">{b.label}</text>
+            ) : null,
+          )}
+        </svg>
       </div>
     </div>
   );
