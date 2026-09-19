@@ -126,8 +126,8 @@ export function TeachersAndGroupsPage() {
   return (
     <>
       <PageHeader
-        title={isTeacher ? 'Мои группы сегодня' : teacherId ? selectedTeacher?.displayName ?? 'Учитель' : 'Учителя и группы'}
-        count={teacherId ? undefined : teachers.length}
+        title={isTeacher ? 'Мои группы сегодня' : teacherId ? selectedTeacher?.displayName ?? 'Учитель' : undefined}
+        count={undefined}
         actions={
           teacherId ? (
             !isTeacher && (
@@ -164,7 +164,6 @@ export function TeachersAndGroupsPage() {
             <div className="mb-6 flex items-start gap-3 rounded-card bg-success-bg p-4">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
               <div className="flex-1">
-                <p className="font-bold text-success">Внимание!</p>
                 <p className="text-[15px] text-success">CEO профилями можно связать учителя с другим филиалом.</p>
               </div>
               <button type="button" onClick={dismissBanner} className="text-success" aria-label="Закрыть">

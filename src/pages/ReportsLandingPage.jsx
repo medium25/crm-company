@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { FileText, TrendingUp, ChevronRight } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Card } from '../components/ui/Card.jsx';
 
 const SECTIONS = [
@@ -14,7 +13,6 @@ export function ReportsLandingPage() {
 
   return (
     <>
-      <PageHeader title="Отчёты и статистика" />
       <div className="flex flex-col gap-3">
         {SECTIONS.map((s) => {
           const Icon = s.icon;

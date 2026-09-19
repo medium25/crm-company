@@ -117,7 +117,6 @@ export function TeachersPage() {
         <div className="mb-6 flex items-start gap-3 rounded-card bg-success-bg p-4">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
           <div className="flex-1">
-            <p className="font-bold text-success">Внимание!</p>
             <p className="text-[15px] text-success">
               CEO профилями можно связать учителя с другим филиалом.
             </p>

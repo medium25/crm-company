@@ -644,7 +644,6 @@ export function StudentsPage() {
 
     return (
       <>
-        <PageHeader title="Студенты" />
         <div className="flex flex-col gap-3">
           {SECTION_TABS.map((t) => {
             const Icon = t.icon;

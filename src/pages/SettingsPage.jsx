@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Tabs } from '../components/ui/Tabs.jsx';
 import { BranchSettingsTab } from '../components/settings/BranchSettingsTab.jsx';
 import { StaffSettingsTab } from '../components/settings/StaffSettingsTab.jsx';
@@ -30,7 +29,6 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Настройки" />
       <Tabs tabs={tabs} activeKey={tab} onChange={setTab} />
       <div className="mt-6">
         {tab === 'branch' && <BranchSettingsTab />}

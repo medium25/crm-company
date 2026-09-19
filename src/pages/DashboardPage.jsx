@@ -5,7 +5,6 @@ import { GraduationCap, AlertTriangle, Timer, Handshake, LogOut, UserX } from 'l
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useDoc } from '../hooks/useDoc.js';
-import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { StatCard } from '../components/ui/StatCard.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
@@ -138,8 +137,6 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Дашборд" />
-
       {!stats && statsError ? (
         <LoadError onRetry={retry} />
       ) : !stats ? (

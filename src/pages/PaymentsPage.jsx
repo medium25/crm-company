@@ -6,7 +6,6 @@ import { ChevronRight, Coins, Wallet } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
-import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Input } from '../components/ui/Input.jsx';
@@ -295,8 +294,6 @@ export function PaymentsPage() {
 
   return (
     <>
-      <PageHeader title="Все платежи" />
-
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
         <div className="flex flex-col gap-4">
           <Card>
