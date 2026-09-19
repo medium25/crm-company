@@ -623,7 +623,9 @@ export function TasksPage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-[22px] font-bold text-text">Задачи</h1>
+        <h1 className="text-[22px] font-bold text-text">
+          Задач на сегодня: {loading ? '…' : buckets.overdue.length + buckets.today.length}
+        </h1>
         {canSeeAllTasks && (
           <DropdownMenu
             items={[
