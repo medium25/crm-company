@@ -81,12 +81,13 @@ function squareColor(i, n) {
  * «Выполненная задача» = отметка касания (callAttempts/closingTouchLog/
  * unreachableAttempts) — отдельной записи «выполнено» в системе нет.
  */
-function DoneStrip({ count }) {
+function DoneStrip({ count, name, compact = false }) {
   const rows = Math.min(Math.floor(count / DAILY_GOAL) + 1, 5);
   return (
-    <div className="mb-4 rounded-2xl bg-[#F0F0EF] p-4">
-      <p className="mb-3 text-[22px] font-bold leading-tight text-[#111]">
-        Выполнено сегодня: {count} из {DAILY_GOAL}
+    <div className={`rounded-2xl bg-[#F0F0EF] p-4 ${compact ? 'mb-3' : 'mb-4'}`}>
+      <p className={`font-bold leading-tight text-[#111] ${compact ? 'mb-2 text-[15px]' : 'mb-3 text-[22px]'}`}>
+        {name ? `${name} — ` : ''}
+        {name ? 'выполнено' : 'Выполнено'} сегодня: {count} из {DAILY_GOAL}
         {count >= DAILY_GOAL && <span className="ml-2 text-[#1F4FBF]">— Доминатор</span>}
       </p>
       <div className="flex flex-col gap-[3px]">
@@ -138,7 +139,7 @@ function loadDaysOff() {
  * месяц (30 дней) и год (12 месяцев) — линия с точками. Выходные дни
  * (см. daysOff) не рисуются и не входят в сумму.
  */
-function ActivityChart({ counts }) {
+function ActivityChart({ counts, label }) {
   const [period, setPeriod] = useState('week');
   const [daysOff, setDaysOff] = useState(loadDaysOff);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -228,7 +229,7 @@ function ActivityChart({ counts }) {
   return (
     <div className="mb-6 rounded-2xl bg-[#F0F0EF] p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[15px] font-bold text-[#111]">Активность: {total} выполнено</p>
+        <p className="text-[15px] font-bold text-[#111]">Активность{label ? ` · ${label}` : ''}: {total} выполнено</p>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -417,28 +418,56 @@ export function TasksPage() {
         ? null
         : operatorFilter;
 
-  const activity = useMemo(() => {
-    const counts = new Map();
+  // Кто сделал касание — пишется в саму отметку (`by`). У старых отметок
+  // поля нет — их относим к оператору, за которым лид закреплён сейчас.
+  const activityByUid = useMemo(() => {
+    const byUid = new Map();
     for (const lead of allLeads) {
-      if (scopedOperatorUid && lead.assignedOperator !== scopedOperatorUid) continue;
       for (const list of [lead.callAttempts, lead.closingTouchLog, lead.unreachableAttempts]) {
         for (const e of list ?? []) {
           const ms = msOf(e.at);
-          if (!ms) continue;
+          const uid = e.by ?? lead.assignedOperator;
+          if (!ms || !uid) continue;
           const key = format(new Date(ms), 'yyyy-MM-dd');
+          if (!byUid.has(uid)) byUid.set(uid, new Map());
+          const counts = byUid.get(uid);
           counts.set(key, (counts.get(key) ?? 0) + 1);
         }
       }
     }
-    return counts;
-  }, [allLeads, scopedOperatorUid]);
+    return byUid;
+  }, [allLeads]);
+
+  const activity = useMemo(() => {
+    if (scopedOperatorUid) return activityByUid.get(scopedOperatorUid) ?? new Map();
+    const total = new Map();
+    for (const counts of activityByUid.values()) {
+      for (const [key, n] of counts) total.set(key, (total.get(key) ?? 0) + n);
+    }
+    return total;
+  }, [activityByUid, scopedOperatorUid]);
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const doneToday = activity.get(todayKey) ?? 0;
+  const myDoneToday = activityByUid.get(user.uid)?.get(todayKey) ?? 0;
 
-  // Уведомление об уровне — раз в день и только по СВОИМ задачам
-  // (менеджер, смотрящий «Все», не должен получать чужое достижение).
+  // «Все» у менеджера/CEO — полоса на каждого сотрудника отдельно: все
+  // операторы филиала (даже с нулём) + любой, кто сегодня что-то отметил.
+  const staffNames = useMemo(() => new Map(staffList.map((s) => [s.id, s.fullName])), [staffList]);
+  const perOperator = useMemo(() => {
+    const uids = new Set(operatorOptions.map((op) => op.id));
+    for (const [uid, counts] of activityByUid) {
+      if ((counts.get(todayKey) ?? 0) > 0 && staffNames.has(uid)) uids.add(uid);
+    }
+    return [...uids]
+      .map((uid) => ({ uid, name: staffNames.get(uid) ?? uid, count: activityByUid.get(uid)?.get(todayKey) ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [operatorOptions, activityByUid, staffNames, todayKey]);
+  const scopedName = scopedOperatorUid && scopedOperatorUid !== user.uid ? staffNames.get(scopedOperatorUid) : null;
+
+  // Уведомление об уровне — раз в день, по СВОЕМУ прогрессу в любом виде
+  // страницы (менеджер, смотрящий чужого/«Все», своё достижение тоже получит).
   useEffect(() => {
-    if (scopedOperatorUid !== user.uid || doneToday < DAILY_GOAL) return;
+    if (myDoneToday < DAILY_GOAL) return;
     const flag = `icon-crm:dominator:${user.uid}:${todayKey}`;
     try {
       if (localStorage.getItem(flag)) return;
@@ -447,7 +476,7 @@ export function TasksPage() {
       // без localStorage — просто покажем ещё раз при следующем заходе
     }
     showToast('Вы перешли на уровень «Доминатор»');
-  }, [doneToday, scopedOperatorUid, user.uid, todayKey, showToast]);
+  }, [myDoneToday, user.uid, todayKey, showToast]);
 
   const buckets = useMemo(() => {
     const now = new Date();
@@ -508,8 +537,12 @@ export function TasksPage() {
         )}
       </div>
 
-      <DoneStrip count={doneToday} />
-      <ActivityChart counts={activity} />
+      {canSeeAllTasks && operatorFilter === 'all' ? (
+        perOperator.map((op) => <DoneStrip key={op.uid} compact name={op.name} count={op.count} />)
+      ) : (
+        <DoneStrip count={doneToday} name={scopedName} />
+      )}
+      <ActivityChart counts={activity} label={canSeeAllTasks && operatorFilter === 'all' ? 'все' : scopedName} />
 
       {loading ? (
         <p className="text-[13px] text-muted">Загрузка…</p>
