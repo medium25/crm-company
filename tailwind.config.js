@@ -16,6 +16,8 @@ export default {
         bg:            'rgb(var(--color-bg) / <alpha-value>)',
         surface:       'rgb(var(--color-surface) / <alpha-value>)',
         card:          'rgb(var(--color-card) / <alpha-value>)',
+        'card-head':   'rgb(var(--color-card-head) / <alpha-value>)',
+        'card-head-border': 'rgb(var(--color-card-head-border) / <alpha-value>)',
         'surface-alt': 'rgb(var(--color-surface-alt) / <alpha-value>)',
         border:        'rgb(var(--color-border) / <alpha-value>)',
         'border-strong': 'rgb(var(--color-border-strong) / <alpha-value>)',

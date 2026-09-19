@@ -895,20 +895,12 @@ export function LeadCard({
         highlighted ? 'ring-4 ring-navy ring-offset-2' : ''
       }`}
     >
-      {/* И просрочка, и «В норме» красят только шапку (заливка + линия под
-          ней) — не всю карточку, как раньше (border-danger/border-success
-          ring на корне). Отрицательные margin/rounded-t повторяют
-          скругление карточки, растягивая заливку до самых краёв поверх её
-          собственного p-3.5. */}
-      <div
-        className={`flex items-center justify-between gap-2 border-b pb-1.5 ${
-          overdue
-            ? '-mx-3.5 -mt-3.5 rounded-t-xl border-[rgba(225,29,72,0.26)] bg-[rgba(225,29,72,0.09)] px-3.5 pt-2 dark:border-[rgba(251,113,133,0.30)] dark:bg-[rgba(251,113,133,0.13)]'
-            : !isTerminal
-              ? '-mx-3.5 -mt-3.5 rounded-t-xl border-success/30 bg-success/10 px-3.5 pt-2'
-              : 'border-border'
-        }`}
-      >
+      {/* Шапка одного цвета у всех карточек (серо-голубая заливка + линия
+          под ней); статус — просрочка/«В норме» — читается по бейджу рядом
+          с именем. Отрицательные margin/rounded-t повторяют скругление
+          карточки, растягивая заливку до самых краёв поверх её собственного
+          p-3.5. */}
+      <div className="-mx-3.5 -mt-3.5 flex items-center justify-between gap-2 rounded-t-xl border-b border-card-head-border bg-card-head px-3.5 pb-1.5 pt-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
           {overdue ? (
