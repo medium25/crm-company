@@ -186,7 +186,8 @@ export function TasksPage() {
                         <span className="absolute -top-[5px] right-2.5 bg-surface px-1 text-[9px] leading-none text-orange">приоритет</span>
                       )}
                       <div className="min-w-0">
-                        <p className="text-[13px] font-bold leading-snug text-text">{pendingTaskText(lead)}</p>
+                        <p className="truncate text-[13px] font-bold leading-snug text-text">{lead.fullName}</p>
+                        <p className="text-[12px] leading-snug text-text">{pendingTaskText(lead)}</p>
                         <p className={`mt-0.5 text-[11px] ${bucket.key === 'overdue' ? 'font-bold text-danger' : 'text-muted'}`}>
                           {priority ? 'сегодня' : formatRelativeDeadline(deadline)}
                         </p>
@@ -194,7 +195,7 @@ export function TasksPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/leads?highlight=${lead.id}`)}
-                        className="shrink-0 rounded-field bg-navy px-3 py-1.5 text-[12px] font-bold text-white hover:bg-navy-hover"
+                        className="shrink-0 rounded-field bg-[#0088CC] px-3 py-1.5 text-[12px] font-bold text-white hover:bg-[#0077B3]"
                       >
                         Выполнить
                       </button>
