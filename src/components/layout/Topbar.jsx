@@ -68,7 +68,7 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
         <button
           type="button"
           onClick={() => setProfileOpen((v) => !v)}
-          className="flex items-center gap-2 rounded-full border border-border-strong px-2 py-1.5 text-[13px] sm:px-3"
+          className="flex items-center gap-2 rounded-field border border-border-strong px-2 py-1.5 text-[13px] sm:px-3"
         >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-[12px] font-bold text-white">
             {staff?.fullName?.[0] ?? '?'}

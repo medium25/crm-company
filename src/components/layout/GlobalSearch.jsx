@@ -166,7 +166,7 @@ export function GlobalSearch() {
           setOpen(true);
           setTimeout(() => inputRef.current?.focus(), 0);
         }}
-        className="flex h-9 w-full items-center justify-center gap-2 rounded-full border border-border-strong bg-white px-3 text-[13px] text-muted sm:justify-start"
+        className="flex h-9 w-full items-center justify-center gap-2 rounded-field border border-border-strong bg-white px-3 text-[13px] text-muted sm:justify-start"
       >
         <Search className="h-4 w-4 shrink-0" />
         {open ? (
