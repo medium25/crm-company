@@ -181,6 +181,14 @@ function EditableStageTitle({ column, onEdit, maxTouchesColumn, onEditMaxTouches
 function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, defaultOpen = true, children, closedIcon: ClosedIcon, closedIconClassName, closedCaption }) {
   const [open, setOpen] = useState(defaultOpen);
 
+  // Переход к карточке из поиска/«Задач» — группа с этим лидом раскрывается
+  // сама, иначе карточки просто нет в DOM и подсвечивать нечего.
+  const highlightId = cardActions?.highlightLeadId;
+  const holdsHighlight = Boolean(highlightId) && leads.some((l) => l.id === highlightId);
+  useEffect(() => {
+    if (holdsHighlight) setOpen(true);
+  }, [holdsHighlight]);
+
   if (ClosedIcon) {
     // Заголовок (иконка + название + подпись) выглядит ОДИНАКОВО что
     // свёрнуто, что развёрнуто — раньше при клике он мгновенно сжимался в
@@ -519,6 +527,7 @@ export function LeadColumn({ column, leads, operatorByUid, onAdd, onDropLead, on
                   key={month.key}
                   title={month.label}
                   leads={month.leads}
+                  cardActions={cardActions}
                   defaultOpen={false}
                   closedIcon={XCircle}
                   closedIconClassName={month.isCurrent ? TONE_DANGER : TONE_MUTED}

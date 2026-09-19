@@ -44,6 +44,9 @@ export function LeadsPage() {
   // (оператор должен видеть карточку в контексте колонки, не отдельным окном).
   const [searchParams] = useSearchParams();
   const highlightLeadId = searchParams.get('highlight');
+  // t — метка повторного перехода к тому же лиду (поиск), иначе эффект ниже не сработал бы второй раз
+  const highlightNonce = searchParams.get('t');
+  const fromTasks = searchParams.get('from') === 'tasks';
   const [activeHighlight, setActiveHighlight] = useState(highlightLeadId);
   useEffect(() => {
     if (!highlightLeadId) return;
@@ -61,7 +64,7 @@ export function LeadsPage() {
       }
     }, 150);
     return () => clearInterval(id);
-  }, [highlightLeadId]);
+  }, [highlightLeadId, highlightNonce]);
   // Ceo/manager видят все заявки филиала по умолчанию, с кнопкой
   // переключения на «только мои»; остальные роли (admin/teacher) всегда
   // видят только назначенные лично им — без кнопки, переключать нечего.
@@ -176,6 +179,14 @@ export function LeadsPage() {
       : operatorFilter === 'all'
         ? null
         : operatorFilter;
+
+  // Лид из поиска может принадлежать другому оператору, чем выбран в фильтре
+  // (ceo/manager) — сбрасываем на «Все», иначе карточки на доске просто нет.
+  useEffect(() => {
+    if (!highlightLeadId || !canSeeAllLeads || operatorFilter === 'all') return;
+    const target = allLeads.find((l) => l.id === highlightLeadId);
+    if (target && scopedOperatorUid && target.assignedOperator !== scopedOperatorUid) setOperatorFilter('all');
+  }, [highlightLeadId, highlightNonce, allLeads, canSeeAllLeads, operatorFilter, scopedOperatorUid]);
 
   const leads = useMemo(() => {
     return allLeads.filter((l) => {
@@ -586,11 +597,11 @@ export function LeadsPage() {
 
   return (
     <div>
-      {/* Виден только при переходе с «Задачи» (?highlight=...) — быстрый
+      {/* Виден только при переходе с «Задачи» (?highlight=...&from=tasks) — быстрый
           путь назад, не полагаясь на кнопку «Назад» браузера (карточку уже
           проскроллили/подсветили, обычный «назад» увёл бы на пустой список
           без этого состояния). */}
-      {highlightLeadId && (
+      {highlightLeadId && fromTasks && (
         <Link
           to="/tasks"
           className="fixed bottom-4 left-4 z-10 flex items-center gap-1 rounded-full bg-navy px-4 py-2 text-[13px] font-bold text-white shadow-hover hover:bg-navy-hover"

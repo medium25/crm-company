@@ -5,12 +5,37 @@ import { Search } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
+import { useAuth } from '../../hooks/useAuth.js';
+import { COLUMNS } from '../leads/columns.js';
 import { formatPhone } from '../../lib/format.js';
+
+const STUDENT_STATUS = { active: 'Активен', paused: 'Заморожен', trial: 'Пробный', left: 'Ушёл' };
+
+/**
+ * Где человек живёт в системе и куда вести по клику: лид (стадия воронки,
+ * кроме «Оплачено») — на доску «Заявки», к его карточке (выделяется рамкой; раскрываются группы),
+ * остальные — на страницу ученика. Лид, которого нет на доске (скрыт
+ * крестиком или чужой у оператора без права видеть всех), — тоже на
+ * страницу.
+ */
+function locate(s, canSeeAllLeads, uid) {
+  // Доска строится по funnelStage (не по status: лид на пробном/в дожиме уже
+  // имеет status 'trial'). 'won' — уже ученик, его место — раздел «Студенты».
+  const column = COLUMNS.find((c) => c.key === s.funnelStage);
+  if (column && column.key !== 'won') {
+    if (s.boardHiddenAt) return { path: `/students/${s.id}`, place: 'Заявки · скрыта с доски' };
+    if (!canSeeAllLeads && s.assignedOperator !== uid) return { path: `/students/${s.id}`, place: `Заявки · ${column.label} · у другого оператора` };
+    return { path: `/leads?highlight=${s.id}&t=${Date.now()}`, place: `Заявки · ${column.label}`, live: true };
+  }
+  return { path: `/students/${s.id}`, place: `Студенты · ${STUDENT_STATUS[s.status] ?? 'ученик'}` };
+}
 
 /** Поиск по студентам и группам активного филиала — ⌘K/Ctrl+K или клик. */
 export function GlobalSearch() {
   const navigate = useNavigate();
   const { activeBranchId } = useBranch();
+  const { user, staff } = useAuth();
+  const canSeeAllLeads = staff?.role === 'ceo' || staff?.role === 'manager' || staff?.role === 'test';
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const inputRef = useRef(null);
@@ -101,17 +126,23 @@ export function GlobalSearch() {
               {studentResults.length > 0 && (
                 <div className="mb-1">
                   <p className="px-3 pb-1 text-[11px] font-bold uppercase text-muted">Студенты</p>
-                  {studentResults.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => goTo(`/students/${s.id}`)}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-[14px] hover:bg-surface-alt"
-                    >
-                      <span className="text-text">{s.fullName}</span>
-                      <span className="text-muted">{formatPhone(s.phone)}</span>
-                    </button>
-                  ))}
+                  {studentResults.map((s) => {
+                    const where = locate(s, canSeeAllLeads, user?.uid);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => goTo(where.path)}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[14px] hover:bg-surface-alt"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-text">{s.fullName}</span>
+                          <span className="block truncate text-[11px] text-muted">{where.place}</span>
+                        </span>
+                        <span className="shrink-0 text-muted">{formatPhone(s.phone)}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
               {groupResults.length > 0 && (
