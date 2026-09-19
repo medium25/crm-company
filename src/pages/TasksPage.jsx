@@ -281,7 +281,7 @@ function ActivityChart({ counts }) {
                     className="w-full rounded-t-[4px]"
                     style={{
                       height: `${Math.max(b.value > 0 ? 4 : 2, (b.value / maxValue) * 84)}%`,
-                      background: b.value > 0 ? squareColor(i, bars.length) : EMPTY_SQUARE,
+                      background: b.value > 0 ? '#3865C9' : EMPTY_SQUARE,
                     }}
                   />
                 </div>
