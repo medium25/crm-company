@@ -56,8 +56,43 @@ export async function countDebtors(db, branchId) {
   return snap.docs.filter((d) => d.data().balance < 0).length;
 }
 
-/** Оплатили в текущем месяце — уникальные студенты среди оплат месяца. */
-export async function countPaidThisMonth(db, branchId, month) {
+/**
+ * Платежи (type=payment) за перечисленные месяцы — одним запросом. Дашборд
+ * берёт их один раз и отдаёт и в «Оплатили в текущем месяце», и в график
+ * «Сравнение» (раньше оба читали одни и те же оплаты каждый своим запросом).
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @param {string[]} months 'yyyy-MM', до 30 штук
+ * @returns {Promise<Array<Object>>}
+ */
+export async function fetchPaymentDocs(db, branchId, months) {
+  const snap = await getDocs(
+    query(collection(db, 'transactions'), where('branchId', '==', branchId), where('type', '==', 'payment'), where('month', 'in', months)),
+  );
+  return snap.docs.map((d) => d.data());
+}
+
+/**
+ * Платежи текущего и прошлого месяца одним запросом — то, что нужно и
+ * плитке «Оплатили в текущем месяце», и графику «Сравнение» на дашборде.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @param {Date} [today]
+ * @returns {Promise<Array<Object>>}
+ */
+export function fetchDashboardPayments(db, branchId, today = new Date()) {
+  return fetchPaymentDocs(db, branchId, [format(today, 'yyyy-MM'), format(subMonths(today, 1), 'yyyy-MM')]);
+}
+
+/**
+ * Оплатили в текущем месяце — уникальные студенты среди оплат месяца.
+ * `payments` — уже загруженные платежи (см. fetchPaymentDocs), чтобы не читать их повторно.
+ */
+export async function countPaidThisMonth(db, branchId, month, payments) {
+  if (payments) {
+    const list = await payments;
+    return new Set(list.filter((t) => t.month === month).map((t) => t.studentId)).size;
+  }
   const snap = await getDocs(
     query(collection(db, 'transactions'), where('branchId', '==', branchId), where('type', '==', 'payment'), where('month', '==', month)),
   );
@@ -131,24 +166,25 @@ export async function countLeftAfterTrial(db, branchId, periodStart, periodEnd) 
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} branchId
  * @param {'month'|'quarter'|'year'} [churnPeriod]
+ * @param {Promise<Array<Object>>} [payments] платежи текущего и прошлого месяца (fetchPaymentDocs), если уже загружены
  * @returns {Promise<Object>}
  */
-export async function loadDashboardStats(db, branchId, churnPeriod = 'year') {
+export async function loadDashboardStats(db, branchId, churnPeriod = 'year', payments) {
   const month = format(new Date(), 'yyyy-MM');
   const { start, end } = churnPeriodRange(churnPeriod);
 
-  const [activeLeads, activeStudents, activeGroups, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial] = await Promise.all([
-    countActiveLeads(db, branchId),
+  // Активные лиды и группы дашборд не показывает — не считаем (countActiveLeads/
+  // countActiveGroups остаются для других экранов).
+  const [activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial] = await Promise.all([
     countActiveStudents(db, branchId),
-    countActiveGroups(db, branchId),
     countTrial(db, branchId),
     countDebtors(db, branchId),
-    countPaidThisMonth(db, branchId, month),
+    countPaidThisMonth(db, branchId, month, payments),
     countLeftActiveGroup(db, branchId, start, end),
     countLeftAfterTrial(db, branchId, start, end),
   ]);
 
-  return { activeLeads, activeStudents, activeGroups, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial };
+  return { activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial };
 }
 
 /**
@@ -171,25 +207,18 @@ export async function getMonthlyRevenue(db, branchId) {
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} branchId
  * @param {Date} [today]
+ * @param {Promise<Array<Object>>} [payments] платежи этих двух месяцев, если уже загружены (fetchPaymentDocs)
  * @returns {Promise<{data: Array<{day: number, current: number|null, previous: number|null}>, currentMonth: string, prevMonth: string}>}
  */
-export async function getDailyRevenueComparison(db, branchId, today = new Date()) {
+export async function getDailyRevenueComparison(db, branchId, today = new Date(), payments) {
   const currentMonth = format(today, 'yyyy-MM');
   const prevMonthDate = subMonths(today, 1);
   const prevMonth = format(prevMonthDate, 'yyyy-MM');
 
-  const snap = await getDocs(
-    query(
-      collection(db, 'transactions'),
-      where('branchId', '==', branchId),
-      where('type', '==', 'payment'),
-      where('month', 'in', [currentMonth, prevMonth]),
-    ),
-  );
+  const txs = await (payments ?? fetchPaymentDocs(db, branchId, [currentMonth, prevMonth]));
 
   const byDay = { [currentMonth]: {}, [prevMonth]: {} };
-  for (const d of snap.docs) {
-    const tx = d.data();
+  for (const tx of txs) {
     const day = tx.date.toDate().getDate();
     byDay[tx.month][day] = (byDay[tx.month][day] ?? 0) + tx.amount;
   }
