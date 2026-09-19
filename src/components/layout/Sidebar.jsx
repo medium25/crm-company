@@ -72,7 +72,7 @@ export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
           collapsed ? 'w-16' : 'w-28'
         }`}
       >
-        <nav className="flex-1 overflow-y-auto py-2">
+        <nav className="flex-1 overflow-y-auto pb-2">
           {items.map((item) => {
             const Icon = item.icon;
             const badge = item.badgeKey === 'leads' ? leadsCount : undefined;

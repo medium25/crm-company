@@ -53,21 +53,19 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
         </select>
       )}
 
-      {/* Поиск начинается там же, где содержимое страницы (правее бокового меню, а не над ним),
-          короткий, и не заходит на логотип по центру. Ширина распорки = меню + отступ страницы минус промежуток flex (1rem). */}
-      <div className={`hidden shrink-0 transition-[width] md:block ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-[7.5rem]'}`} />
+      {/* Логотип — в левом углу шапки (над меню, ×1,2 от прежнего размера; в узком меню — только знак).
+          Ширина блока = меню + отступ страницы минус промежуток flex (1rem): поиск ниже начинается
+          у левого края содержимого, а не над меню. */}
+      <div className={`hidden shrink-0 items-center pl-4 transition-[width] md:flex ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-[7.5rem]'}`}>
+        <img src={iconMark} alt="ICON" className="h-[29px] w-[29px] shrink-0" />
+        {!sidebarCollapsed && <img src={iconWordmark} alt="" className="ml-1.5 h-[22px] w-auto shrink-0" />}
+      </div>
       <div
         className={`flex min-w-0 max-w-[20rem] flex-1 ${
           sidebarCollapsed ? 'md:max-w-[min(20rem,calc(50%-9.3rem))]' : 'md:max-w-[min(20rem,calc(50%-12.3rem))]'
         }`}
       >
         <GlobalSearch />
-      </div>
-
-      {/* Логотип по центру шапки; на телефоне его нет (там он в выдвижном меню). */}
-      <div className="pointer-events-none absolute inset-x-0 hidden items-center justify-center gap-2 sm:flex">
-        <img src={iconMark} alt="" className="h-6 w-6 shrink-0" />
-        <img src={iconWordmark} alt="ICON" className="h-[18px] w-auto shrink-0" />
       </div>
 
       <div className="relative ml-auto shrink-0">
