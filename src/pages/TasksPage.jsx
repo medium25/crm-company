@@ -3,11 +3,12 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, setDoc } from 'firebase/firestore';
 import { AlertTriangle, Clock, CalendarDays, Settings, Check } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
+import { useDoc } from '../hooks/useDoc.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
@@ -62,7 +63,14 @@ const PRIORITY_STYLES = {
   4: { color: '#7C5CBF', label: 'приоритет 4' },
 };
 
-const DAILY_GOAL = 40;
+// Цель задач в день — у каждого сотрудника своя (settings/{филиал}.dailyTaskGoals[uid],
+// правится в ⚙ у графика активности); по умолчанию 50. Число квадратиков в полосе = цель.
+const DEFAULT_DAILY_GOAL = 50;
+const MAX_DAILY_GOAL = 100;
+const clampGoal = (n) => {
+  const v = Math.round(Number(n));
+  return Number.isFinite(v) && v >= 1 ? Math.min(MAX_DAILY_GOAL, v) : DEFAULT_DAILY_GOAL;
+};
 const PERIODS = [
   { key: 'week', label: 'Неделя' },
   { key: 'month', label: 'Месяц' },
@@ -80,36 +88,84 @@ function squareColor(i, n) {
 }
 
 /**
- * Полоса «выполнено сегодня» (все размеры — 80% от исходных) — 40 квадратов в строку (DAILY_GOAL), по
+ * Полоса «выполнено сегодня» (все размеры — 80% от исходных) — `goal` квадратов в строку, по
  * квадрату на задачу, градиент светлый→тёмный. Дошли до 40 — появляется
  * вторая строка (и дальше по строке на каждые 40) и уровень «Доминатор».
  * «Выполненная задача» = отметка касания (callAttempts/closingTouchLog/
  * unreachableAttempts) — отдельной записи «выполнено» в системе нет.
  */
-function DoneStrip({ count, name, compact = false }) {
-  const rows = Math.min(Math.floor(count / DAILY_GOAL) + 1, 5);
+function DoneStrip({ count, name, goal, compact = false }) {
+  const rows = Math.min(Math.floor(count / goal) + 1, 5);
   return (
-    <div className={`w-4/5 rounded-[13px] border border-border-strong bg-[#F0F0EF] p-[13px] ${compact ? 'mb-[10px]' : 'mb-[13px]'}`}>
+    <div className={`rounded-[13px] border border-border-strong bg-[#F0F0EF] p-[13px] ${compact ? 'mb-[10px]' : 'mb-[13px]'}`}>
       <p className={`font-bold leading-tight text-[#111] ${compact ? 'mb-[6px] text-[12px]' : 'mb-[10px] text-[17.6px]'}`}>
         {name ? `${name} — ` : ''}
-        {name ? 'выполнено' : 'Выполнено'} сегодня: {count} из {DAILY_GOAL}
-        {count >= DAILY_GOAL && <span className="ml-[6px] text-[#1F4FBF]">— Доминатор</span>}
+        {name ? 'выполнено' : 'Выполнено'} сегодня: {count} из {goal}
+        {count >= goal && <span className="ml-[6px] text-[#1F4FBF]">— Доминатор</span>}
       </p>
       <div className="flex flex-col gap-[2.4px]">
         {Array.from({ length: rows }, (_, r) => {
-          const filled = Math.max(0, Math.min(DAILY_GOAL, count - r * DAILY_GOAL));
+          const filled = Math.max(0, Math.min(goal, count - r * goal));
           return (
             <div key={r} className="flex gap-[2.4px]">
-              {Array.from({ length: DAILY_GOAL }, (_, i) => (
+              {Array.from({ length: goal }, (_, i) => (
                 <div
                   key={i}
                   className="aspect-square flex-1 rounded-[2.4px]"
-                  style={{ background: i < filled ? squareColor(i, DAILY_GOAL) : EMPTY_SQUARE }}
+                  style={{ background: i < filled ? squareColor(i, goal) : EMPTY_SQUARE }}
                 />
               ))}
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/** Одно поле цели: сохраняется по потере фокуса или Enter. */
+function GoalRow({ name, goal, editable, onSave }) {
+  const [value, setValue] = useState(String(goal));
+  useEffect(() => {
+    setValue(String(goal));
+  }, [goal]);
+  const commit = () => {
+    const n = Math.round(Number(value));
+    if (!Number.isFinite(n) || n < 1 || n > MAX_DAILY_GOAL) {
+      setValue(String(goal));
+      return;
+    }
+    if (n !== goal) onSave(n);
+  };
+  return (
+    <label className="flex items-center justify-between gap-3 text-[12px] text-[#111]">
+      <span className="truncate">{name}</span>
+      <input
+        type="number"
+        min="1"
+        max={MAX_DAILY_GOAL}
+        value={value}
+        disabled={!editable}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+        className="h-7 w-20 rounded-field border border-[#D6DAE1] bg-white px-2 text-right text-[12px] font-bold disabled:bg-[#DADAD9] disabled:text-[#8a8a86]"
+      />
+    </label>
+  );
+}
+
+/** Цель задач в день для каждого сотрудника (правит CEO/менеджер, оператор видит свою). */
+function GoalEditor({ rows, editable, onSave }) {
+  return (
+    <div className="mb-3">
+      <p className="mb-1.5 text-[12px] text-[#8a8a86]">
+        Цель задач в день — столько квадратиков в полосе «выполнено сегодня» (1–{MAX_DAILY_GOAL}){editable ? '' : '; выставляет менеджер'}:
+      </p>
+      <div className="flex max-w-sm flex-col gap-1.5">
+        {rows.map((r) => (
+          <GoalRow key={r.uid} name={r.name} goal={r.goal} editable={editable} onSave={(n) => onSave(r.uid, n)} />
+        ))}
       </div>
     </div>
   );
@@ -144,7 +200,7 @@ function loadDaysOff() {
  * месяц (30 дней) и год (12 месяцев) — линия с точками. Выходные дни
  * (см. daysOff) не рисуются и не входят в сумму.
  */
-function ActivityChart({ counts, label }) {
+function ActivityChart({ counts, label, goalEditor }) {
   const [period, setPeriod] = useState('week');
   const [daysOff, setDaysOff] = useState(loadDaysOff);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -259,6 +315,7 @@ function ActivityChart({ counts, label }) {
           </div>
         </div>
       </div>
+      {settingsOpen && goalEditor}
       {settingsOpen && (
         <div className="mb-3">
           <p className="mb-1.5 text-[12px] text-[#8a8a86]">Выходные — не показываются в графике и не входят в сумму:</p>
@@ -541,10 +598,29 @@ export function TasksPage() {
   }, [operatorOptions, activityByUid, staffNames, todayKey]);
   const scopedName = scopedOperatorUid && scopedOperatorUid !== user.uid ? staffNames.get(scopedOperatorUid) : null;
 
+  // Цели задач в день — по сотрудникам, общие для всех (settings/{филиал}.dailyTaskGoals).
+  const settingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
+  const { data: settingsDoc } = useDoc(settingsRef);
+  const goalOf = (uid) => clampGoal(settingsDoc?.dailyTaskGoals?.[uid]);
+  const saveGoal = async (uid, n) => {
+    try {
+      await setDoc(settingsRef, { dailyTaskGoals: { [uid]: n } }, { merge: true });
+    } catch {
+      showToast('Не удалось сохранить цель.', { type: 'error' });
+    }
+  };
+  const goalRows = (
+    canSeeAllTasks
+      ? scopedOperatorUid
+        ? [{ uid: scopedOperatorUid, name: staffNames.get(scopedOperatorUid) ?? staff?.fullName ?? 'Вы' }]
+        : operatorOptions.map((op) => ({ uid: op.id, name: op.fullName }))
+      : [{ uid: user.uid, name: staff?.fullName ?? 'Вы' }]
+  ).map((r) => ({ ...r, goal: goalOf(r.uid) }));
+
   // Уведомление об уровне — раз в день, по СВОЕМУ прогрессу в любом виде
   // страницы (менеджер, смотрящий чужого/«Все», своё достижение тоже получит).
   useEffect(() => {
-    if (myDoneToday < DAILY_GOAL) return;
+    if (myDoneToday < goalOf(user.uid)) return;
     const flag = `icon-crm:dominator:${user.uid}:${todayKey}`;
     try {
       if (localStorage.getItem(flag)) return;
@@ -553,7 +629,8 @@ export function TasksPage() {
       // без localStorage — просто покажем ещё раз при следующем заходе
     }
     showToast('Вы перешли на уровень «Доминатор»');
-  }, [myDoneToday, user.uid, todayKey, showToast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myDoneToday, user.uid, todayKey, showToast, settingsDoc]);
 
   // Выполненные СЕГОДНЯ задачи выбранного сотрудника (или всех): по одной
   // карточке на лид, в той колонке, где задача стояла в момент отметки —
@@ -692,11 +769,15 @@ export function TasksPage() {
       </div>
 
       {canSeeAllTasks && operatorFilter === 'all' ? (
-        perOperator.map((op) => <DoneStrip key={op.uid} compact name={op.name} count={op.count} />)
+        perOperator.map((op) => <DoneStrip key={op.uid} compact name={op.name} count={op.count} goal={goalOf(op.uid)} />)
       ) : (
-        <DoneStrip count={doneToday} name={scopedName} />
+        <DoneStrip count={doneToday} name={scopedName} goal={goalOf(scopedOperatorUid ?? user.uid)} />
       )}
-      <ActivityChart counts={activity} label={canSeeAllTasks && operatorFilter === 'all' ? 'все' : scopedName} />
+      <ActivityChart
+        counts={activity}
+        label={canSeeAllTasks && operatorFilter === 'all' ? 'все' : scopedName}
+        goalEditor={<GoalEditor rows={goalRows} editable={canSeeAllTasks} onSave={saveGoal} />}
+      />
 
       {loading ? (
         <p className="text-[13px] text-muted">Загрузка…</p>
