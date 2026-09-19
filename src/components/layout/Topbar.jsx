@@ -3,6 +3,8 @@ import { ChevronDown, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useRole } from '../../hooks/useRole.js';
 import { GlobalSearch } from './GlobalSearch.jsx';
+import iconMark from '../../../public/icon-mark.png';
+import iconWordmark from '../../../public/icon-wordmark.png';
 
 const ROLE_LABELS = {
   ceo: 'CEO',
@@ -17,16 +19,15 @@ const ROLE_LABELS = {
  * @param {Array<{id: string, name: string}>} [props.branches] список филиалов пользователя, переключатель — если больше одного
  * @param {string} [props.activeBranchId]
  * @param {(id: string) => void} [props.onBranchChange]
- * @param {import('react').ReactNode} [props.billingBanner] баннер месячного начисления (логика — фаза 5)
  * @param {() => void} [props.onMenuClick] открыть выдвижное меню (кнопка-гамбургер, только < md)
  */
-export function Topbar({ branches = [], activeBranchId, onBranchChange, billingBanner, onMenuClick }) {
+export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuClick }) {
   const { staff, logout } = useAuth();
   const { role } = useRole();
   const [profileOpen, setProfileOpen] = useState(false);
 
   return (
-    <header className="flex h-16 items-center gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-6">
+    <header className="relative flex h-16 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-6">
       <button
         type="button"
         onClick={onMenuClick}
@@ -50,9 +51,16 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, billingB
         </select>
       )}
 
-      <GlobalSearch />
+      {/* Поиск слева — не шире половины шапки минус место под логотип по центру. */}
+      <div className="flex min-w-0 max-w-[min(28rem,calc(50%-4rem))] flex-1">
+        <GlobalSearch />
+      </div>
 
-      {billingBanner && <div className="hidden flex-1 md:block">{billingBanner}</div>}
+      {/* Логотип по центру шапки; на телефоне его нет (там он в выдвижном меню). */}
+      <div className="pointer-events-none absolute inset-x-0 hidden items-center justify-center gap-2 sm:flex">
+        <img src={iconMark} alt="" className="h-6 w-6 shrink-0" />
+        <img src={iconWordmark} alt="ICON" className="h-[18px] w-auto shrink-0" />
+      </div>
 
       <div className="relative ml-auto shrink-0">
         <button

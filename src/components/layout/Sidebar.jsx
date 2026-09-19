@@ -80,11 +80,6 @@ export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
           collapsed ? 'w-16' : 'w-28'
         }`}
       >
-        <div className="flex h-16 items-center justify-center gap-2 px-3">
-          <img src={iconMark} alt="" className="h-5 w-5 shrink-0" />
-          {!collapsed && <img src={iconWordmark} alt="ICON" className="h-4 w-auto shrink-0" />}
-        </div>
-
         <nav className="flex-1 overflow-y-auto py-2">
           {items.map((item) => {
             const Icon = item.icon;
