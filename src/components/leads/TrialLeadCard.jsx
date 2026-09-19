@@ -1,7 +1,5 @@
-import { useState } from 'react';
-import { MessageSquare } from 'lucide-react';
 import { formatPhone, formatDateTimeShort, formatSource } from '../../lib/format.js';
-import { operatorInitials, trialScheduleLabel, LeadCommentsPanel } from './LeadCard.jsx';
+import { operatorInitials, trialScheduleLabel } from './LeadCard.jsx';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 
 /**
@@ -18,9 +16,7 @@ import { DropdownMenu } from '../ui/DropdownMenu.jsx';
  * @param {(lead: Object) => void} props.onReschedule «⋮ → Перенести пробный» — открывает TrialFormModal(mode:'reschedule')
  */
 export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCreateStudent, onReschedule }) {
-  const [commentsOpen, setCommentsOpen] = useState(false);
   const operatorLabel = operatorInitials(operatorName);
-  const hasComments = (lead.commentsCount ?? 0) > 0;
 
   return (
     <div
@@ -49,20 +45,9 @@ export function TrialLeadCard({ lead, operatorColor, operatorName, onOpen, onCre
           <span />
         )}
         <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => setCommentsOpen((v) => !v)}
-            aria-label="Комментарии"
-            className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-              commentsOpen || hasComments ? 'text-navy' : 'text-muted'
-            }`}
-          >
-            <MessageSquare className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
-          </button>
           <DropdownMenu items={[{ label: 'Перенести пробный', onClick: () => onReschedule(lead) }]} />
         </div>
       </div>
-      {commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
       <div className="mt-auto border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"

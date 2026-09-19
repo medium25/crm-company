@@ -1,93 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { collection, addDoc, doc, updateDoc, increment, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, MessageSquareText, ClipboardCheck, Users, X, Settings, ChevronUp, ChevronDown } from 'lucide-react';
+import { doc, updateDoc } from 'firebase/firestore';
+import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, ClipboardCheck, Users, X, Settings, ChevronUp, ChevronDown } from 'lucide-react';
 import { db } from '../../firebase.js';
-import { useAuth } from '../../hooks/useAuth.js';
-import { useCollection } from '../../hooks/useCollection.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { LeadFormDataModal } from './LeadFormDataModal.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, isTrialDay, contactDueDate, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { formatPhone, formatDateTime, formatDateTimeShort, formatRelativeDeadline, formatRelativeDay, formatOverdueBy, formatSource } from '../../lib/format.js';
 import { DEFAULT_CHECKLIST_ITEMS, checklistCheckedCount, checklistPercent } from '../../lib/leadChecklist.js';
-
-/**
- * Компактная лента комментариев лида, разворачивается прямо в карточке.
- * Та же коллекция `comments` (entityType/entityId), что и CommentsTab у
- * студента/группы, но своя вёрстка — под тесную карточку в канбане, ввод
- * одной строкой («командная строка»), без textarea и большой кнопки.
- */
-export function LeadCommentsPanel({ leadId }) {
-  const { user, staff } = useAuth();
-  const [text, setText] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const commentsQuery = useMemo(
-    () =>
-      db
-        ? query(collection(db, 'comments'), where('entityType', '==', 'lead'), where('entityId', '==', leadId), orderBy('createdAt', 'desc'))
-        : null,
-    [leadId],
-  );
-  const { data: comments, loading } = useCollection(commentsQuery);
-
-  const submit = async () => {
-    const value = text.trim();
-    if (!value || saving) return;
-    setSaving(true);
-    try {
-      await addDoc(collection(db, 'comments'), {
-        entityType: 'lead',
-        entityId: leadId,
-        text: value,
-        authorId: user.uid,
-        authorName: staff?.fullName ?? '',
-        createdAt: serverTimestamp(),
-      });
-      // Денормализованный счётчик на самом лиде — чтобы иконка комментария
-      // могла показать «тут есть записи», не открывая отдельный listener
-      // на comments для каждой из карточек на доске.
-      await updateDoc(doc(db, 'students', leadId), { commentsCount: increment(1) });
-      setText('');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="mt-1.5 border-t border-border pt-1.5" onClick={(e) => e.stopPropagation()}>
-      <div className="max-h-40 space-y-1.5 overflow-y-auto">
-        {loading && <p className="text-[12px] text-muted">Загрузка…</p>}
-        {!loading && comments.length === 0 && <p className="text-[12px] text-muted">Пока нет комментариев</p>}
-        {comments.map((c) => (
-          <div key={c.id} className="text-[12px]">
-            <span className="font-bold text-text">{c.authorName}</span>{' '}
-            <span className="text-muted">{formatDateTime(c.createdAt)}</span>
-            <p className="whitespace-pre-wrap text-text">{c.text}</p>
-          </div>
-        ))}
-      </div>
-      <div className="mt-1.5 flex items-center gap-1 rounded-field border border-border-strong bg-surface-alt px-2 py-1">
-        <span className="shrink-0 font-mono text-[13px] text-muted">&gt;</span>
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return;
-            e.stopPropagation();
-            submit();
-          }}
-          placeholder="Написать комментарий…"
-          disabled={saving}
-          className="min-w-0 flex-1 bg-transparent font-mono text-[13px] text-text placeholder:text-muted focus:outline-none"
-        />
-      </div>
-    </div>
-  );
-}
 
 /**
  * Чек-лист первого разговора — раскрывается прямо в карточке, только в
@@ -640,7 +562,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts, onOpenC
  * завязано на другую бизнес-логику (нет своей сетки дедлайнов/автопереноса),
  * менять его безопасно.
  */
-function TouchDots({ closingTouchNumber, nextTouchAt, onMark, onFail, maxTouches }) {
+function TouchDots({ closingTouchNumber, nextTouchAt, onMark, onFail, maxTouches, onPress }) {
   const count = closingTouchNumber ?? 0;
   const deadlineLabel = count < maxTouches && nextTouchAt ? formatRelativeDeadline(nextTouchAt) : null;
   const [confirming, setConfirming] = useState(false);
@@ -654,7 +576,10 @@ function TouchDots({ closingTouchNumber, nextTouchAt, onMark, onFail, maxTouches
     <TouchActionButton
       text={`Касание ${count}/${maxTouches}`}
       time={deadlineLabel}
-      onClick={() => setConfirming(true)}
+      onClick={() => {
+        setConfirming(true);
+        onPress?.();
+      }}
       ariaLabel={`Касание ${count + 1}: отметить результат`}
       compact
     />
@@ -879,9 +804,12 @@ export function LeadCard({
       {operatorLabel}
     </span>
   ) : null;
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const hasComments = (lead.commentsCount ?? 0) > 0;
   const [checklistOpen, setChecklistOpen] = useState(false);
+  // Чек-лист и «Свободные места» на карточках с кнопкой «Касание» (новый лид,
+  // дозвон, дожим) появляются только после её нажатия; на остальных — всегда.
+  const [touchPressed, setTouchPressed] = useState(false);
+  const hasTouchButton = stage === 'new' || stage === 'calling' || stage === 'closing';
+  const showTouchExtras = !hasTouchButton || touchPressed;
   const [formDataOpen, setFormDataOpen] = useState(false);
   const checklistChecked = checklistCheckedCount(lead.checklist, checklistItems);
   const checklistPct = checklistPercent(lead.checklist, checklistItems);
@@ -958,7 +886,7 @@ export function LeadCard({
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
       className={`group relative flex flex-col gap-2.5 rounded-xl border bg-card p-3.5 pb-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-        checklistOpen || commentsOpen ? 'min-h-[237px]' : 'h-[237px]'
+        checklistOpen ? 'min-h-[237px]' : 'h-[237px]'
       } ${
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'
       } ${
@@ -1076,7 +1004,10 @@ export function LeadCard({
               onMark={(result) => onMarkAttempt(lead, result)}
               nextCallDueAt={lead.nextCallDueAt}
               maxAttempts={columns.find((c) => c.key === stage)?.maxTouches ?? 5}
-              onOpenChecklist={() => setChecklistOpen(true)}
+              onOpenChecklist={() => {
+                setChecklistOpen(true);
+                setTouchPressed(true);
+              }}
             />
           ) : stage === 'closing' ? (
             <TouchDots
@@ -1085,6 +1016,7 @@ export function LeadCard({
               onMark={() => onMarkTouch(lead)}
               onFail={() => onMarkUnreachable(lead, 'fail', () => {})}
               maxTouches={columns.find((c) => c.key === 'closing')?.maxTouches ?? 2}
+              onPress={() => setTouchPressed(true)}
             />
           ) : stage === 'trial_scheduled' ? (
             <UnreachableBlock
@@ -1113,7 +1045,7 @@ export function LeadCard({
           </button>
         ) : (
           <div className="flex shrink-0 items-center gap-0.5">
-            {(stage === 'new' || stage === 'calling') && (
+            {(stage === 'new' || stage === 'calling') && showTouchExtras && (
               <button
                 type="button"
                 onClick={() => setChecklistOpen((v) => !v)}
@@ -1131,7 +1063,7 @@ export function LeadCard({
                 <ClipboardCheck className="h-4 w-4" />
               </button>
             )}
-            {!isTerminal && (
+            {!isTerminal && showTouchExtras && (
               <button
                 type="button"
                 onClick={() => onOpenBooking(lead)}
@@ -1141,16 +1073,6 @@ export function LeadCard({
                 <Users className="h-4 w-4" />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setCommentsOpen((v) => !v)}
-              aria-label="Комментарии"
-              className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-alt ${
-                hasComments ? 'text-navy' : 'text-muted'
-              }`}
-            >
-              <MessageSquareText className="h-4 w-4" fill={hasComments ? 'currentColor' : 'none'} fillOpacity={hasComments ? 0.15 : 1} />
-            </button>
             {!isTerminal && moveItems.length > 0 && <DropdownMenu items={moveItems} icon={ArrowRight} ariaLabel="Перенести в колонку" />}
             <DropdownMenu items={menuItems} />
           </div>
@@ -1160,7 +1082,6 @@ export function LeadCard({
         {(stage === 'new' || stage === 'calling') && checklistOpen && (
           <LeadChecklistPanel leadId={lead.id} checklist={lead.checklist} items={checklistItems} onEditItems={onEditChecklist} />
         )}
-        {stage !== 'won' && commentsOpen && <LeadCommentsPanel leadId={lead.id} />}
 
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-muted">
