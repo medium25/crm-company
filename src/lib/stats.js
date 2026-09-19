@@ -57,6 +57,33 @@ export async function countDebtors(db, branchId) {
 }
 
 /**
+ * «Активные студенты», «В пробном уроке» и «Должники» одной выборкой: студенты
+ * active/trial/paused (не в архиве) скачиваются один раз — и так нужны для
+ * должников, — и уже из них считаются все три числа. Раньше первые два шли
+ * отдельными агрегатными запросами (getCountFromServer), которые Firestore
+ * временами отклоняет с «Quota exceeded» — из-за чего плитки дашборда
+ * оставались пустыми. Числа те же, что у countActiveStudents/countTrial/countDebtors.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @returns {Promise<{activeStudents: number, trial: number, debtors: number}>}
+ */
+export async function countStudentBuckets(db, branchId) {
+  const snap = await getDocs(
+    query(collection(db, 'students'), where('branchId', '==', branchId), where('status', 'in', ['active', 'trial', 'paused']), where('isArchived', '==', false)),
+  );
+  let activeStudents = 0;
+  let trial = 0;
+  let debtors = 0;
+  for (const d of snap.docs) {
+    const s = d.data();
+    if (s.status === 'active') activeStudents += 1;
+    if (s.status === 'trial') trial += 1;
+    if (s.balance < 0) debtors += 1;
+  }
+  return { activeStudents, trial, debtors };
+}
+
+/**
  * Платежи (type=payment) за перечисленные месяцы — одним запросом. Дашборд
  * берёт их один раз и отдаёт и в «Оплатили в текущем месяце», и в график
  * «Сравнение» (раньше оба читали одни и те же оплаты каждый своим запросом).
@@ -175,10 +202,8 @@ export async function loadDashboardStats(db, branchId, churnPeriod = 'year', pay
 
   // Активные лиды и группы дашборд не показывает — не считаем (countActiveLeads/
   // countActiveGroups остаются для других экранов).
-  const [activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial] = await Promise.all([
-    countActiveStudents(db, branchId),
-    countTrial(db, branchId),
-    countDebtors(db, branchId),
+  const [{ activeStudents, trial, debtors }, paidThisMonth, leftActiveGroup, leftAfterTrial] = await Promise.all([
+    countStudentBuckets(db, branchId),
     countPaidThisMonth(db, branchId, month, payments),
     countLeftActiveGroup(db, branchId, start, end),
     countLeftAfterTrial(db, branchId, start, end),
