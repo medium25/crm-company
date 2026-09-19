@@ -80,7 +80,7 @@ function squareColor(i, n) {
 }
 
 /**
- * Полоса «выполнено сегодня» — 40 квадратов в строку (DAILY_GOAL), по
+ * Полоса «выполнено сегодня» (все размеры — 80% от исходных) — 40 квадратов в строку (DAILY_GOAL), по
  * квадрату на задачу, градиент светлый→тёмный. Дошли до 40 — появляется
  * вторая строка (и дальше по строке на каждые 40) и уровень «Доминатор».
  * «Выполненная задача» = отметка касания (callAttempts/closingTouchLog/
@@ -89,21 +89,21 @@ function squareColor(i, n) {
 function DoneStrip({ count, name, compact = false }) {
   const rows = Math.min(Math.floor(count / DAILY_GOAL) + 1, 5);
   return (
-    <div className={`rounded-2xl border border-border-strong bg-[#F0F0EF] p-4 ${compact ? 'mb-3' : 'mb-4'}`}>
-      <p className={`font-bold leading-tight text-[#111] ${compact ? 'mb-2 text-[15px]' : 'mb-3 text-[22px]'}`}>
+    <div className={`w-4/5 rounded-[13px] border border-border-strong bg-[#F0F0EF] p-[13px] ${compact ? 'mb-[10px]' : 'mb-[13px]'}`}>
+      <p className={`font-bold leading-tight text-[#111] ${compact ? 'mb-[6px] text-[12px]' : 'mb-[10px] text-[17.6px]'}`}>
         {name ? `${name} — ` : ''}
         {name ? 'выполнено' : 'Выполнено'} сегодня: {count} из {DAILY_GOAL}
-        {count >= DAILY_GOAL && <span className="ml-2 text-[#1F4FBF]">— Доминатор</span>}
+        {count >= DAILY_GOAL && <span className="ml-[6px] text-[#1F4FBF]">— Доминатор</span>}
       </p>
-      <div className="flex flex-col gap-[3px]">
+      <div className="flex flex-col gap-[2.4px]">
         {Array.from({ length: rows }, (_, r) => {
           const filled = Math.max(0, Math.min(DAILY_GOAL, count - r * DAILY_GOAL));
           return (
-            <div key={r} className="flex gap-[3px]">
+            <div key={r} className="flex gap-[2.4px]">
               {Array.from({ length: DAILY_GOAL }, (_, i) => (
                 <div
                   key={i}
-                  className="aspect-square flex-1 rounded-[3px]"
+                  className="aspect-square flex-1 rounded-[2.4px]"
                   style={{ background: i < filled ? squareColor(i, DAILY_GOAL) : EMPTY_SQUARE }}
                 />
               ))}
