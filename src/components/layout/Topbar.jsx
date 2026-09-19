@@ -53,12 +53,12 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
         </select>
       )}
 
-      {/* Логотип — в левом углу шапки (над меню, ×1,2 от прежнего размера; в узком меню — только знак).
+      {/* Логотип — в левом углу шапки (над меню, вдвое меньше, чем было; в узком меню — только знак).
           Ширина блока = меню + отступ страницы минус промежуток flex (1rem): поиск ниже начинается
           у левого края содержимого, а не над меню. */}
       <div className={`hidden shrink-0 items-center pl-4 transition-[width] md:flex ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-[7.5rem]'}`}>
-        <img src={iconMark} alt="ICON" className="h-[29px] w-[29px] shrink-0" />
-        {!sidebarCollapsed && <img src={iconWordmark} alt="" className="ml-1.5 h-[22px] w-auto shrink-0" />}
+        <img src={iconMark} alt="ICON" className="h-[15px] w-[15px] shrink-0" />
+        {!sidebarCollapsed && <img src={iconWordmark} alt="" className="ml-1 h-[11px] w-auto shrink-0" />}
       </div>
       <div
         className={`flex min-w-0 max-w-[20rem] flex-1 ${
