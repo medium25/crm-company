@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { isToday, isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import { AlertTriangle, Clock, CalendarDays, Settings } from 'lucide-react';
+import { AlertTriangle, Clock, CalendarDays, Settings, Check } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -32,6 +32,22 @@ function pendingTaskText(lead) {
   if (text) return text;
   if (!last && (lead.funnelStage ?? 'new') === 'new') return 'Позвонить в первые 30 минут';
   return overdueReasonLabel(lead);
+}
+
+const allEntriesOf = (lead) =>
+  [...(lead.callAttempts ?? []), ...(lead.closingTouchLog ?? []), ...(lead.unreachableAttempts ?? [])]
+    .filter((e) => msOf(e.at))
+    .sort((a, b) => msOf(a.at) - msOf(b.at));
+
+/**
+ * Что было поставлено ДО отметки `entry` — «Следующий шаг» предыдущей
+ * отметки (или «Что произошло?», если шага нет). Первая отметка по лиду —
+ * стандартное «Позвонить в первые 30 минут», как на карточке нового лида.
+ */
+function taskTextBefore(all, entry) {
+  const prev = all[all.indexOf(entry) - 1];
+  if (!prev) return 'Позвонить в первые 30 минут';
+  return prev.nextStep || prev.outcome || 'Задача';
 }
 
 /**
@@ -349,6 +365,66 @@ function ActivityChart({ counts, label }) {
   );
 }
 
+const timeOf = (e) => format(new Date(msOf(e.at)), 'HH:mm');
+
+/**
+ * Выполненная задача — остаётся в колонке до конца дня (на следующий день
+ * её уже нет: список строится только по отметкам за сегодня). Спереди —
+ * имя, задача и «Выполнено»; по клику карточка переворачивается: на
+ * обороте все записи зачёркнуты.
+ */
+function CompletedTaskCard({ lead, taskText, entries }) {
+  const [flipped, setFlipped] = useState(false);
+  const face = 'col-start-1 row-start-1 [backface-visibility:hidden]';
+  const struck = 'text-muted line-through';
+  const last = entries[entries.length - 1];
+  return (
+    <div style={{ perspective: '900px' }}>
+      <div
+        className="grid transition-transform duration-500"
+        style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'none' }}
+      >
+        <div
+          className={`${face} flex items-center justify-between gap-3 rounded-field border border-border bg-surface p-3`}
+          style={{ pointerEvents: flipped ? 'none' : 'auto' }}
+        >
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-bold leading-snug text-text">{lead.fullName}</p>
+            <p className="text-[12px] leading-snug text-text">{taskText}</p>
+            <p className="mt-0.5 text-[11px] text-muted">сегодня в {timeOf(last)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFlipped(true)}
+            className="flex shrink-0 items-center gap-1 rounded-field bg-success-bg px-3 py-1.5 text-[12px] font-bold text-success"
+          >
+            <Check className="h-3.5 w-3.5" />
+            Выполнено
+          </button>
+        </div>
+        <div
+          className={`${face} rounded-field border border-border bg-surface-alt p-3`}
+          style={{ transform: 'rotateY(180deg)', pointerEvents: flipped ? 'auto' : 'none' }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <p className={`truncate text-[13px] font-bold leading-snug ${struck}`}>{lead.fullName}</p>
+            <button type="button" onClick={() => setFlipped(false)} className="shrink-0 text-[11px] text-muted underline hover:text-text">
+              Назад
+            </button>
+          </div>
+          <p className={`text-[12px] leading-snug ${struck}`}>{taskText}</p>
+          {entries.map((e, i) => (
+            <div key={i} className="mt-1.5 border-t border-border pt-1.5">
+              <p className={`text-[11px] leading-snug ${struck}`}>{timeOf(e)}{e.outcome ? ` · ${e.outcome}` : ''}</p>
+              {e.nextStep && <p className={`text-[11px] leading-snug ${struck}`}>Следующий шаг: {e.nextStep}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const BUCKETS = [
   { key: 'overdue', title: 'Просроченные задачи', accent: '#E11D48', icon: AlertTriangle },
   { key: 'today', title: 'Задачи на сегодня', accent: '#2F6FE4', icon: Clock },
@@ -478,6 +554,34 @@ export function TasksPage() {
     showToast('Вы перешли на уровень «Доминатор»');
   }, [myDoneToday, user.uid, todayKey, showToast]);
 
+  // Выполненные СЕГОДНЯ задачи выбранного сотрудника (или всех): по одной
+  // карточке на лид, в той колонке, где задача стояла в момент отметки —
+  // берётся из expectedBy первой отметки за день (дедлайн, действовавший до неё).
+  const completed = useMemo(() => {
+    const result = { overdue: [], today: [], tomorrow: [] };
+    for (const lead of allLeads) {
+      const all = allEntriesOf(lead);
+      const mine = all.filter(
+        (e) =>
+          format(new Date(msOf(e.at)), 'yyyy-MM-dd') === todayKey &&
+          (!scopedOperatorUid || (e.by ?? lead.assignedOperator) === scopedOperatorUid),
+      );
+      if (mine.length === 0) continue;
+      const first = mine[0];
+      const expected = msOf(first.expectedBy);
+      let bucket = 'today';
+      if (all[0] !== first && expected) {
+        if (expected < msOf(first.at)) bucket = 'overdue';
+        else if (isTomorrow(new Date(expected))) bucket = 'tomorrow';
+      }
+      result[bucket].push({ lead, entries: mine, taskText: taskTextBefore(all, first) });
+    }
+    for (const key of Object.keys(result)) {
+      result[key].sort((a, b) => msOf(b.entries[b.entries.length - 1].at) - msOf(a.entries[a.entries.length - 1].at));
+    }
+    return result;
+  }, [allLeads, scopedOperatorUid, todayKey]);
+
   const buckets = useMemo(() => {
     const now = new Date();
     const result = { overdue: [], today: [], tomorrow: [] };
@@ -558,7 +662,7 @@ export function TasksPage() {
                 </span>
               </div>
               <div className="flex flex-col gap-2 p-3">
-                {buckets[bucket.key].length === 0 ? (
+                {buckets[bucket.key].length === 0 && completed[bucket.key].length === 0 ? (
                   <p className="py-6 text-center text-[13px] text-muted">Пусто</p>
                 ) : (
                   buckets[bucket.key].map(({ lead, deadline, level, pinnedToday }) => {
@@ -597,6 +701,9 @@ export function TasksPage() {
                     );
                   })
                 )}
+                {completed[bucket.key].map(({ lead, entries, taskText }) => (
+                  <CompletedTaskCard key={`done-${lead.id}`} lead={lead} entries={entries} taskText={taskText} />
+                ))}
               </div>
             </div>
           ))}
