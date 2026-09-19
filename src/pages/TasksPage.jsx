@@ -150,6 +150,17 @@ function ActivityChart({ counts }) {
     setSelected(null);
   }, [period, daysOff]);
 
+  // Подсказка закрывается кликом в любое место, кроме самих точек (клик по
+  // точке переключает её же — см. onClick у <g data-dot>).
+  useEffect(() => {
+    if (selected === null) return undefined;
+    const close = (e) => {
+      if (!e.target.closest?.('[data-dot]')) setSelected(null);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [selected]);
+
   const toggleDayOff = (day) => {
     setDaysOff((prev) => {
       const next = prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day];
@@ -178,7 +189,7 @@ function ActivityChart({ counts }) {
     const days = period === 'week' ? 7 : 30;
     const list = Array.from({ length: days }, (_, i) => subDays(now, days - 1 - i)).filter((d) => !daysOff.includes(d.getDay()));
     return list.map((d, i) => ({
-      label: period === 'week' || i % 5 === 0 || i === list.length - 1 ? format(d, period === 'week' ? 'EEEEEE' : 'd', { locale: ru }) : '',
+      label: period === 'week' || i % 5 === 0 || i === list.length - 1 ? format(d, period === 'week' ? 'EEEEEE d' : 'd MMM', { locale: ru }) : '',
       value: counts.get(format(d, 'yyyy-MM-dd')) ?? 0,
       title: format(d, 'd MMMM', { locale: ru }),
     }));
@@ -295,7 +306,12 @@ function ActivityChart({ counts }) {
             ))}
             <path d={path} fill="none" stroke="#3865C9" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
             {bars.map((b, i) => (
-              <g key={`c${i}`} onClick={() => setSelected((cur) => (cur === i ? null : i))} className="cursor-pointer">
+              <g
+                key={`c${i}`}
+                data-dot
+                onClick={() => setSelected((cur) => (cur === i ? null : i))}
+                className="cursor-pointer"
+              >
                 <circle cx={x(i)} cy={y(b.value)} r="11" fill="transparent" />
                 <circle
                   cx={x(i)}
@@ -322,7 +338,7 @@ function ActivityChart({ counts }) {
             })()}
             {bars.map((b, i) =>
               b.label ? (
-                <text key={`l${i}`} x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill="#8a8a86">{b.label}</text>
+                <text key={`l${i}`} x={x(i)} y={H - 8} textAnchor={i === bars.length - 1 ? 'end' : 'middle'} fontSize="11" fill="#6b6b67">{b.label}</text>
               ) : null,
             )}
           </svg>
