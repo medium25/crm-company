@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useRole } from '../../hooks/useRole.js';
+import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed.js';
 import { GlobalSearch } from './GlobalSearch.jsx';
 import iconMark from '../../../public/icon-mark.png';
 import iconWordmark from '../../../public/icon-wordmark.png';
@@ -25,9 +26,10 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
   const { staff, logout } = useAuth();
   const { role } = useRole();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [sidebarCollapsed] = useSidebarCollapsed();
 
   return (
-    <header className="relative flex h-16 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-6">
+    <header className="relative flex h-16 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-6 md:pl-0">
       <button
         type="button"
         onClick={onMenuClick}
@@ -51,8 +53,14 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
         </select>
       )}
 
-      {/* Поиск слева — не шире половины шапки минус место под логотип по центру. */}
-      <div className="flex min-w-0 max-w-[min(28rem,calc(50%-4rem))] flex-1">
+      {/* Поиск начинается там же, где содержимое страницы (правее бокового меню, а не над ним),
+          короткий, и не заходит на логотип по центру. Ширина распорки = меню + отступ страницы минус промежуток flex (1rem). */}
+      <div className={`hidden shrink-0 transition-[width] md:block ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-[7.5rem]'}`} />
+      <div
+        className={`flex min-w-0 max-w-[20rem] flex-1 ${
+          sidebarCollapsed ? 'md:max-w-[min(20rem,calc(50%-9.3rem))]' : 'md:max-w-[min(20rem,calc(50%-12.3rem))]'
+        }`}
+      >
         <GlobalSearch />
       </div>
 

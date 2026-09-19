@@ -16,10 +16,10 @@ import {
   X,
 } from 'lucide-react';
 import { useRole } from '../../hooks/useRole.js';
+import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed.js';
 import iconMark from '../../../public/icon-mark.png';
 import iconWordmark from '../../../public/icon-wordmark.png';
 
-const STORAGE_KEY = 'icon-crm:sidebar-collapsed';
 
 /**
  * Полный список пунктов меню. Видимость по роли — см. ROLE_ITEM_KEYS ниже.
@@ -60,15 +60,7 @@ const ROLE_ITEM_KEYS = {
  */
 export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
   const { role, isTest, allowedSections } = useRole();
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(STORAGE_KEY) === '1');
-
-  const toggle = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(STORAGE_KEY, next ? '1' : '0');
-      return next;
-    });
-  };
+  const [collapsed, toggle] = useSidebarCollapsed();
 
   const visibleKeys = isTest ? allowedSections : (ROLE_ITEM_KEYS[role] ?? []);
   const items = ITEMS.filter((item) => visibleKeys.includes(item.key));
