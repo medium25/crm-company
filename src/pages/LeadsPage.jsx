@@ -430,8 +430,8 @@ export function LeadsPage() {
   // за день до второго урока, второе — в день второго урока. Даты —
   // только подсказка для предзаполнения, оператор ставит любое время в
   // рабочих часах.
-  // Задача обязательна на КАЖДОМ касании, включая финальное (2-е) — там
-  // дедлайну взяться неоткуда (noDate), но что сделано/сказано — фиксируем.
+  // Задача и дедлайн следующего действия обязательны на КАЖДОМ касании,
+  // включая финальное (2-е) — предзаполняется «конец следующего дня».
   const markTouch = (lead) => {
     const snapshot = taskSnapshot(lead);
     const nextNumber = (lead.closingTouchNumber ?? 0) + 1;
@@ -445,14 +445,15 @@ export function LeadsPage() {
       setDeadlineTarget({
         lead,
         title: `Задача — касание ${nextNumber}`,
-        noDate: true,
+        suggestedDate: unreachableCallDueAt(),
         requireTask: true,
-        onConfirm: (_date, outcome, nextStep) =>
+        onConfirm: (dueDate, outcome, nextStep) =>
           patch(
             lead,
-            { closingTouchNumber: nextNumber, nextTouchAt: null, unreachableAttempts: [], closingTouchLog: buildLog(outcome, nextStep) },
+            { closingTouchNumber: nextNumber, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: buildLog(outcome, nextStep) },
             `Касание ${nextNumber} отмечено.`,
           ),
+        validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }
@@ -497,10 +498,11 @@ export function LeadsPage() {
       if (attemptsExhausted) {
         setDeadlineTarget({
           lead,
-          title: 'Задача — попытка связаться',
-          noDate: true,
+          title: 'Дедлайн следующего касания',
+          suggestedDate: unreachableCallDueAt(),
           requireTask: true,
-          onConfirm: (_date, outcome, nextStep) => patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), nextTouchAt: null }),
+          onConfirm: (dueDate, outcome, nextStep) => patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), nextTouchAt: dueDate }),
+          validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
         });
         return;
       }
@@ -510,6 +512,7 @@ export function LeadsPage() {
         suggestedDate: unreachableCallDueAt(),
         requireTask: true,
         onConfirm: (dueDate, outcome, nextStep) => patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), nextTouchAt: dueDate }),
+        validate: (candidate) => validateCallDeadline(candidate, branchSettings?.operatorSchedules?.[lead.assignedOperator]),
       });
       return;
     }
