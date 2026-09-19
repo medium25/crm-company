@@ -373,7 +373,7 @@ function CompletedTaskCard({ lead, taskText, entries }) {
         style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'none' }}
       >
         <div
-          className={`${face} flex items-center justify-between gap-3 rounded-field border border-border bg-surface p-3`}
+          className={`${face} flex items-center justify-between gap-3 rounded-field border border-border bg-card p-3`}
           style={{ pointerEvents: flipped ? 'none' : 'auto' }}
         >
           <div className="min-w-0">
@@ -688,14 +688,14 @@ export function TasksPage() {
                     return (
                     <div
                       key={lead.id}
-                      className={`relative flex items-center justify-between gap-3 rounded-field border bg-surface p-3 ${
+                      className={`relative flex items-center justify-between gap-3 rounded-field border bg-card p-3 ${
                         mark ? '' : 'border-border'
                       }`}
                       style={mark ? { borderColor: mark.color } : undefined}
                     >
                       {mark && (
                         <span
-                          className="absolute -top-[5px] right-2.5 bg-surface px-1 text-[9px] leading-none"
+                          className="absolute -top-[5px] right-2.5 bg-card px-1 text-[9px] leading-none"
                           style={{ color: mark.color }}
                         >
                           {mark.label}

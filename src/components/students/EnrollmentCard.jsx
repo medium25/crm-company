@@ -52,7 +52,7 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
       : null;
 
   return (
-    <div className="rounded-card border border-border bg-surface p-5">
+    <div className="rounded-card border border-border bg-card p-5">
       <div className="mb-3 flex items-start justify-between">
         <button
           type="button"

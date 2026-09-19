@@ -23,6 +23,7 @@
   --color-bg: 244 245 247;
   --color-surface: 255 255 255;
   --color-surface-alt: 250 251 252;
+  --color-card: 246 246 245;
   --color-border: 233 235 239;
   --color-border-strong: 214 218 225;
   --color-text: 43 52 64;
@@ -48,6 +49,7 @@
   --color-bg: 16 21 29;
   --color-surface: 27 35 48;
   --color-surface-alt: 34 43 58;
+  --color-card: 27 35 48;
   --color-border: 46 57 72;
   --color-border-strong: 61 74 92;
   --color-text: 231 234 238;

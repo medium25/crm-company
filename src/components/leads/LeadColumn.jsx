@@ -201,7 +201,7 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
     // переключалось на компактный py-4 и заголовок «уменьшался» при
     // раскрытии, что тоже читалось как баг.
     return (
-      <div className="rounded-xl border border-border bg-surface shadow-sm">
+      <div className="rounded-xl border border-border bg-card shadow-sm">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -246,7 +246,7 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
   // Развёрнутая — высота по контенту, без навязанного min-height.
   return (
     <div
-      className={`rounded-xl border border-border bg-surface shadow-sm ${!open ? 'flex min-h-[215px] flex-col justify-center' : ''}`}
+      className={`rounded-xl border border-border bg-card shadow-sm ${!open ? 'flex min-h-[215px] flex-col justify-center' : ''}`}
     >
       <button
         type="button"

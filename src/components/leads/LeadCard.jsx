@@ -957,7 +957,7 @@ export function LeadCard({
       }}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className={`group relative flex flex-col gap-2.5 rounded-xl border bg-surface p-3.5 pb-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group relative flex flex-col gap-2.5 rounded-xl border bg-card p-3.5 pb-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         checklistOpen || commentsOpen ? 'min-h-[237px]' : 'h-[237px]'
       } ${
         isTerminal ? 'cursor-pointer border-border' : 'cursor-grab border-border hover:border-navy/20 active:cursor-grabbing'

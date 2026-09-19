@@ -6,7 +6,7 @@
 export function Card({ hoverable = false, className = '', children, ...rest }) {
   return (
     <div
-      className={`rounded-card border border-border bg-surface p-6 shadow-card ${hoverable ? 'transition-shadow hover:shadow-hover' : ''} ${className}`}
+      className={`rounded-card border border-border bg-card p-6 shadow-card ${hoverable ? 'transition-shadow hover:shadow-hover' : ''} ${className}`}
       {...rest}
     >
       {children}
