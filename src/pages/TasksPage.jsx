@@ -574,10 +574,25 @@ export function TasksPage() {
         if (expected < msOf(first.at)) bucket = 'overdue';
         else if (isTomorrow(new Date(expected))) bucket = 'tomorrow';
       }
-      result[bucket].push({ lead, entries: mine, taskText: taskTextBefore(all, first) });
-    }
-    for (const key of Object.keys(result)) {
-      result[key].sort((a, b) => msOf(b.entries[b.entries.length - 1].at) - msOf(a.entries[a.entries.length - 1].at));
+      // Приоритет и дедлайн — какими были до отметки, чтобы карточка осталась
+      // на том же месте среди невыполненных (стадия — по stageHistory на момент
+      // отметки; первая отметка по лиду — он был «Новым лидом»).
+      const wasStage =
+        all[0] === first
+          ? 'new'
+          : ((lead.stageHistory ?? [])
+              .filter((h) => msOf(h.enteredAt) && msOf(h.enteredAt) < msOf(first.at))
+              .sort((x, y) => msOf(x.enteredAt) - msOf(y.enteredAt))
+              .at(-1)?.stage ?? lead.funnelStage ?? 'new');
+      const wasOverdue = bucket === 'overdue';
+      result[bucket].push({
+        done: true,
+        lead,
+        entries: mine,
+        taskText: taskTextBefore(all, first),
+        level: priorityLevel({ funnelStage: wasStage }, wasOverdue),
+        deadlineMs: expected || msOf(first.at),
+      });
     }
     return result;
   }, [allLeads, scopedOperatorUid, todayKey]);
@@ -610,6 +625,19 @@ export function TasksPage() {
     }
     return result;
   }, [allLeads, scopedOperatorUid]);
+
+  // Выполненная карточка не переезжает вниз: встаёт по тому же порядку
+  // (приоритет, дедлайн), по которому стояла до отметки.
+  const columnItems = useMemo(() => {
+    const result = {};
+    for (const key of Object.keys(buckets)) {
+      result[key] = [
+        ...buckets[key].map((it) => ({ ...it, done: false, deadlineMs: it.deadline.getTime() })),
+        ...completed[key],
+      ].sort((a, b) => a.level - b.level || a.deadlineMs - b.deadlineMs);
+    }
+    return result;
+  }, [buckets, completed]);
 
   return (
     <div>
@@ -662,10 +690,14 @@ export function TasksPage() {
                 </span>
               </div>
               <div className="flex flex-col gap-2 p-3">
-                {buckets[bucket.key].length === 0 && completed[bucket.key].length === 0 ? (
+                {columnItems[bucket.key].length === 0 ? (
                   <p className="py-6 text-center text-[13px] text-muted">Пусто</p>
                 ) : (
-                  buckets[bucket.key].map(({ lead, deadline, level, pinnedToday }) => {
+                  columnItems[bucket.key].map((item) => {
+                    if (item.done) {
+                      return <CompletedTaskCard key={`done-${item.lead.id}`} lead={item.lead} entries={item.entries} taskText={item.taskText} />;
+                    }
+                    const { lead, deadline, level, pinnedToday } = item;
                     const mark = PRIORITY_STYLES[level];
                     return (
                     <div
@@ -701,9 +733,6 @@ export function TasksPage() {
                     );
                   })
                 )}
-                {completed[bucket.key].map(({ lead, entries, taskText }) => (
-                  <CompletedTaskCard key={`done-${lead.id}`} lead={lead} entries={entries} taskText={taskText} />
-                ))}
               </div>
             </div>
           ))}
