@@ -26,6 +26,111 @@ const FIRESTORE_SCOPE = 'https://www.googleapis.com/auth/datastore';
 const TOKEN_CACHE_KEY = 'firestore_access_token';
 const RATE_LIMIT_PER_MINUTE = 60;
 
+// --- Учёт квот Apps Script ----------------------------------------------------------------------
+// Считаем, сколько запросов UrlFetch и сколько времени триггеров тратит эта система, и раз в
+// USAGE_FLUSH_MS отправляем счётчики в Firestore (settings/appsusage_{сутки квоты}) — их читает
+// раздел «Настройки → Лимиты и расход» в CRM. Суточные квоты Apps Script (личный аккаунт):
+// UrlFetch 20 000 вызовов, суммарное время триггеров 90 минут. Ключи функций:
+// web_* — веб-приложение (не входит в квоту триггеров), trg_* — триггеры (входят).
+// Другие проекты (SheetsSync/SheetsExport) присылают свои счётчики действием 'usage' (см. doPost).
+const USAGE_PENDING_KEY = 'USAGE_PENDING';
+const USAGE_LAST_FLUSH_KEY = 'USAGE_LAST_FLUSH';
+const USAGE_FLUSH_MS = 10 * 60 * 1000;
+const USAGE_KEY_RE = /^(trg|web)_[a-z0-9_]{1,30}$/;
+let USAGE_RUN_ = { fetches: 0, reads: 0, writes: 0 }; // модульное состояние живёт в пределах одного выполнения (reads/writes — документы Firestore, которые прочитал/записал именно Code.gs)
+const USAGE_FIELDS = ['runs', 'ms', 'fetches', 'errors', 'reads', 'writes'];
+
+/** Обёртка над UrlFetchApp.fetch — считает вызовы текущего выполнения. */
+function fetch_(url, options) {
+  USAGE_RUN_.fetches += 1;
+  return UrlFetchApp.fetch(url, options);
+}
+
+/** Сутки квоты (граница — полночь по Тихому океану, 12:00 по Ташкенту) в виде yyyy-MM-dd. */
+function usageDayKey_() {
+  return Utilities.formatDate(new Date(), 'America/Los_Angeles', 'yyyy-MM-dd');
+}
+
+/** Прибавляет счётчики к накопленным в Script Properties (под замком — параллельные запуски не теряют друг друга). */
+function usageMerge_(name, delta) {
+  if (!USAGE_KEY_RE.test(name)) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return; // учёт не должен тормозить работу — при занятом замке пропускаем
+  try {
+    const pending = JSON.parse(props_().getProperty(USAGE_PENDING_KEY) || '{}');
+    const cur = pending[name] || { runs: 0, ms: 0, fetches: 0, errors: 0, reads: 0, writes: 0 };
+    USAGE_FIELDS.forEach((f) => {
+      cur[f] = (cur[f] || 0) + Math.max(0, Math.round(Number(delta[f]) || 0));
+    });
+    pending[name] = cur;
+    props_().setProperty(USAGE_PENDING_KEY, JSON.stringify(pending));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Запись Firestore commit: увеличивает счётчики документа settings/appsusage_{сутки} (документ создаётся при первой записи). */
+function buildUsageWrite_(pending) {
+  const name = `projects/${projectId_()}/databases/(default)/documents/settings/appsusage_${usageDayKey_()}`;
+  const updateTransforms = [];
+  Object.keys(pending).forEach((fn) => {
+    USAGE_FIELDS.forEach((f) => {
+      if (pending[fn][f]) updateTransforms.push({ fieldPath: `byFn.${fn}.${f}`, increment: { integerValue: String(pending[fn][f]) } });
+    });
+  });
+  updateTransforms.push({ fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' });
+  return { update: { name, fields: {} }, updateMask: { fieldPaths: [] }, updateTransforms };
+}
+
+/** Отправляет накопленное в Firestore. При ошибке возвращает счётчики в очередь. */
+function usageFlush_() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return;
+  let pending;
+  try {
+    pending = JSON.parse(props_().getProperty(USAGE_PENDING_KEY) || '{}');
+    if (!Object.keys(pending).length) return;
+    props_().deleteProperty(USAGE_PENDING_KEY);
+  } finally {
+    lock.releaseLock();
+  }
+  try {
+    fsRequest_('POST', ':commit', { writes: [buildUsageWrite_(pending)] });
+    usageMerge_('web_usage_flush', { fetches: 1, writes: 1 }); // сам запрос отправки тоже тратит квоту и 1 запись
+  } catch (err) {
+    Object.keys(pending).forEach((fn) => usageMerge_(fn, pending[fn]));
+    Logger.log('usageFlush_: не отправлено, останется в очереди: ' + (err.message || err));
+  }
+}
+
+/** Отправляет счётчики не чаще раза в USAGE_FLUSH_MS. */
+function usageFlushMaybe_() {
+  const last = Number(props_().getProperty(USAGE_LAST_FLUSH_KEY) || 0);
+  if (Date.now() - last < USAGE_FLUSH_MS) return;
+  props_().setProperty(USAGE_LAST_FLUSH_KEY, String(Date.now())); // ставим ДО отправки — параллельные запуски не продублируют
+  usageFlush_();
+}
+
+/** Выполняет work() и записывает в счётчики её время, число запросов UrlFetch и ошибку. Учёт никогда не ломает саму работу. */
+function trackedRun_(name, work) {
+  const started = Date.now();
+  USAGE_RUN_ = { fetches: 0, reads: 0, writes: 0 };
+  let failed = 0;
+  try {
+    return work();
+  } catch (err) {
+    failed = 1;
+    throw err;
+  } finally {
+    try {
+      usageMerge_(name, { runs: 1, ms: Date.now() - started, fetches: USAGE_RUN_.fetches, errors: failed, reads: USAGE_RUN_.reads, writes: USAGE_RUN_.writes });
+      usageFlushMaybe_();
+    } catch (e) {
+      // квота/сеть — счётчики просто отстанут
+    }
+  }
+}
+
 // --- Экономия запросов и чтений ------------------------------------------------
 // Каждый вызов UrlFetchApp — из суточной квоты (20 000), каждое прочитанное
 // документа — из суточной квоты Firestore (Spark: 50 000). Редко меняющееся
@@ -163,7 +268,7 @@ function getAccessToken_() {
   const signatureBytes = Utilities.computeRsaSha256Signature(signingInput, privateKey);
   const jwt = `${signingInput}.${base64url_(signatureBytes)}`;
 
-  const resp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+  const resp = fetch_('https://oauth2.googleapis.com/token', {
     method: 'post',
     contentType: 'application/x-www-form-urlencoded',
     payload: {
@@ -188,13 +293,17 @@ function fsRequest_(method, path, body) {
     muteHttpExceptions: true,
   };
   if (body !== undefined) options.payload = JSON.stringify(body);
-  const resp = UrlFetchApp.fetch(`${firestoreBaseUrl_()}${path}`, options);
+  const resp = fetch_(`${firestoreBaseUrl_()}${path}`, options);
   const code = resp.getResponseCode();
   const text = resp.getContentText();
   const json = text ? JSON.parse(text) : null;
   if (code >= 400) {
     throw new Error(`Firestore ${method} ${path} → ${code}: ${text}`);
   }
+  // Учёт операций Firestore (реальные чтения/записи, которые тратит именно этот скрипт):
+  // GET документа — 1 чтение; запись (POST/PATCH, кроме запросов) — 1 запись; запросы считает runQuery_/countDocs_.
+  if (method === 'GET') USAGE_RUN_.reads += 1;
+  else if (path.indexOf(':runQuery') === -1 && path.indexOf(':runAggregationQuery') === -1) USAGE_RUN_.writes += 1;
   return json;
 }
 
@@ -326,6 +435,7 @@ function countDocs_(collectionId, filters) {
       },
     });
     const value = resp && resp[0] && resp[0].result && resp[0].result.aggregateFields && resp[0].result.aggregateFields.n;
+    USAGE_RUN_.reads += 1; // COUNT — примерно 1 чтение на 1000 записей индекса
     return value && 'integerValue' in value ? Number(value.integerValue) : null;
   } catch (err) {
     return null;
@@ -346,9 +456,9 @@ function runQuery_(collectionId, filters, opts) {
   }
 
   const resp = fsRequest_('POST', ':runQuery', { structuredQuery });
-  return (resp || [])
-    .filter((r) => r.document)
-    .map((r) => fromFsDoc_(r.document));
+  const docs = (resp || []).filter((r) => r.document);
+  USAGE_RUN_.reads += Math.max(1, docs.length); // запрос читает столько документов, сколько вернул (минимум 1)
+  return docs.map((r) => fromFsDoc_(r.document));
 }
 
 // --- lead helpers ----------------------------------------------------------
@@ -583,6 +693,10 @@ function handle_(fn) {
 }
 
 function doPost(e) {
+  return trackedRun_('web_api', () => doPostImpl_(e));
+}
+
+function doPostImpl_(e) {
   return handle_(() => {
     let body;
     try {
@@ -596,6 +710,15 @@ function doPost(e) {
     // редиректе иногда не докидывают тело POST. Query-строка через редирект
     // не теряется никогда, поэтому она приоритетнее. См. API.md.
     const apiKey = (e.parameter && e.parameter.apiKey) || body.apiKey;
+
+    // Счётчики квот от других проектов (SheetsSync/SheetsExport): { action: 'usage', entries: { trg_sync: {runs, ms, fetches, errors} } }.
+    // Нужен любой действующий ключ; сами счётчики уходят в Firestore вместе со своими (см. usageFlush_).
+    if (body.action === 'usage') {
+      authenticate_(apiKey, 'read');
+      const entries = body.entries && typeof body.entries === 'object' ? body.entries : {};
+      Object.keys(entries).forEach((name) => usageMerge_(name, entries[name] || {}));
+      return { status: 200, data: { accepted: Object.keys(entries).length } };
+    }
 
     if (body.action === 'update') {
       authenticate_(apiKey, 'write');
@@ -673,7 +796,7 @@ function telegramSendMessageTo_(chatId, threadId, text, parseMode, replyMarkup) 
   const payload = { chat_id: chatId, text, parse_mode: parseMode || '' };
   if (threadId) payload.message_thread_id = Number(threadId);
   if (replyMarkup) payload.reply_markup = replyMarkup;
-  const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const resp = fetch_(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify(payload),
@@ -688,7 +811,7 @@ function telegramSendMessageTo_(chatId, threadId, text, parseMode, replyMarkup) 
 function telegramAnswerCallback_(callbackQueryId, text) {
   const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
   if (!token) return;
-  UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+  fetch_(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify({ callback_query_id: callbackQueryId, text: text || undefined }),
@@ -792,6 +915,10 @@ function buildOperatorReportText_(op, windowStart, windowEnd) {
  * отправили один отчёт дважды.
  */
 function checkAndSendDailyOperatorReports() {
+  return trackedRun_('trg_reports', checkAndSendDailyOperatorReportsImpl_);
+}
+
+function checkAndSendDailyOperatorReportsImpl_() {
   const branchId = defaultBranchId_();
   // Триггер идёт каждые 5 минут (288 раз в сутки) — график смен и список операторов держим в кэше на 30 минут,
   // иначе каждый тик = 2 запроса UrlFetch и несколько чтений впустую, хотя отчёт нужен раз в день на оператора.
@@ -999,10 +1126,14 @@ function handleTelegramUpdate_(update) {
  * одни и те же апдейты повторно между тиками триггера.
  */
 function checkTelegramCommands_() {
+  return trackedRun_('trg_telegram', checkTelegramCommandsImpl_);
+}
+
+function checkTelegramCommandsImpl_() {
   const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
   if (!token) return;
   const offset = Number(props_().getProperty('TELEGRAM_LAST_UPDATE_ID') || 0);
-  const resp = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=0`, {
+  const resp = fetch_(`https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=0`, {
     muteHttpExceptions: true,
   });
   const json = JSON.parse(resp.getContentText());
@@ -1034,7 +1165,7 @@ function checkTelegramCommands_() {
 function installTelegramCommandPolling() {
   const token = props_().getProperty('TELEGRAM_BOT_TOKEN');
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN не задан в Script Properties.');
-  UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/deleteWebhook`, { muteHttpExceptions: true });
+  fetch_(`https://api.telegram.org/bot${token}/deleteWebhook`, { muteHttpExceptions: true });
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'checkTelegramCommands_')
     .forEach((t) => ScriptApp.deleteTrigger(t));
@@ -1070,6 +1201,10 @@ function enrichOperatorNames_(leadOrList) {
 }
 
 function doGet(e) {
+  return trackedRun_('web_api', () => doGetImpl_(e));
+}
+
+function doGetImpl_(e) {
   return handle_(() => {
     const params = e.parameter || {};
     const action = params.action || 'list';

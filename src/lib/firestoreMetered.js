@@ -1,6 +1,6 @@
 // src/lib/firestoreMetered.js
 import * as real from '@firebase/firestore';
-import { recordReads } from './usageMeter.js';
+import { recordReads, recordWrites } from './usageMeter.js';
 
 /**
  * Замена 'firebase/firestore' (алиас в vite.config.js): всё то же самое, но
@@ -56,4 +56,73 @@ export function onSnapshot(ref, ...args) {
     return arg;
   });
   return real.onSnapshot(ref, ...wrapped);
+}
+
+// --- Записи и удаления (лимиты Spark: по 20 000 в сутки) -----------------------------------------
+// Считаем после успешного вызова: 1 документ = 1 запись/удаление. Батч и транзакция — по числу
+// операций в них на момент commit.
+
+export async function setDoc(...args) {
+  const out = await real.setDoc(...args);
+  recordWrites(1);
+  return out;
+}
+
+export async function addDoc(...args) {
+  const out = await real.addDoc(...args);
+  recordWrites(1);
+  return out;
+}
+
+export async function updateDoc(...args) {
+  const out = await real.updateDoc(...args);
+  recordWrites(1);
+  return out;
+}
+
+export async function deleteDoc(...args) {
+  const out = await real.deleteDoc(...args);
+  recordWrites(0, 1);
+  return out;
+}
+
+/** Оборачивает методы set/update/delete у batch/transaction — считает операции, отдаёт счётчик. */
+function countOps(target) {
+  const ops = { writes: 0, deletes: 0 };
+  for (const name of ['set', 'update']) {
+    const orig = target[name]?.bind(target);
+    if (orig) target[name] = (...a) => ((ops.writes += 1), orig(...a));
+  }
+  const del = target.delete?.bind(target);
+  if (del) target.delete = (...a) => ((ops.deletes += 1), del(...a));
+  return ops;
+}
+
+export function writeBatch(...args) {
+  const batch = real.writeBatch(...args);
+  const ops = countOps(batch);
+  const commit = batch.commit.bind(batch);
+  batch.commit = async () => {
+    const out = await commit();
+    recordWrites(ops.writes, ops.deletes);
+    return out;
+  };
+  return batch;
+}
+
+export function runTransaction(db, updateFunction, ...rest) {
+  let ops = { writes: 0, deletes: 0 };
+  return real
+    .runTransaction(
+      db,
+      (tx) => {
+        ops = countOps(tx); // при повторе транзакции счётчик пересоздаётся — считаем только успешную попытку
+        return updateFunction(tx);
+      },
+      ...rest,
+    )
+    .then((out) => {
+      recordWrites(ops.writes, ops.deletes);
+      return out;
+    });
 }

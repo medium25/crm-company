@@ -2,10 +2,11 @@
 import { doc, setDoc, increment, serverTimestamp } from '@firebase/firestore';
 
 /**
- * Счётчик чтений Firestore для раздела «Расход Firebase» в настройках.
- * Считает документы, которые приложение получило от сервера (обёртки над
+ * Счётчик чтений/записей/удалений Firestore для раздела «Лимиты и расход» в настройках.
+ * Читает документы, которые приложение получило от сервера (обёртки над
  * onSnapshot/getDocs/getDoc/getCountFromServer в firestoreMetered.js) —
- * без данных из локального кэша, они не тарифицируются. Копит в памяти и раз в
+ * без данных из локального кэша, они не тарифицируются; записи и удаления —
+ * setDoc/addDoc/updateDoc/deleteDoc/writeBatch/runTransaction. Копит в памяти и раз в
  * 5 минут одной записью добавляет в `settings/usage_{день квоты}` (общий счётчик по
  * всем пользователям; в `settings`, чтобы не менять правила безопасности —
  * писать туда могут ceo/manager/admin/test, чтения учителей не попадут в счёт). Это ПРИБЛИЗИТЕЛЬНАЯ оценка только по этому приложению: чтения
@@ -53,19 +54,30 @@ function currentSection() {
   return first in SECTION_LABELS ? first : 'other';
 }
 
-const emptyBatch = () => ({ total: 0, byLabel: {}, byHour: {} });
+const emptyBatch = () => ({ reads: 0, writes: 0, deletes: 0, byLabel: {}, wByLabel: {}, byHour: {} });
 let pending = emptyBatch();
 let dbRef = null;
 let started = false;
 
+const bump = (map, key, n) => {
+  map[key] = (map[key] ?? 0) + n;
+};
+
 /** Записать n прочитанных документов (раздел — по текущему адресу страницы). */
 export function recordReads(n) {
   if (!n || n < 0) return;
-  const section = currentSection();
-  const hour = String(new Date().getHours());
-  pending.total += n;
-  pending.byLabel[section] = (pending.byLabel[section] ?? 0) + n;
-  pending.byHour[hour] = (pending.byHour[hour] ?? 0) + n;
+  pending.reads += n;
+  bump(pending.byLabel, currentSection(), n);
+  bump(pending.byHour, String(new Date().getHours()), n);
+}
+
+/** Записать n записанных (writes) и m удалённых (deletes) документов — их суточные лимиты у Spark по 20 000. */
+export function recordWrites(n, m = 0) {
+  if (n > 0) {
+    pending.writes += n;
+    bump(pending.wByLabel, currentSection(), n);
+  }
+  if (m > 0) pending.deletes += m;
 }
 
 const incrementAll = (map) => Object.fromEntries(Object.entries(map).map(([k, v]) => [k, increment(v)]));
@@ -73,24 +85,32 @@ const incrementAll = (map) => Object.fromEntries(Object.entries(map).map(([k, v]
 /** id документа-счётчика за сутки квоты в коллекции settings. */
 export const usageDocId = (dayKey = quotaDayKey()) => `usage_${dayKey}`;
 
+/** id документа со счётчиками Apps Script (их пишет Code.gs, см. appsscript/Code.gs → flushUsage_). */
+export const appsUsageDocId = (dayKey = quotaDayKey()) => `appsusage_${dayKey}`;
+
+const hasPending = (b) => b.reads + b.writes + b.deletes > 0;
+
 /** Отправить накопленное в settings/usage_{день}. Одна запись, только если есть что отправлять. */
 export async function flushUsage() {
-  if (!dbRef || pending.total === 0) return;
+  if (!dbRef || !hasPending(pending)) return;
   const batch = pending;
   pending = emptyBatch();
+  const data = { updatedAt: serverTimestamp() };
+  if (batch.reads) Object.assign(data, { reads: increment(batch.reads), byLabel: incrementAll(batch.byLabel), byHour: incrementAll(batch.byHour) });
+  if (batch.writes) Object.assign(data, { writes: increment(batch.writes), wByLabel: incrementAll(batch.wByLabel) });
+  if (batch.deletes) data.deletes = increment(batch.deletes);
   try {
-    await setDoc(
-      doc(dbRef, 'settings', usageDocId()),
-      { reads: increment(batch.total), byLabel: incrementAll(batch.byLabel), byHour: incrementAll(batch.byHour), updatedAt: serverTimestamp() },
-      { merge: true },
-    );
+    await setDoc(doc(dbRef, 'settings', usageDocId()), data, { merge: true });
   } catch (err) {
-    // у учителей нет права писать в settings — их чтения просто не считаем
+    // у учителей нет права писать в settings — их счётчики просто не ведутся
     if (err?.code === 'permission-denied') return;
     // не записалось (нет сети) — вернём в очередь, отправим со следующим разом
-    pending.total += batch.total;
-    for (const [k, v] of Object.entries(batch.byLabel)) pending.byLabel[k] = (pending.byLabel[k] ?? 0) + v;
-    for (const [k, v] of Object.entries(batch.byHour)) pending.byHour[k] = (pending.byHour[k] ?? 0) + v;
+    pending.reads += batch.reads;
+    pending.writes += batch.writes;
+    pending.deletes += batch.deletes;
+    for (const [k, v] of Object.entries(batch.byLabel)) bump(pending.byLabel, k, v);
+    for (const [k, v] of Object.entries(batch.wByLabel)) bump(pending.wByLabel, k, v);
+    for (const [k, v] of Object.entries(batch.byHour)) bump(pending.byHour, k, v);
   }
 }
 

@@ -19,8 +19,8 @@ const TABS = [
   { key: 'sms', label: 'Шаблоны SMS' },
   { key: 'billing', label: 'Биллинг' },
 ];
-// Расход Firebase видят только CEO и менеджер (правила доступа к usage — то же).
-const USAGE_TAB = { key: 'firebase', label: 'Расход Firebase' };
+// «Лимиты и расход» (Firebase и Apps Script) видят только CEO и менеджер (правила доступа к usage — то же).
+const USAGE_TAB = { key: 'firebase', label: 'Лимиты и расход' };
 
 export function SettingsPage() {
   const { staff } = useAuth();

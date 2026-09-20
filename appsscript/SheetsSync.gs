@@ -89,6 +89,89 @@ function props_() {
   return PropertiesService.getScriptProperties();
 }
 
+// --- Учёт квот Apps Script ----------------------------------------------------------------------
+// Считаем свои запросы UrlFetch и время работы триггера и раз в USAGE_FLUSH_MS отправляем в CRM
+// (действие 'usage' у leads-api) — они показываются в «Настройки → Лимиты и расход». Отправка стоит
+// один запрос UrlFetch на 10 минут и никогда не ломает основную работу.
+const USAGE_PENDING_KEY = 'USAGE_PENDING';
+const USAGE_LAST_FLUSH_KEY = 'USAGE_LAST_FLUSH';
+const USAGE_FLUSH_MS = 10 * 60 * 1000;
+let USAGE_RUN_ = { fetches: 0 }; // состояние одного выполнения
+
+/** Обёртка над UrlFetchApp.fetch — считает вызовы текущего выполнения. */
+function fetch_(url, options) {
+  USAGE_RUN_.fetches += 1;
+  return UrlFetchApp.fetch(url, options);
+}
+
+function usageMerge_(name, delta) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return;
+  try {
+    const pending = JSON.parse(PropertiesService.getScriptProperties().getProperty(USAGE_PENDING_KEY) || '{}');
+    const cur = pending[name] || { runs: 0, ms: 0, fetches: 0, errors: 0 };
+    ['runs', 'ms', 'fetches', 'errors'].forEach((f) => {
+      cur[f] = (cur[f] || 0) + Math.max(0, Math.round(Number(delta[f]) || 0));
+    });
+    pending[name] = cur;
+    PropertiesService.getScriptProperties().setProperty(USAGE_PENDING_KEY, JSON.stringify(pending));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function usageFlushMaybe_() {
+  const p = PropertiesService.getScriptProperties();
+  if (Date.now() - Number(p.getProperty(USAGE_LAST_FLUSH_KEY) || 0) < USAGE_FLUSH_MS) return;
+  const apiUrl = p.getProperty('LEADS_API_URL');
+  const apiKey = p.getProperty('LEADS_API_KEY');
+  if (!apiUrl || !apiKey) return;
+  const pending = JSON.parse(p.getProperty(USAGE_PENDING_KEY) || '{}');
+  if (!Object.keys(pending).length) return;
+  p.setProperty(USAGE_LAST_FLUSH_KEY, String(Date.now())); // до отправки — чтобы повтор не пришёл раньше времени
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return;
+  try {
+    p.deleteProperty(USAGE_PENDING_KEY);
+  } finally {
+    lock.releaseLock();
+  }
+  try {
+    const resp = fetch_(`${apiUrl}?apiKey=${encodeURIComponent(apiKey)}`, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ action: 'usage', entries: pending }),
+      muteHttpExceptions: true,
+    });
+    if (JSON.parse(resp.getContentText()).status !== 200) throw new Error('usage: ' + resp.getContentText().slice(0, 120));
+    usageMerge_(Object.keys(pending)[0], { fetches: 1 }); // сама отправка тоже тратит квоту
+  } catch (err) {
+    Object.keys(pending).forEach((k) => usageMerge_(k, pending[k])); // вернуть в очередь
+    Logger.log('usage: не отправлено, останется в очереди: ' + (err.message || err));
+  }
+}
+
+/** Выполняет work() и записывает время, число запросов UrlFetch и ошибку в счётчики под ключом name (trg_* / web_*). */
+function trackedRun_(name, work) {
+  const started = Date.now();
+  USAGE_RUN_ = { fetches: 0 };
+  let failed = 0;
+  try {
+    return work();
+  } catch (err) {
+    failed = 1;
+    throw err;
+  } finally {
+    try {
+      usageMerge_(name, { runs: 1, ms: Date.now() - started, fetches: USAGE_RUN_.fetches, errors: failed });
+      usageFlushMaybe_();
+    } catch (e) {
+      // квота/сеть — счётчики отстанут, работа не страдает
+    }
+  }
+}
+
+
 /** Таблица-источник — контейнер по умолчанию, либо SPREADSHEET_ID, если задан. */
 function getSpreadsheet_() {
   const id = props_().getProperty('SPREADSHEET_ID');
@@ -172,7 +255,7 @@ function sendLead_(payload) {
   if (!apiUrl || !apiKey) throw new Error('LEADS_API_URL/LEADS_API_KEY не заданы в Script Properties.');
 
   const url = `${apiUrl}?${encodeURIComponent('apiKey')}=${encodeURIComponent(apiKey)}`;
-  const resp = UrlFetchApp.fetch(url, {
+  const resp = fetch_(url, {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify({ ...payload, apiKey }),
@@ -309,6 +392,10 @@ function syncSheet_(sheet, budget, deadlineMs) {
  * Без лока — return сразу, следующий тик подхватит.
  */
 function syncNewLeadsToCrm() {
+  return trackedRun_('trg_sync', syncNewLeadsToCrmLocked_);
+}
+
+function syncNewLeadsToCrmLocked_() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) {
     Logger.log('Предыдущий проход ещё выполняется — пропускаю этот тик.');
