@@ -19,15 +19,13 @@
  * даже если студент потом ушёл/архивировался).
  *
  * КАЖДЫЙ ПРОГОН ПЕРЕЗАПИСЫВАЕТ лист целиком (не апдейт по индексу строки) —
- * так порядок по времени гарантирован. Но won/lost в CRM НЕ ЧИТАЮТСЯ: лид,
- * получивший финальный статус, больше не меняется, поэтому его строка
+ * так порядок по времени гарантирован. Но won/lost за всё время НЕ ЧИТАЮТСЯ:
+ * лид, получивший финальный статус, больше не меняется, поэтому его строка
  * остаётся в листе как есть (см. exportOnce_). Из CRM каждый прогон
- * забираются только «живые» стадии (new, calling, trial_scheduled, trial_completed, closing) плюс
- * won/lost за последние RECENT_FINAL_DAYS дней (чтобы поймать лидов,
- * которые появились и сразу стали won/lost между прогонами). Полная выгрузка
- * won/lost — только при пустом листе и когда в листе есть «живая» строка,
- * которой уже нет среди живых стадий CRM (значит она ушла в won/lost, а
- * webhook doPost её не обновил).
+ * забираются только «живые» стадии (new, calling, trial_scheduled,
+ * trial_completed, closing) плюс won/lost лидов, СОЗДАННЫХ В ТЕКУЩЕМ МЕСЯЦЕ
+ * (лиды прошлых месяцев не перечитываются никогда). Смена статуса лида,
+ * созданного раньше этого месяца, доезжает в таблицу через webhook doPost.
  *
  * Настройка:
  *   1. В целевой таблице: Extensions → Apps Script.
@@ -54,11 +52,8 @@ const SHEET_NAME = 'leads 15 sept';
 // это единственное место правды по стадиям воронки.
 const ACTIVE_STAGES = ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing'];
 const FINAL_STAGES = ['won', 'lost'];
-// Значения колонки «Статус» (см. statusLabel_), которые больше не перечитываются.
-const FINAL_STATUSES = ['won', 'lost'];
-// won/lost, созданные за последние N дней, перечитываются каждый прогон —
-// это страховка для лидов, которых ещё нет в листе (см. exportOnce_).
-const RECENT_FINAL_DAYS = 7;
+// won/lost перечитываются только для лидов, созданных с начала текущего месяца
+// (см. monthStartIso_ и exportOnce_).
 const ALLOWED_SOURCES = ['meta_target', 'target_manual'];
 
 const QUAL_STAGES = ['trial_scheduled', 'trial_completed', 'closing'];
@@ -242,6 +237,12 @@ function exportOnce() {
   }
 }
 
+/** Начало текущего месяца (00:00 в часовом поясе скрипта) как ISO-строка — граница для won/lost. */
+function monthStartIso_() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+}
+
 /** «дд.мм.гг чч:мм» (или Date, если Sheets сам превратил строку в дату) → мс, 0 если не распарсилось. */
 function parseSheetTime_(value) {
   if (value instanceof Date) return value.getTime();
@@ -279,21 +280,11 @@ function exportOnce_() {
     activeKeys[leadKey_(lead)] = true;
   });
 
-  // 2) won/lost — по умолчанию НЕ читаем существующие строки. Полная выгрузка
-  // нужна только если лист пуст (первый прогон) или в нём есть «живая» строка,
-  // которой уже нет среди живых стадий CRM: лид ушёл в won/lost, а webhook
-  // (doPost) строку не обновил. Иначе — только won/lost за последние
-  // RECENT_FINAL_DAYS дней: строк для них в листе ещё может не быть.
-  const vanished = existing.filter(
-    (r) => FINAL_STATUSES.indexOf(String(r[statusCol])) === -1 && !activeKeys[String(r[idCol])],
-  );
-  const fullFinal = existing.length === 0 || vanished.length > 0;
-  const cutoff = fullFinal ? null : new Date(Date.now() - RECENT_FINAL_DAYS * 86400000).toISOString();
-  const finals = FINAL_STAGES.reduce((acc, st) => acc.concat(fetchStage_(st, cutoff)), []);
-  Logger.log(
-    'won/lost: ' + (fullFinal ? 'полная выгрузка (лист пуст или есть ушедшие «живые» строки: ' + vanished.length + ')' : 'только за ' + RECENT_FINAL_DAYS + ' дн.') +
-      ', получено ' + finals.length + '.',
-  );
+  // 2) won/lost — ТОЛЬКО лиды, созданные в текущем месяце. Всё, что раньше,
+  // уже финальное и остаётся в листе как есть, из CRM не читается.
+  const monthStart = monthStartIso_();
+  const finals = FINAL_STAGES.reduce((acc, st) => acc.concat(fetchStage_(st, monthStart)), []);
+  Logger.log('won/lost за текущий месяц (с ' + monthStart + '): ' + finals.length + '.');
 
   // 3) Свежие данные CRM + строки листа, которых в них нет (старые won/lost остаются как были).
   const fetched = active.concat(finals);
