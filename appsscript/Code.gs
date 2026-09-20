@@ -476,9 +476,14 @@ function listLeads_(params) {
   const filters = [];
   if (params.status) filters.push({ field: 'funnelStage', op: 'EQUAL', value: params.status });
   if (params.source) filters.push({ field: 'source', op: 'EQUAL', value: params.source });
+  // created_after/created_before — прямо в запрос Firestore (индекс funnelStage+createdAt тот же, что у
+  // orderBy ниже), а не фильтром по уже прочитанным 1000 документам: иначе «список за неделю» читает всё.
+  const createdAfter = params.created_after ? new Date(params.created_after) : null;
+  const createdBefore = params.created_before ? new Date(params.created_before) : null;
+  if (createdAfter && !isNaN(createdAfter)) filters.push({ field: 'createdAt', op: 'GREATER_THAN_OR_EQUAL', value: createdAfter });
+  if (createdBefore && !isNaN(createdBefore)) filters.push({ field: 'createdAt', op: 'LESS_THAN_OR_EQUAL', value: createdBefore });
 
-  // created_after/created_before требуют доп. фильтра на createdAt — Firestore
-  // REST не даёт OFFSET/COUNT дёшево, поэтому пагинация здесь offset-based
+  // Firestore REST не даёт OFFSET/COUNT дёшево, поэтому пагинация здесь offset-based
   // (перечитывает limit*page документов) — приемлемо при объёме одной школы,
   // не рассчитано на десятки тысяч лидов.
   let all = runQuery_('students', filters.length ? filters : [{ field: 'status', op: 'EQUAL', value: 'lead' }], {

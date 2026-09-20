@@ -18,11 +18,16 @@
  * won/lost — финальные фактически (funnelStage не меняется задним числом
  * даже если студент потом ушёл/архивировался).
  *
- * КАЖДЫЙ ПРОГОН ПОЛНОСТЬЮ ПЕРЕЗАПИСЫВАЕТ данные (не апдейт по индексу
- * строки) — так порядок по времени гарантирован, и любой мусор от
- * предыдущих версий скрипта/ручных правок самовосстанавливается за один
- * тик, а не накапливается. Строка полностью определяется текущим
- * состоянием CRM, вручную в неё лучше не писать — перезапишет.
+ * КАЖДЫЙ ПРОГОН ПЕРЕЗАПИСЫВАЕТ лист целиком (не апдейт по индексу строки) —
+ * так порядок по времени гарантирован. Но won/lost в CRM НЕ ЧИТАЮТСЯ: лид,
+ * получивший финальный статус, больше не меняется, поэтому его строка
+ * остаётся в листе как есть (см. exportOnce_). Из CRM каждый прогон
+ * забираются только «живые» стадии (new, calling, trial_scheduled, trial_completed, closing) плюс
+ * won/lost за последние RECENT_FINAL_DAYS дней (чтобы поймать лидов,
+ * которые появились и сразу стали won/lost между прогонами). Полная выгрузка
+ * won/lost — только при пустом листе и когда в листе есть «живая» строка,
+ * которой уже нет среди живых стадий CRM (значит она ушла в won/lost, а
+ * webhook doPost её не обновил).
  *
  * Настройка:
  *   1. В целевой таблице: Extensions → Apps Script.
@@ -47,7 +52,13 @@ const SHEET_NAME = 'leads 15 sept';
 
 // Порядок и ключи — см. src/components/leads/columns.js в репозитории CRM,
 // это единственное место правды по стадиям воронки.
-const STAGES = ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing', 'won', 'lost'];
+const ACTIVE_STAGES = ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing'];
+const FINAL_STAGES = ['won', 'lost'];
+// Значения колонки «Статус» (см. statusLabel_), которые больше не перечитываются.
+const FINAL_STATUSES = ['won', 'lost'];
+// won/lost, созданные за последние N дней, перечитываются каждый прогон —
+// это страховка для лидов, которых ещё нет в листе (см. exportOnce_).
+const RECENT_FINAL_DAYS = 7;
 const ALLOWED_SOURCES = ['meta_target', 'target_manual'];
 
 const QUAL_STAGES = ['trial_scheduled', 'trial_completed', 'closing'];
@@ -134,12 +145,18 @@ function apiGet_(action, params) {
   throw lastErr;
 }
 
-/** Все лиды данной стадии (все страницы), уже отфильтрованные по ALLOWED_SOURCES. */
-function fetchStage_(stage) {
+/**
+ * Все лиды данной стадии (все страницы), уже отфильтрованные по ALLOWED_SOURCES.
+ * `createdAfter` (ISO) — только лиды, созданные не раньше этого момента (сервер
+ * сам ограничивает выборку, если Code.gs задеплоен с поддержкой created_after).
+ */
+function fetchStage_(stage, createdAfter) {
   const out = [];
   let page = 1;
   for (;;) {
-    const json = apiGet_('list', { status: stage, per_page: '100', page: String(page) });
+    const params = { status: stage, per_page: '100', page: String(page) };
+    if (createdAfter) params.created_after = createdAfter;
+    const json = apiGet_('list', params);
     json.data.forEach((lead) => {
       if (ALLOWED_SOURCES.indexOf(lead.source) !== -1) out.push(lead);
     });
@@ -225,22 +242,76 @@ function exportOnce() {
   }
 }
 
+/** «дд.мм.гг чч:мм» (или Date, если Sheets сам превратил строку в дату) → мс, 0 если не распарсилось. */
+function parseSheetTime_(value) {
+  if (value instanceof Date) return value.getTime();
+  const m = /^(\d{2})\.(\d{2})\.(\d{2}) (\d{2}):(\d{2})$/.exec(String(value || '').trim());
+  if (!m) return 0;
+  return new Date(2000 + Number(m[3]), Number(m[2]) - 1, Number(m[1]), Number(m[4]), Number(m[5])).getTime();
+}
+
+/** Строки данных листа (без шапки и без пустых по id) — как массивы значений в порядке HEADER. */
+function readExistingRows_(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const idCol = HEADER.indexOf('id');
+  return sheet
+    .getRange(2, 1, lastRow - 1, HEADER.length)
+    .getValues()
+    .filter((r) => String(r[idCol]).trim() !== '');
+}
+
 function exportOnce_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) throw new Error('Лист "' + SHEET_NAME + '" не найден в таблице.');
   ensureHeader_(sheet);
 
-  const leads = STAGES.reduce((acc, s) => acc.concat(fetchStage_(s)), []);
+  const idCol = HEADER.indexOf('id');
+  const statusCol = HEADER.indexOf('Статус');
+  const timeCol = HEADER.indexOf('created_time');
+  const existing = readExistingRows_(sheet);
+
+  // 1) «Живые» стадии — читаем всегда, там статус ещё меняется.
+  const active = ACTIVE_STAGES.reduce((acc, st) => acc.concat(fetchStage_(st)), []);
+  const activeKeys = {};
+  active.forEach((lead) => {
+    activeKeys[leadKey_(lead)] = true;
+  });
+
+  // 2) won/lost — по умолчанию НЕ читаем существующие строки. Полная выгрузка
+  // нужна только если лист пуст (первый прогон) или в нём есть «живая» строка,
+  // которой уже нет среди живых стадий CRM: лид ушёл в won/lost, а webhook
+  // (doPost) строку не обновил. Иначе — только won/lost за последние
+  // RECENT_FINAL_DAYS дней: строк для них в листе ещё может не быть.
+  const vanished = existing.filter(
+    (r) => FINAL_STATUSES.indexOf(String(r[statusCol])) === -1 && !activeKeys[String(r[idCol])],
+  );
+  const fullFinal = existing.length === 0 || vanished.length > 0;
+  const cutoff = fullFinal ? null : new Date(Date.now() - RECENT_FINAL_DAYS * 86400000).toISOString();
+  const finals = FINAL_STAGES.reduce((acc, st) => acc.concat(fetchStage_(st, cutoff)), []);
+  Logger.log(
+    'won/lost: ' + (fullFinal ? 'полная выгрузка (лист пуст или есть ушедшие «живые» строки: ' + vanished.length + ')' : 'только за ' + RECENT_FINAL_DAYS + ' дн.') +
+      ', получено ' + finals.length + '.',
+  );
+
+  // 3) Свежие данные CRM + строки листа, которых в них нет (старые won/lost остаются как были).
+  const fetched = active.concat(finals);
+  const fetchedKeys = {};
+  const items = fetched.map((lead) => {
+    fetchedKeys[leadKey_(lead)] = true;
+    return { ts: new Date(lead.createdAt || 0).getTime() || 0, row: leadRow_(lead) };
+  });
+  existing.forEach((r) => {
+    if (!fetchedKeys[String(r[idCol])]) items.push({ ts: parseSheetTime_(r[timeCol]), row: r });
+  });
   // По времени попадания в CRM, новые сверху — иначе порядок шёл блоками
   // по статусу (сперва все in process, потом qual...), не по факту прихода.
-  leads.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  const rows = leads.map(leadRow_);
+  items.sort((a, b) => b.ts - a.ts);
+  const rows = items.map((it) => it.row);
 
   // Полная перезапись данных (без шапки), не апдейт по индексу строки —
-  // так порядок по времени гарантирован при каждом прогоне, и любой мусор
-  // от предыдущих версий/ручных правок сам исчезает за один тик, вместо
-  // накопления дыр и висящих строк между перезапусками.
+  // так порядок по времени гарантирован при каждом прогоне.
   const allocatedDataRows = sheet.getMaxRows() - 1;
   if (allocatedDataRows > 0) {
     sheet.getRange(2, 1, allocatedDataRows, HEADER.length).clearContent();
@@ -249,7 +320,7 @@ function exportOnce_() {
     sheet.getRange(2, 1, rows.length, HEADER.length).setValues(rows);
   }
 
-  Logger.log('Готово: строк записано ' + rows.length + '.');
+  Logger.log('Готово: строк записано ' + rows.length + ' (из CRM ' + fetched.length + ', оставлено из листа ' + (rows.length - fetched.length) + ').');
 }
 
 /**
