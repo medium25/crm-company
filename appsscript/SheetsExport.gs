@@ -25,9 +25,11 @@
  * забираются:
  *   • живые стадии (new, calling, trial_scheduled, trial_completed, closing);
  *   • won лидов, созданных за последние 2 месяца (текущий + прошлый);
- *   • lost из CRM НЕ читается вовсе — он выводится: строка, которая в листе
- *     «in process»/«qual», но уже пропала из живых стадий и не нашлась среди
- *     won, считается lost (лид ушёл в отказ, либо удалён из CRM).
+ *   • lost лидов, созданных в ТЕКУЩЕМ месяце;
+ *   • старше этих окон won/lost не читаются: строки остаются в листе как есть.
+ * Плюс страховка для более старых: строка, которая в листе «in process»/
+ * «qual», но уже пропала из живых стадий и не нашлась ни в won, ни в lost
+ * выше, считается lost (лид ушёл в отказ давно, либо удалён из CRM).
  * Мгновенное обновление статуса при смене стадии всё равно идёт через
  * webhook doPost (см. ниже) — этот прогон только страховка и подхват новых.
  *
@@ -57,7 +59,8 @@ const SHEET_NAME = 'leads 15 sept';
 const ACTIVE_STAGES = ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing'];
 // Значения колонки «Статус» (см. statusLabel_) у «живых» лидов — только они пересчитываются.
 const LIVE_STATUSES = ['in process', 'qual'];
-// won читается для лидов, созданных с начала ПРОШЛОГО месяца (см. wonWindowStartIso_).
+// won читается для лидов, созданных с начала ПРОШЛОГО месяца (см. wonWindowStartIso_),
+// lost — для созданных с начала ТЕКУЩЕГО (см. monthStartIso_).
 const ALLOWED_SOURCES = ['meta_target', 'target_manual'];
 
 const QUAL_STAGES = ['trial_scheduled', 'trial_completed', 'closing'];
@@ -241,6 +244,12 @@ function exportOnce() {
   }
 }
 
+/** Начало текущего месяца (00:00 в часовом поясе скрипта) как ISO-строка — граница для lost. */
+function monthStartIso_() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+}
+
 /** Начало прошлого месяца (00:00 в часовом поясе скрипта) как ISO-строка — граница для won («последние 2 месяца»). */
 function wonWindowStartIso_() {
   const now = new Date();
@@ -280,16 +289,19 @@ function exportOnce_() {
   // 1) «Живые» стадии — читаем всегда, там статус ещё меняется.
   const active = ACTIVE_STAGES.reduce((acc, st) => acc.concat(fetchStage_(st)), []);
 
-  // 2) won — лиды, созданные за последние 2 месяца. Всё старее уже финальное и
-  // остаётся в листе как есть. lost из CRM не читаем совсем (см. ниже).
+  // 2) won — лиды, созданные за последние 2 месяца; lost — созданные в текущем
+  // месяце. Всё старее уже финальное и остаётся в листе как есть.
   const wonSince = wonWindowStartIso_();
   const won = fetchStage_('won', wonSince);
-  Logger.log('won с ' + wonSince + ': ' + won.length + '.');
+  const lostSince = monthStartIso_();
+  const lost = fetchStage_('lost', lostSince);
+  Logger.log('won с ' + wonSince + ': ' + won.length + '; lost с ' + lostSince + ': ' + lost.length + '.');
 
   // 3) Свежие данные CRM + строки листа, которых в них нет. Живая строка
-  // («in process»/«qual»), пропавшая и из живых стадий, и из won, — это lost.
-  // Строки со статусом won/lost, которых в свежей выгрузке нет, остаются как были.
-  const fetched = active.concat(won);
+  // («in process»/«qual»), пропавшая и из живых стадий, и из won/lost выше, —
+  // это lost (ушла в отказ давно). Строки со статусом won/lost, которых в свежей
+  // выгрузке нет, остаются как были.
+  const fetched = active.concat(won, lost);
   const fetchedKeys = {};
   const items = fetched.map((lead) => {
     fetchedKeys[leadKey_(lead)] = true;
@@ -306,7 +318,7 @@ function exportOnce_() {
     }
     items.push({ ts: parseSheetTime_(r[timeCol]), row: row });
   });
-  Logger.log('Выведено lost (пропали из живых стадий и не в won): ' + inferredLost + '.');
+  Logger.log('Выведено lost (пропали из живых стадий и не нашлись в won/lost): ' + inferredLost + '.');
   // По времени попадания в CRM, новые сверху — иначе порядок шёл блоками
   // по статусу (сперва все in process, потом qual...), не по факту прихода.
   items.sort((a, b) => b.ts - a.ts);
