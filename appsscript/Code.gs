@@ -26,6 +26,41 @@ const FIRESTORE_SCOPE = 'https://www.googleapis.com/auth/datastore';
 const TOKEN_CACHE_KEY = 'firestore_access_token';
 const RATE_LIMIT_PER_MINUTE = 60;
 
+// --- Экономия запросов и чтений ------------------------------------------------
+// Каждый вызов UrlFetchApp — из суточной квоты (20 000), каждое прочитанное
+// документа — из суточной квоты Firestore (Spark: 50 000). Редко меняющееся
+// (ключи API, настройки филиала, список операторов, имена) читаем раз в несколько
+// минут и держим в CacheService, а не при каждом запросе.
+const KEY_CACHE_SEC = 120; // отзыв API-ключа вступает в силу не позже, чем через это время
+const SETTINGS_CACHE_SEC = 300;
+const NAMES_CACHE_SEC = 600;
+const LAST_USED_THROTTLE_SEC = 600; // apiKeys.lastUsedAt пишем не чаще, чем раз в 10 минут на ключ
+
+/**
+ * Значение из CacheService, а при промахе — loader() и запись в кэш. null/undefined
+ * не кэшируются (чтобы «нет такого ключа/лида» не залипало).
+ */
+function cached_(key, ttlSec, loader) {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get(key);
+  if (hit !== null) {
+    try {
+      return JSON.parse(hit);
+    } catch (e) {
+      // битая запись — перечитаем
+    }
+  }
+  const value = loader();
+  if (value !== null && value !== undefined) {
+    try {
+      cache.put(key, JSON.stringify(value), ttlSec);
+    } catch (e) {
+      // слишком большое значение (лимит 100 КБ) — работаем без кэша
+    }
+  }
+  return value;
+}
+
 function props_() {
   return PropertiesService.getScriptProperties();
 }
@@ -220,8 +255,11 @@ function authenticate_(rawKey, requiredScope) {
   if (!rawKey) throw apiError_(401, 'Не передан apiKey.');
   const hash = sha256Hex_(rawKey);
 
-  const result = runQuery_('apiKeys', [{ field: 'hash', op: 'EQUAL', value: hash }]);
-  const keyDoc = result[0];
+  // Ключ читаем из Firestore раз в KEY_CACHE_SEC, а не на каждый запрос (это 1 запрос UrlFetch + 1 чтение).
+  const keyDoc = cached_('apikey:' + hash, KEY_CACHE_SEC, () => {
+    const doc = runQuery_('apiKeys', [{ field: 'hash', op: 'EQUAL', value: hash }])[0];
+    return doc ? { id: doc.id, name: doc.name, scope: doc.scope, revoked: Boolean(doc.revoked) } : null;
+  });
   if (!keyDoc || keyDoc.revoked) throw apiError_(401, 'Неверный или отозванный API-ключ.');
 
   const cache = CacheService.getScriptCache();
@@ -236,9 +274,14 @@ function authenticate_(rawKey, requiredScope) {
     (requiredScope === 'read' && keyDoc.scope === 'write'); // write подразумевает возможность читать своё же
   if (!scopeOk) throw apiError_(403, `Ключ "${keyDoc.name}" не имеет прав "${requiredScope}".`);
 
-  fsRequest_('PATCH', `/apiKeys/${keyDoc.id}?updateMask.fieldPaths=lastUsedAt`, {
-    fields: { lastUsedAt: { timestampValue: new Date().toISOString() } },
-  });
+  // lastUsedAt — раз в LAST_USED_THROTTLE_SEC, а не на каждый запрос (это запись в Firestore + запрос UrlFetch).
+  const usedKey = `keyused:${keyDoc.id}`;
+  if (!cache.get(usedKey)) {
+    fsRequest_('PATCH', `/apiKeys/${keyDoc.id}?updateMask.fieldPaths=lastUsedAt`, {
+      fields: { lastUsedAt: { timestampValue: new Date().toISOString() } },
+    });
+    cache.put(usedKey, '1', LAST_USED_THROTTLE_SEC);
+  }
 
   return keyDoc;
 }
@@ -256,19 +299,42 @@ function apiError_(status, message) {
  * @param {Array<{field:string, op:string, value:*}>} filters op — 'EQUAL' | 'GREATER_THAN' | 'LESS_THAN' | ...
  * @param {{limit?:number, orderBy?:{field:string,dir?:string}}} [opts]
  */
+function buildWhere_(filters) {
+  return filters.length === 1
+    ? { fieldFilter: { field: { fieldPath: filters[0].field }, op: filters[0].op, value: toFsValue_(filters[0].value) } }
+    : {
+        compositeFilter: {
+          op: 'AND',
+          filters: filters.map((f) => ({
+            fieldFilter: { field: { fieldPath: f.field }, op: f.op, value: toFsValue_(f.value) },
+          })),
+        },
+      };
+}
+
+/**
+ * Число документов по фильтру одним запросом-агрегатом (COUNT) — Firestore берёт ~1 чтение
+ * на 1000 записей индекса, а не по чтению на каждый документ. При любой ошибке (в т.ч. если
+ * агрегаты временно отклоняются по квоте) возвращает null — вызывающий код откатится на обычный запрос.
+ */
+function countDocs_(collectionId, filters) {
+  try {
+    const resp = fsRequest_('POST', ':runAggregationQuery', {
+      structuredAggregationQuery: {
+        structuredQuery: { from: [{ collectionId }], where: filters.length ? buildWhere_(filters) : undefined },
+        aggregations: [{ count: {}, alias: 'n' }],
+      },
+    });
+    const value = resp && resp[0] && resp[0].result && resp[0].result.aggregateFields && resp[0].result.aggregateFields.n;
+    return value && 'integerValue' in value ? Number(value.integerValue) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 function runQuery_(collectionId, filters, opts) {
   opts = opts || {};
-  const where =
-    filters.length === 1
-      ? { fieldFilter: { field: { fieldPath: filters[0].field }, op: filters[0].op, value: toFsValue_(filters[0].value) } }
-      : {
-          compositeFilter: {
-            op: 'AND',
-            filters: filters.map((f) => ({
-              fieldFilter: { field: { fieldPath: f.field }, op: f.op, value: toFsValue_(f.value) },
-            })),
-          },
-        };
+  const where = buildWhere_(filters);
 
   const structuredQuery = {
     from: [{ collectionId }],
@@ -341,20 +407,22 @@ function isOperatorWorkingAt_(workSchedule, date) {
  * в React-версии, чтобы поведение не расходилось до первой настройки).
  */
 function nextLeastLoadedOperator_(branchId, createdAt) {
-  const settings = fromFsDoc_(fsGetOptional_(`/settings/${branchId}`) || { fields: {} });
+  // Настройки филиала и список операторов — из кэша (раз в SETTINGS_CACHE_SEC), не два запроса на каждого лида.
+  const settings = cached_('settings:' + branchId, SETTINGS_CACHE_SEC, () => fromFsDoc_(fsGetOptional_(`/settings/${branchId}`) || { fields: {} }));
   let ids = settings.activeLeadOperators;
   if (!ids || !ids.length) {
-    const operatorsResult = runQuery_(
-      'staff',
-      [
-        { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
-        { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
-      ],
-      { limit: 30 },
+    ids = cached_('operators:' + branchId, SETTINGS_CACHE_SEC, () =>
+      runQuery_(
+        'staff',
+        [
+          { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
+          { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
+        ],
+        { limit: 30 },
+      ).map((s) => s.id),
     );
-    ids = operatorsResult.map((s) => s.id);
   }
-  if (!ids.length) return null;
+  if (!ids || !ids.length) return null;
 
   const schedules = settings.operatorSchedules || {};
   const onShiftIds = ids.filter((id) => isOperatorWorkingAt_(schedules[id], createdAt));
@@ -363,16 +431,15 @@ function nextLeastLoadedOperator_(branchId, createdAt) {
   let best = null;
   let bestCount = Infinity;
   candidateIds.forEach((id) => {
-    const leads = runQuery_(
-      'students',
-      [
-        { field: 'assignedOperator', op: 'EQUAL', value: id },
-        { field: 'funnelStage', op: 'IN', value: ['new', 'calling'] },
-      ],
-      { limit: 500 },
-    );
-    if (leads.length < bestCount) {
-      bestCount = leads.length;
+    const filters = [
+      { field: 'assignedOperator', op: 'EQUAL', value: id },
+      { field: 'funnelStage', op: 'IN', value: ['new', 'calling'] },
+    ];
+    // Загрузка оператора — COUNT одним запросом (≈1 чтение) вместо чтения до 500 документов на каждого оператора.
+    let count = countDocs_('students', filters);
+    if (count === null) count = runQuery_('students', filters, { limit: 500 }).length;
+    if (count < bestCount) {
+      bestCount = count;
       best = id;
     }
   });
@@ -471,7 +538,9 @@ function createLead_(body) {
 
 function listLeads_(params) {
   const page = Math.max(1, Number(params.page) || 1);
-  const perPage = Math.min(100, Math.max(1, Number(params.per_page) || 20));
+  // До 1000 за страницу: стадию можно забрать одним запросом (раньше при 100 на страницу каждая следующая
+  // страница перечитывала все документы стадии заново — offset-пагинация).
+  const perPage = Math.min(1000, Math.max(1, Number(params.per_page) || 20));
 
   const filters = [];
   if (params.status) filters.push({ field: 'funnelStage', op: 'EQUAL', value: params.status });
@@ -724,17 +793,25 @@ function buildOperatorReportText_(op, windowStart, windowEnd) {
  */
 function checkAndSendDailyOperatorReports() {
   const branchId = defaultBranchId_();
-  const settingsDoc = fsGetOptional_(`/settings/${branchId}`);
-  const schedules = (settingsDoc ? fromFsDoc_(settingsDoc) : {}).operatorSchedules || {};
+  // Триггер идёт каждые 5 минут (288 раз в сутки) — график смен и список операторов держим в кэше на 30 минут,
+  // иначе каждый тик = 2 запроса UrlFetch и несколько чтений впустую, хотя отчёт нужен раз в день на оператора.
+  const schedules =
+    cached_('report:schedules:' + branchId, 1800, () => {
+      const settingsDoc = fsGetOptional_(`/settings/${branchId}`);
+      return (settingsDoc ? fromFsDoc_(settingsDoc) : {}).operatorSchedules || {};
+    }) || {};
 
-  const operators = runQuery_(
-    'staff',
-    [
-      { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
-      { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
-    ],
-    { limit: 30 },
-  );
+  const operators =
+    cached_('report:operators:' + branchId, 1800, () =>
+      runQuery_(
+        'staff',
+        [
+          { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
+          { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
+        ],
+        { limit: 30 },
+      ),
+    ) || [];
 
   const now = new Date();
   const cache = CacheService.getScriptCache();
@@ -949,7 +1026,7 @@ function checkTelegramCommands_() {
  * Разовая настройка — запусти один раз (Run из редактора). Снимает webhook,
  * если он был поставлен раньше (getUpdates и webhook несовместимы —
  * Telegram отдаст 409, пока webhook висит), и ставит триггер опроса
- * команд раз в минуту.
+ * команд раз в 10 минут.
  * ADMIN_TELEGRAM_USER_ID не обязателен — без него редактировать шаблон
  * (см. handleTelegramUpdate_) сможет кто угодно, кто напишет боту; задай
  * это свойство, когда захочешь ограничить только собой.
@@ -961,8 +1038,8 @@ function installTelegramCommandPolling() {
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'checkTelegramCommands_')
     .forEach((t) => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('checkTelegramCommands_').timeBased().everyMinutes(1).create();
-  Logger.log('Опрос команд Telegram запущен — раз в минуту.');
+  ScriptApp.newTrigger('checkTelegramCommands_').timeBased().everyMinutes(10).create();
+  Logger.log('Опрос команд Telegram запущен — раз в 10 минут (команды правки шаблона отчёта редкие; раз в минуту это 1440 запросов UrlFetch в сутки).');
 }
 
 /**
@@ -973,8 +1050,11 @@ function installTelegramCommandPolling() {
 function resolveOperatorName_(uid, cache) {
   if (!uid) return null;
   if (Object.prototype.hasOwnProperty.call(cache, uid)) return cache[uid];
-  const doc = fsGetOptional_(`/staff/${uid}`);
-  const name = doc ? fromFsDoc_(doc).fullName || null : null;
+  // Имя оператора — из CacheService на NAMES_CACHE_SEC (раньше — запрос UrlFetch + чтение на каждый вызов list).
+  const name = cached_('opname:' + uid, NAMES_CACHE_SEC, () => {
+    const doc = fsGetOptional_(`/staff/${uid}`);
+    return doc ? fromFsDoc_(doc).fullName || null : null;
+  });
   cache[uid] = name;
   return name;
 }

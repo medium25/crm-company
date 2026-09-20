@@ -156,13 +156,14 @@ function fetchStage_(stage, createdAfter) {
   const out = [];
   let page = 1;
   for (;;) {
-    const params = { status: stage, per_page: '100', page: String(page) };
+    // 1000 на страницу (старая версия API отдаст 100 — цикл ниже ориентируется на реальный per_page ответа).
+    const params = { status: stage, per_page: '1000', page: String(page) };
     if (createdAfter) params.created_after = createdAfter;
     const json = apiGet_('list', params);
     json.data.forEach((lead) => {
       if (ALLOWED_SOURCES.indexOf(lead.source) !== -1) out.push(lead);
     });
-    if (page * 100 >= json.total) break;
+    if (page * (json.per_page || 100) >= json.total) break;
     page += 1;
   }
   return out;
