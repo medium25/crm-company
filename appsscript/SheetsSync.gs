@@ -64,7 +64,26 @@ const FIELD_HEADERS = {
 const SYNCED_AT_HEADER = 'CRM synced';
 const SYNCED_ID_HEADER = 'CRM lead id';
 const SYNCED_ERROR_HEADER = 'CRM error';
-const MAX_ROWS_PER_RUN = 25; // общий бюджет на ВСЕ листы за один тик — не бьём rate limit (60/мин на ключ)
+const MAX_ROWS_PER_RUN = 10; // общий бюджет на ВСЕ листы за один тик (было 25) — не бьём rate limit (60/мин на ключ) и суточную квоту UrlFetch
+const RUN_TIME_BUDGET_MS = 4 * 60 * 1000; // проход сам останавливается заранее (лимит Apps Script — 6 минут)
+
+// --- Повторы упавших строк ---------------------------------------------------
+// Раньше строка, которую не удалось отправить, оставалась «несинхронизированной» и
+// её брал следующий тик — снова и снова, без пауз и без предела. При исчерпанной
+// квоте UrlFetch это давало бесконечный цикл: 25 строк × ~7 с на каждой минуте, и
+// каждая попытка тратила ещё запросы после сброса квоты. Теперь:
+//  • ошибка квоты («Service invoked too many times…», 429) останавливает ВЕСЬ проход
+//    и ставит паузу (QUOTA_BLOCKED_UNTIL) — строки не трогаются, попытки не тратятся;
+//  • обычная ошибка строки пишется в «CRM error» как «ERR#n <время> <текст>» и
+//    повторяется с нарастающей паузой (RETRY_BACKOFF_MIN), максимум MAX_ATTEMPTS раз;
+//  • после этого строка помечается «СТОП# …» и больше не берётся, пока не очистить
+//    ячейку «CRM error» вручную (или запустить retryFailedRows).
+const MAX_ATTEMPTS = 5;
+const RETRY_BACKOFF_MIN = [5, 15, 60, 180]; // пауза после 1-й, 2-й, 3-й, 4-й неудачи
+const ERR_PREFIX = 'ERR#';
+const GAVE_UP_PREFIX = 'СТОП#';
+const NO_CONTACT_ERROR = 'Нет имени или телефона — пропущена';
+const QUOTA_BLOCK_KEY = 'QUOTA_BLOCKED_UNTIL';
 
 function props_() {
   return PropertiesService.getScriptProperties();
@@ -164,15 +183,68 @@ function sendLead_(payload) {
   return json.data;
 }
 
+/** Ошибка исчерпанной квоты/лимита (а не «плохая строка»): её повтор ничего не даст, пока квота не сбросится. */
+function isQuotaError_(message) {
+  return /Service invoked too many times|too many times for one day|Quota exceeded|Превышен лимит|\b429\b/i.test(String(message));
+}
+
+/** Мс до полуночи по Тихому океану — тогда сбрасываются суточные квоты Apps Script (12:00 по Ташкенту). */
+function msUntilPacificMidnight_() {
+  const parts = Utilities.formatDate(new Date(), 'America/Los_Angeles', 'H:m:s').split(':').map(Number);
+  return (86400 - (parts[0] * 3600 + parts[1] * 60 + parts[2])) * 1000;
+}
+
+/** Ставит паузу всему синку: суточная квота — до сброса (+2 мин), прочий лимит — на 15 минут. */
+function blockSync_(message) {
+  const daily = /one day|за сутки|суточн/i.test(String(message));
+  const until = Date.now() + (daily ? msUntilPacificMidnight_() + 2 * 60000 : 15 * 60000);
+  props_().setProperty(QUOTA_BLOCK_KEY, String(until));
+  Logger.log('Пауза синка до ' + new Date(until).toISOString() + ' (' + (daily ? 'суточная квота' : 'лимит запросов') + '): ' + message);
+}
+
+/** Пауза синка, если она ещё идёт (мс до конца), иначе 0. */
+function syncBlockedForMs_() {
+  const until = Number(props_().getProperty(QUOTA_BLOCK_KEY) || 0);
+  return until > Date.now() ? until - Date.now() : 0;
+}
+
+/** «ERR#3 2026-09-20T07:01:00.000Z текст» → {attempts, at}; старый/чужой текст ошибки → {attempts: 1, at: 0} (можно повторить сразу). */
+function parseErrorCell_(text) {
+  const m = new RegExp('^' + ERR_PREFIX + '(\\d+) (\\S+)').exec(String(text || ''));
+  if (!m) return { attempts: 1, at: 0 };
+  return { attempts: Number(m[1]), at: new Date(m[2]).getTime() || 0 };
+}
+
+/** Брать ли строку с такой ячейкой «CRM error» сейчас. */
+function shouldAttemptRow_(errorText, nowMs) {
+  const text = String(errorText || '');
+  if (!text || text === 'merged') return true;
+  if (text.indexOf(GAVE_UP_PREFIX) === 0) return false;
+  if (text === NO_CONTACT_ERROR) return false; // чинится только правкой самой строки — очисти ячейку после правки
+  const { attempts, at } = parseErrorCell_(text);
+  if (attempts >= MAX_ATTEMPTS) return false;
+  const waitMin = RETRY_BACKOFF_MIN[Math.min(attempts, RETRY_BACKOFF_MIN.length) - 1];
+  return nowMs >= at + waitMin * 60000;
+}
+
+/** Новый текст ячейки после неудачи: ERR#n… или, на последней попытке, СТОП#… */
+function failureCellText_(errorText, message, nowMs) {
+  const prev = parseErrorCell_(errorText);
+  const attempts = String(errorText || '').indexOf(ERR_PREFIX) === 0 ? prev.attempts + 1 : 1;
+  const stamp = new Date(nowMs).toISOString();
+  if (attempts >= MAX_ATTEMPTS) return GAVE_UP_PREFIX + attempts + ' ' + stamp + ' ' + message + ' (очисти ячейку, чтобы повторить)';
+  return ERR_PREFIX + attempts + ' ' + stamp + ' ' + message;
+}
+
 /**
  * Синкает один лист, обрабатывая не больше budget строк. Возвращает
  * фактически обработанное количество (списывается с общего бюджета в
  * syncNewLeadsToCrm_, чтобы три листа вместе не превысили MAX_ROWS_PER_RUN
  * за один тик).
  */
-function syncSheet_(sheet, budget) {
+function syncSheet_(sheet, budget, deadlineMs) {
   const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return 0;
+  if (data.length < 2) return { processed: 0, stop: false };
 
   const headers = data[0];
   const idx = ensureTrackingColumns_(sheet, headers);
@@ -186,12 +258,18 @@ function syncSheet_(sheet, budget) {
 
   let processed = 0;
   for (let r = startIndex; r < data.length && processed < budget; r++) {
+    if (Date.now() > deadlineMs) {
+      Logger.log('Вышло время прохода — остальное подберёт следующий тик.');
+      return { processed, stop: true };
+    }
     const row = data[r];
     if (row[syncedCol]) continue; // уже отправлена
+    const nowMs = Date.now();
+    if (!shouldAttemptRow_(row[errorCol], nowMs)) continue; // ждёт паузу повтора или сдалась (СТОП#)
 
     const payload = buildPayload_(row, idx, headers, trackingCols);
     if (!payload.fullName || !payload.phone) {
-      sheet.getRange(r + 1, errorCol + 1).setValue('Нет имени или телефона — пропущена');
+      if (row[errorCol] !== NO_CONTACT_ERROR) sheet.getRange(r + 1, errorCol + 1).setValue(NO_CONTACT_ERROR);
       continue;
     }
 
@@ -201,12 +279,18 @@ function syncSheet_(sheet, budget) {
       sheet.getRange(r + 1, idCol + 1).setValue(result.id);
       sheet.getRange(r + 1, errorCol + 1).setValue(result.merged ? 'merged' : '');
     } catch (err) {
-      sheet.getRange(r + 1, errorCol + 1).setValue(String(err.message || err));
-      Logger.log(`${sheet.getName()}, строка ${r + 1}: ${err.message || err}`);
+      const message = String(err.message || err);
+      Logger.log(`${sheet.getName()}, строка ${r + 1}: ${message}`);
+      if (isQuotaError_(message)) {
+        // Не «плохая строка» — кончилась квота. Ячейку и счётчик попыток не трогаем, весь синк на паузу.
+        blockSync_(message);
+        return { processed: processed + 1, stop: true };
+      }
+      sheet.getRange(r + 1, errorCol + 1).setValue(failureCellText_(row[errorCol], message, nowMs));
     }
     processed += 1;
   }
-  return processed;
+  return { processed, stop: false };
 }
 
 /**
@@ -238,6 +322,13 @@ function syncNewLeadsToCrm() {
 }
 
 function syncNewLeadsToCrm_() {
+  const blockedMs = syncBlockedForMs_();
+  if (blockedMs > 0) {
+    // Ни таблицу, ни сеть не трогаем — вся проверка стоит долю секунды.
+    Logger.log('Синк на паузе ещё ' + Math.ceil(blockedMs / 60000) + ' мин (квота/лимит) — пропускаю тик.');
+    return;
+  }
+  const deadlineMs = Date.now() + RUN_TIME_BUDGET_MS;
   const ss = getSpreadsheet_();
   const sheetNames = getSheetNames_(ss);
   let budget = MAX_ROWS_PER_RUN;
@@ -250,11 +341,42 @@ function syncNewLeadsToCrm_() {
       Logger.log(`Лист "${name}" не найден в таблице — пропускаю.`);
       continue;
     }
-    const processed = syncSheet_(sheet, budget);
+    const { processed, stop } = syncSheet_(sheet, budget, deadlineMs);
     budget -= processed;
     totalProcessed += processed;
+    if (stop) break;
   }
   Logger.log(`Обработано строк всего: ${totalProcessed} (листы: ${sheetNames.join(', ')})`);
+}
+
+/**
+ * Ручной сброс: снимает паузу квоты и очищает «CRM error» у строк, которые ждут повтора
+ * или сдались (ERR#/СТОП#), — они снова пойдут в работу. Запусти вручную (Run), когда
+ * исправил причину ошибки. Строки без имени/телефона («Нет имени или телефона») не трогает.
+ */
+function retryFailedRows() {
+  props_().deleteProperty(QUOTA_BLOCK_KEY);
+  const ss = getSpreadsheet_();
+  let cleared = 0;
+  for (const name of getSheetNames_(ss)) {
+    const sheet = ss.getSheetByName(name);
+    if (!sheet || sheet.getLastRow() < 2) continue;
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const errorCol = headers.indexOf(SYNCED_ERROR_HEADER);
+    if (errorCol === -1) continue;
+    const range = sheet.getRange(2, errorCol + 1, sheet.getLastRow() - 1, 1);
+    const values = range.getValues();
+    const next = values.map(([v]) => {
+      const t = String(v || '');
+      if (t.indexOf(ERR_PREFIX) === 0 || t.indexOf(GAVE_UP_PREFIX) === 0) {
+        cleared += 1;
+        return [''];
+      }
+      return [v];
+    });
+    range.setValues(next);
+  }
+  Logger.log('Пауза снята, ячеек «CRM error» очищено: ' + cleared + '.');
 }
 
 /**
@@ -315,7 +437,7 @@ function testSyncOneRow() {
   }
 }
 
-/** Запусти один раз вручную — ставит опрос каждую минуту. */
+/** Запусти один раз вручную — ставит опрос каждую минуту (тик без работы и во время паузы квоты почти ничего не стоит). */
 function installTrigger() {
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'syncNewLeadsToCrm')
