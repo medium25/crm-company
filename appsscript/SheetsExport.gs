@@ -22,10 +22,14 @@
  * так порядок по времени гарантирован. Но won/lost за всё время НЕ ЧИТАЮТСЯ:
  * лид, получивший финальный статус, больше не меняется, поэтому его строка
  * остаётся в листе как есть (см. exportOnce_). Из CRM каждый прогон
- * забираются только «живые» стадии (new, calling, trial_scheduled,
- * trial_completed, closing) плюс won/lost лидов, СОЗДАННЫХ В ТЕКУЩЕМ МЕСЯЦЕ
- * (лиды прошлых месяцев не перечитываются никогда). Смена статуса лида,
- * созданного раньше этого месяца, доезжает в таблицу через webhook doPost.
+ * забираются:
+ *   • живые стадии (new, calling, trial_scheduled, trial_completed, closing);
+ *   • won лидов, созданных за последние 2 месяца (текущий + прошлый);
+ *   • lost из CRM НЕ читается вовсе — он выводится: строка, которая в листе
+ *     «in process»/«qual», но уже пропала из живых стадий и не нашлась среди
+ *     won, считается lost (лид ушёл в отказ, либо удалён из CRM).
+ * Мгновенное обновление статуса при смене стадии всё равно идёт через
+ * webhook doPost (см. ниже) — этот прогон только страховка и подхват новых.
  *
  * Настройка:
  *   1. В целевой таблице: Extensions → Apps Script.
@@ -51,9 +55,9 @@ const SHEET_NAME = 'leads 15 sept';
 // Порядок и ключи — см. src/components/leads/columns.js в репозитории CRM,
 // это единственное место правды по стадиям воронки.
 const ACTIVE_STAGES = ['new', 'calling', 'trial_scheduled', 'trial_completed', 'closing'];
-const FINAL_STAGES = ['won', 'lost'];
-// won/lost перечитываются только для лидов, созданных с начала текущего месяца
-// (см. monthStartIso_ и exportOnce_).
+// Значения колонки «Статус» (см. statusLabel_) у «живых» лидов — только они пересчитываются.
+const LIVE_STATUSES = ['in process', 'qual'];
+// won читается для лидов, созданных с начала ПРОШЛОГО месяца (см. wonWindowStartIso_).
 const ALLOWED_SOURCES = ['meta_target', 'target_manual'];
 
 const QUAL_STAGES = ['trial_scheduled', 'trial_completed', 'closing'];
@@ -237,10 +241,10 @@ function exportOnce() {
   }
 }
 
-/** Начало текущего месяца (00:00 в часовом поясе скрипта) как ISO-строка — граница для won/lost. */
-function monthStartIso_() {
+/** Начало прошлого месяца (00:00 в часовом поясе скрипта) как ISO-строка — граница для won («последние 2 месяца»). */
+function wonWindowStartIso_() {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  return new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
 }
 
 /** «дд.мм.гг чч:мм» (или Date, если Sheets сам превратил строку в дату) → мс, 0 если не распарсилось. */
@@ -275,27 +279,34 @@ function exportOnce_() {
 
   // 1) «Живые» стадии — читаем всегда, там статус ещё меняется.
   const active = ACTIVE_STAGES.reduce((acc, st) => acc.concat(fetchStage_(st)), []);
-  const activeKeys = {};
-  active.forEach((lead) => {
-    activeKeys[leadKey_(lead)] = true;
-  });
 
-  // 2) won/lost — ТОЛЬКО лиды, созданные в текущем месяце. Всё, что раньше,
-  // уже финальное и остаётся в листе как есть, из CRM не читается.
-  const monthStart = monthStartIso_();
-  const finals = FINAL_STAGES.reduce((acc, st) => acc.concat(fetchStage_(st, monthStart)), []);
-  Logger.log('won/lost за текущий месяц (с ' + monthStart + '): ' + finals.length + '.');
+  // 2) won — лиды, созданные за последние 2 месяца. Всё старее уже финальное и
+  // остаётся в листе как есть. lost из CRM не читаем совсем (см. ниже).
+  const wonSince = wonWindowStartIso_();
+  const won = fetchStage_('won', wonSince);
+  Logger.log('won с ' + wonSince + ': ' + won.length + '.');
 
-  // 3) Свежие данные CRM + строки листа, которых в них нет (старые won/lost остаются как были).
-  const fetched = active.concat(finals);
+  // 3) Свежие данные CRM + строки листа, которых в них нет. Живая строка
+  // («in process»/«qual»), пропавшая и из живых стадий, и из won, — это lost.
+  // Строки со статусом won/lost, которых в свежей выгрузке нет, остаются как были.
+  const fetched = active.concat(won);
   const fetchedKeys = {};
   const items = fetched.map((lead) => {
     fetchedKeys[leadKey_(lead)] = true;
     return { ts: new Date(lead.createdAt || 0).getTime() || 0, row: leadRow_(lead) };
   });
+  let inferredLost = 0;
   existing.forEach((r) => {
-    if (!fetchedKeys[String(r[idCol])]) items.push({ ts: parseSheetTime_(r[timeCol]), row: r });
+    if (fetchedKeys[String(r[idCol])]) return;
+    let row = r;
+    if (LIVE_STATUSES.indexOf(String(r[statusCol])) !== -1) {
+      row = r.slice();
+      row[statusCol] = 'lost';
+      inferredLost += 1;
+    }
+    items.push({ ts: parseSheetTime_(r[timeCol]), row: row });
   });
+  Logger.log('Выведено lost (пропали из живых стадий и не в won): ' + inferredLost + '.');
   // По времени попадания в CRM, новые сверху — иначе порядок шёл блоками
   // по статусу (сперва все in process, потом qual...), не по факту прихода.
   items.sort((a, b) => b.ts - a.ts);
