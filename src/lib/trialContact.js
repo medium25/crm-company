@@ -2,15 +2,15 @@ import { taskSnapshot } from './leadTasks.js';
 import { unreachableCallDueAt } from './leadFunnel.js';
 
 /**
- * Касание на стадии «Пробный назначен» — «Неуспешно» (не дозвонились) или «Перенос»
- * (перенести пробное, один раз). Общее для доски «Заявки» и страницы «Пробные», чтобы
+ * Касание на стадии «Пробный назначен» — «Неуспешно» (не дозвонились), «Перенос»
+ * (перенести пробное, один раз) или «Успешно» (дозвонились, назначить следующую задачу). Общее для доски «Заявки» и страницы «Пробные», чтобы
  * карточки вели себя одинаково. Задача (DeadlineModal) обязательна на каждой попытке;
  * сама запись — только в onConfirm, после того как оператор задачу подтвердил.
  * `onRescheduleCb` вызывается ПОСЛЕ сохранения задачи — иначе форма переноса пробного
  * открылась бы поверх ещё не закрытой DeadlineModal.
  * @param {Object} args
  * @param {Object} args.lead
- * @param {'reschedule'|'fail'} args.result
+ * @param {'reschedule'|'fail'|'success'} args.result
  * @param {() => void} [args.onRescheduleCb]
  * @param {{uid: string}} args.user
  * @param {(lead: Object, data: Object) => Promise<void>|void} args.patch запись полей лида
@@ -40,7 +40,7 @@ export function markTrialUnreachable({ lead, result, onRescheduleCb, user, patch
   }
   setDeadlineTarget({
     lead,
-    title: attemptsExhausted ? 'Дедлайн следующего звонка' : 'Следующая задача:',
+    title: result === 'fail' && attemptsExhausted ? 'Дедлайн следующего звонка' : 'Следующая задача:',
     suggestedDate: unreachableCallDueAt(),
     requireTask: true,
     onConfirm: (dueDate, outcome, nextStep) =>

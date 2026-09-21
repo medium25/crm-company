@@ -686,7 +686,7 @@ function LeadInfoPopover({ items }) {
  * тут же в onMark) или «Неуспешно». Когда касаний больше рекомендуемого,
  * кнопка остаётся, но бордовая («2/1»); в «Отказ» — через ⋮/стрелку.
  * @param {Object} lead
- * @param {(result: 'reschedule'|'fail', onRescheduleCb?: () => void) => void} onMark
+ * @param {(result: 'reschedule'|'fail'|'success', onRescheduleCb?: () => void) => void} onMark
  * @param {() => void} onReschedule доп. действие при «Перенос» — на пробном открывает TrialFormModal, в дожиме no-op. Вызывается ИЗ LeadsPage.markUnreachable, ПОСЛЕ того как задача сохранена (не раньше — иначе форма пробного открылась бы поверх ещё не закрытой DeadlineModal)
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
@@ -768,9 +768,19 @@ function UnreachableBlock({ lead, onMark, onReschedule, onCreateStudent, nextAtt
             >
               Перенести пробное занятие
             </button>
-            <p className="text-center text-[12px] text-muted">
+            <p className="-mt-1 text-center text-[12px] text-muted">
               {rescheduleUsed ? 'Пробное уже переносили — второй раз нельзя.' : 'Перенести можно только 1 раз.'}
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                setChoiceOpen(false);
+                pick('success');
+              }}
+              className="h-11 rounded-field border border-navy bg-white px-5 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+            >
+              Назначить задачу
+            </button>
           </div>
         </Modal>
       </span>
