@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { formatPhone, formatDateTimeShort, formatOverdueBy, formatSource } from '../../lib/format.js';
-import { operatorInitials } from './LeadCard.jsx';
+import { operatorInitials, HistoryTimeline } from './LeadCard.jsx';
 import { secondLessonAt } from '../../lib/leadFunnel.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 
@@ -56,7 +56,7 @@ export function TrialCompletedCard({
       tabIndex={0}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className={`flex min-h-[215px] cursor-pointer flex-col gap-2.5 rounded-xl border bg-card p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`flex h-[300px] cursor-pointer flex-col gap-2.5 rounded-xl border bg-card p-3.5 pb-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         overdue ? 'border-danger ring-1 ring-danger/40' : 'border-border hover:border-navy/20'
       }`}
     >
@@ -84,18 +84,21 @@ export function TrialCompletedCard({
       <span className="truncate text-[12px] text-muted">
         {teacherName ?? '—'} · {groupCode ?? '—'} · {trialDateJs ? formatDateTimeShort(lead.trialDate) : 'дата не указана'}
       </span>
-      <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-        {operatorLabel ? (
-          <span
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
-            style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
+      {/* Вся история взаимодействий — та же лента, что на карточке в «Заявках». */}
+      <div className="flex min-h-0 flex-1 flex-col empty:hidden" onClick={(e) => e.stopPropagation()}>
+        <HistoryTimeline lead={lead} />
+      </div>
+
+      <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            title="Продвинуть"
+            className="flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-field border border-border-strong px-1.5 py-1 text-[11px] font-bold text-text hover:bg-surface-alt"
           >
-            {operatorLabel}
-          </span>
-        ) : (
-          <span />
-        )}
-        <div className="flex shrink-0 items-center gap-0.5">
+            Продвинуть <ArrowRight className="h-3.5 w-3.5" />
+          </button>
           <DropdownMenu
             items={[
               { label: 'Редактировать', onClick: () => onEdit(lead) },
@@ -103,17 +106,6 @@ export function TrialCompletedCard({
             ]}
           />
         </div>
-      </div>
-
-      <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          title="Продвинуть"
-          className="flex items-center justify-center gap-1 truncate rounded-field border border-border-strong px-1.5 py-1 text-[11px] font-bold text-text hover:bg-surface-alt"
-        >
-          Продвинуть <ArrowRight className="h-3.5 w-3.5" />
-        </button>
         {expanded && (
           <div className="flex items-center gap-1">
             <button
@@ -145,10 +137,21 @@ export function TrialCompletedCard({
           </div>
         )}
       </div>
-      <span className="-mt-1.5 text-[10px] text-muted">
-        {formatDateTimeShort(lead.createdAt)}
-        {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
-      </span>
+      {/* Дата/источник слева, инициалы оператора — в правом нижнем углу, как на карточках «Заявок». */}
+      <div className="-mt-1 flex items-end justify-between">
+        <span className="text-[10px] text-muted">
+          {formatDateTimeShort(lead.createdAt)}
+          {formatSource(lead.source) ? ` · ${formatSource(lead.source)}` : ''}
+        </span>
+        {operatorLabel && (
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+            style={{ backgroundColor: `${operatorColor || '#8B94A3'}26`, color: operatorColor || '#8B94A3' }}
+          >
+            {operatorLabel}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
