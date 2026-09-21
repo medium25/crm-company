@@ -309,8 +309,8 @@ function buildFullHistory(lead) {
 
 // Только реальные взаимодействия (касания) — переходы стадий/передачи
 // оператору в ленту не попадают, это служебные события, не задачи.
-// Каждый узел — две строки: мелкая сверху (насколько опоздали / вовремя — task) и под
-// ней крупный текст (result): «что произошло → следующий шаг», а если его нет — текст
+// Каждый узел — две строки: крупный текст (result) и под ним мелкая (насколько опоздали /
+// вовремя — task). Текст (result): «что произошло → следующий шаг», а если его нет — текст
 // задачи, что стояла (nextStep ПРЕДЫДУЩЕГО касания; у самого первого — стартовый SLA).
 function buildTimelineNodes(history, pendingDueAt, currentStage) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
@@ -453,7 +453,6 @@ export function HistoryTimeline({ lead }) {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              {node.task && <p className="text-[9px] leading-tight text-muted">{node.task}</p>}
               {node.result && (
                 <p
                   onClick={(e) => {
@@ -465,6 +464,7 @@ export function HistoryTimeline({ lead }) {
                   {node.result}
                 </p>
               )}
+              {node.task && <p className="text-[9px] leading-tight text-muted">{node.task}</p>}
             </div>
           </div>
         ),
