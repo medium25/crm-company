@@ -1,5 +1,5 @@
 import { collection, getCountFromServer, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { format, startOfMonth, startOfQuarter, startOfYear, subMonths, getDaysInMonth } from 'date-fns';
+import { addMonths, format, startOfMonth, startOfQuarter, startOfYear, subMonths, getDaysInMonth } from 'date-fns';
 
 /**
  * Диапазон периода оттока для двух KPI-карточек («Ушли из активной группы»,
@@ -74,10 +74,16 @@ export async function countStudentBuckets(db, branchId) {
   let activeStudents = 0;
   let trial = 0;
   let debtors = 0;
+  const monthStart = startOfMonth(new Date());
+  const nextMonthStart = addMonths(monthStart, 1);
   for (const d of snap.docs) {
     const s = d.data();
     if (s.status === 'active') activeStudents += 1;
-    if (s.status === 'trial') trial += 1;
+    // «В пробном уроке» — только пробные текущего месяца (по дате пробного урока).
+    if (s.status === 'trial') {
+      const at = (s.trialDate ?? s.trialAt)?.toDate?.();
+      if (at && at >= monthStart && at < nextMonthStart) trial += 1;
+    }
     if (s.balance < 0) debtors += 1;
   }
   return { activeStudents, trial, debtors };

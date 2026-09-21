@@ -61,8 +61,8 @@ export function Topbar({ branches = [], activeBranchId, onBranchChange, onMenuCl
           {!sidebarCollapsed && <img src={iconWordmark} alt="" className="h-3.5 w-auto shrink-0" />}
         </div>
       </div>
-      {/* Поиск — по центру шапки, 16rem (было 20rem, −20%); на телефоне остаётся в потоке слева. */}
-      <div className="flex min-w-0 flex-1 sm:absolute sm:left-1/2 sm:top-1/2 sm:w-64 sm:flex-none sm:-translate-x-1/2 sm:-translate-y-1/2">
+      {/* Поиск — сразу после логотипа, 16rem; на телефоне занимает всё свободное место слева. */}
+      <div className="flex min-w-0 flex-1 sm:w-64 sm:flex-none">
         <GlobalSearch />
       </div>
 

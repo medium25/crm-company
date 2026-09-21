@@ -66,7 +66,9 @@ export function StudentsPage() {
 
   const section = searchParams.get('section') || null;
   const search = searchParams.get('q') || '';
-  const status = searchParams.get('status') || 'all';
+  // «Все ученики» по умолчанию — только действующие (active): пробные, ушедшие и
+  // замороженные — свои плитки; «Статус: все» выбирается явно.
+  const status = searchParams.get('status') || 'active';
   const onlyDebtors = searchParams.get('debtors') === '1';
   const page = Math.max(1, Number(searchParams.get('page') || 1));
   const leftView = searchParams.get('leftView') || null;
@@ -236,7 +238,7 @@ export function StudentsPage() {
       // ученики, у них свой раздел «Заявки». STATUS_OPTIONS ниже сознательно
       // не даёт выбрать 'lead' фильтром — тот же смысл здесь, явно.
       if (s.status === 'lead') continue;
-      if (s.status !== 'paused') counts.all += 1;
+      if (s.status === 'active') counts.all += 1;
       if (s.status !== 'left' && s.balance < 0) counts.debtors += 1;
       if (s.status === 'trial') counts.trial += 1;
       if (s.status === 'paused') counts.paused += 1;
