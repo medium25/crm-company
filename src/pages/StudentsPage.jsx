@@ -207,6 +207,13 @@ export function StudentsPage() {
     });
   }, [section, leftAllStudents, leftEnrollmentByStudent, leftView]);
 
+  // Пробные считаем и показываем только с учителем: студент с действующей
+  // записью (enrollment) у учителя. Лиды, лишь записанные на пробную дату, — нет.
+  const studentIdsWithTeacher = useMemo(
+    () => new Set(enrollments.filter((e) => e.teacherId && e.status !== 'left' && e.status !== 'archived').map((e) => e.studentId)),
+    [enrollments],
+  );
+
   // Лиды (status:'lead') на эту страницу не относятся — свой раздел
   // «Заявки». studentsQuery (effectiveStatus==='all') не фильтрует по
   // status вообще, так что без этого лиды попадали бы и в таблицу, и в счётчик,
@@ -217,8 +224,13 @@ export function StudentsPage() {
   // плитке открывал таблицу БОЛЬШЕ, чем показанное на ней число.
   const rawStudents = useMemo(() => {
     if (section === 'left') return leftStudents;
-    return statusStudents.filter((st) => st.status !== 'lead' && !(effectiveStatus === 'all' && st.status === 'paused'));
-  }, [section, leftStudents, statusStudents, effectiveStatus]);
+    return statusStudents.filter(
+      (st) =>
+        st.status !== 'lead' &&
+        !(effectiveStatus === 'all' && st.status === 'paused') &&
+        !(section === 'trial' && !studentIdsWithTeacher.has(st.id)),
+    );
+  }, [section, leftStudents, statusStudents, effectiveStatus, studentIdsWithTeacher]);
   const loading = section === 'left' ? leftEnrollmentsLoading || allStudentsLoading : statusLoading;
 
   // Плитки лендинга «Студенты» — свой запрос без фильтров таблицы (`status`/`q`
@@ -240,12 +252,12 @@ export function StudentsPage() {
       if (s.status === 'lead') continue;
       if (s.status === 'active') counts.all += 1;
       if (s.status !== 'left' && s.balance < 0) counts.debtors += 1;
-      if (s.status === 'trial') counts.trial += 1;
+      if (s.status === 'trial' && studentIdsWithTeacher.has(s.id)) counts.trial += 1;
       if (s.status === 'paused') counts.paused += 1;
       if (s.status === 'left' && s.leftAt && s.leftAt.toDate() >= monthStart) counts.leftThisMonth += 1;
     }
     return counts;
-  }, [summaryStudents]);
+  }, [summaryStudents, studentIdsWithTeacher]);
 
   // «Посещаемость» на плитке — % учеников, посетивших вчерашний день (не
   // средний за месяц): вчерашние уроки филиала → их отметки посещаемости.
