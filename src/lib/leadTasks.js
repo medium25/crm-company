@@ -9,10 +9,12 @@ export function isFreshLead(lead) {
 
 /**
  * Порядок карточек в колонке «Задач»: сначала свежие (новый лид, пришёл сегодня) —
- * они на самом верху, дальше по уровню приоритета, дальше по дедлайну.
- * Работает и для живых задач (`deadline` — Date), и для выполненных (`deadlineMs`).
+ * самый новый лид самым первым, выполненная карточка не мешает; дальше по уровню
+ * приоритета, дальше по дедлайну. Работает и для живых задач (`deadline` — Date),
+ * и для выполненных (`deadlineMs`).
  */
 export function compareTasks(a, b) {
+  if (a.fresh && b.fresh) return (b.lead?.createdAt?.toMillis?.() ?? 0) - (a.lead?.createdAt?.toMillis?.() ?? 0);
   return (b.fresh ? 1 : 0) - (a.fresh ? 1 : 0) || a.level - b.level || (a.deadlineMs ?? a.deadline.getTime()) - (b.deadlineMs ?? b.deadline.getTime());
 }
 
