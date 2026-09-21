@@ -197,16 +197,19 @@ const UNREACHABLE_MAX_ATTEMPTS = 3;
  * Главная кнопка следующего касания — под лентой истории, во всю ширину
  * карточки, сплошной синий (цвет системы (navy)), без иконки: единственное
  * реально кликабельное действие на этой стадии, должно выделяться, а не
- * теряться среди мелких строк истории.
+ * теряться среди мелких строк истории. `over` — касаний уже больше рекомендуемого
+ * максимума: кнопка остаётся, но бордовая, со счётом «N/M» (напр. 2/1).
  */
-function TouchActionButton({ ref, onClick, ariaLabel, text, time, compact }) {
+function TouchActionButton({ ref, onClick, ariaLabel, text, time, compact, over = false }) {
   return (
     <button
       ref={ref}
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className={`flex flex-col items-center justify-center gap-0.5 rounded-field bg-navy text-[13px] font-bold leading-tight text-white hover:bg-navy-hover ${
+      className={`flex flex-col items-center justify-center gap-0.5 rounded-field text-[13px] font-bold leading-tight text-white ${
+        over ? 'bg-[#7B1E3A] hover:bg-[#661830]' : 'bg-navy hover:bg-navy-hover'
+      } ${
         compact ? 'shrink-0 px-3 py-1.5' : 'w-1/2 py-1'
       }`}
     >
@@ -550,6 +553,7 @@ function CallAttemptDots({ attempts, onMark, nextCallDueAt, maxAttempts, onOpenC
     <TouchActionButton
       ref={btnRef}
       text={`Касание ${attempts.length}/${maxAttempts}`}
+      over={attempts.length > maxAttempts}
       time={deadlineLabel}
       onClick={() => {
         const r = btnRef.current?.getBoundingClientRect();
@@ -586,6 +590,7 @@ function TouchDots({ closingTouchNumber, nextTouchAt, onMark, onFail, maxTouches
     <TouchActionButton
       ref={btnRef}
       text={`Касание ${count}/${maxTouches}`}
+      over={count > maxTouches}
       time={deadlineLabel}
       onClick={() => {
         const r = btnRef.current?.getBoundingClientRect();
@@ -690,24 +695,22 @@ function LeadInfoPopover({ items }) {
 /**
  * «Не выходит на связь» — трекер стадии «Пробный назначен» (в «Дожиме»
  * его больше нет: там неуспешное касание — крестик у «Касание N/M»).
- * Кнопка «Касание» показывает до 3 попыток связаться. Каждая
+ * Кнопка «Касание» показывает попытки связаться (макс. — из настройки колонки). Каждая
  * попытка — «Перенос» (разрешено один раз за цикл — на пробном сдвигает
  * дату через TrialFormModal, в дожиме сразу просит новый дедлайн касания
- * тут же в onMark) или «Неуспешно»; на 3-й неуспешной подряд открывается
- * «Отказ».
+ * тут же в onMark) или «Неуспешно». Когда касаний больше рекомендуемого,
+ * кнопка остаётся, но бордовая («2/1»); в «Отказ» — через ⋮/стрелку.
  * @param {Object} lead
  * @param {(result: 'reschedule'|'fail', onRescheduleCb?: () => void) => void} onMark
  * @param {() => void} onReschedule доп. действие при «Перенос» — на пробном открывает TrialFormModal, в дожиме no-op. Вызывается ИЗ LeadsPage.markUnreachable, ПОСЛЕ того как задача сохранена (не раньше — иначе форма пробного открылась бы поверх ещё не закрытой DeadlineModal)
- * @param {() => void} onDecline
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
-function UnreachableBlock({ lead, onMark, onReschedule, onDecline, onCreateStudent, nextAttemptDueAt, maxAttempts = UNREACHABLE_MAX_ATTEMPTS }) {
+function UnreachableBlock({ lead, onMark, onReschedule, onCreateStudent, nextAttemptDueAt, maxAttempts = UNREACHABLE_MAX_ATTEMPTS }) {
   const attempts = lead.unreachableAttempts ?? [];
 
   // Перенос пробного — один раз за весь цикл: либо уже был «Перенос» среди
   // касаний, либо дату пробного двигали через форму (rescheduleCount).
   const rescheduleUsed = attempts.some((a) => a.result === 'reschedule') || (lead.rescheduleCount ?? 0) >= 1;
-  const failStreak = attempts.filter((a) => a.result === 'fail').length;
 
   // Задачу теперь всегда спрашивает markUnreachable (DeadlineModal) — тут
   // просто передаём результат + onReschedule дальше, сама запись/переход
@@ -723,19 +726,6 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, onCreateStude
   const [size, setSize] = useState(null);
   const btnRef = useRef(null);
   const dismiss = useCallback(() => setConfirming(false), []);
-
-  if (failStreak >= maxAttempts) {
-    return (
-      <button
-        type="button"
-        onClick={onDecline}
-        className="flex h-[18px] items-center gap-1.5 text-[11.5px] font-bold text-danger hover:opacity-80"
-      >
-        <XCircle className="h-3.5 w-3.5 shrink-0" />
-        Отказ
-      </button>
-    );
-  }
 
   return (
     <>
@@ -756,6 +746,7 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, onCreateStude
         <TouchActionButton
           ref={btnRef}
           text={`Касание ${attempts.length}/${maxAttempts}`}
+          over={attempts.length > maxAttempts}
           time={deadlineLabel}
           onClick={() => {
             const r = btnRef.current?.getBoundingClientRect();
@@ -1081,7 +1072,6 @@ export function LeadCard({
               lead={lead}
               onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
               onReschedule={() => onRescheduleTrial(lead)}
-              onDecline={() => onDecline(lead)}
               onCreateStudent={onCreateStudent}
               nextAttemptDueAt={lead.unreachableNextCallDueAt}
               maxAttempts={columns.find((c) => c.key === 'trial_scheduled')?.maxTouches ?? UNREACHABLE_MAX_ATTEMPTS}
