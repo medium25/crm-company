@@ -18,11 +18,13 @@ import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
 import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
+import { AddToGroupModal } from '../components/students/AddToGroupModal.jsx';
 import { LeadColumn } from '../components/leads/LeadColumn.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS, columnKeyOf, isForwardAllowed, withStageOverrides } from '../components/leads/columns.js';
 import { checklistPercent, DEFAULT_CHECKLIST_ITEMS } from '../lib/leadChecklist.js';
 import { taskSnapshot } from '../lib/leadTasks.js';
+import { markTrialUnreachable } from '../lib/trialContact.js';
 import { setSearchSource, clearSearchSource } from '../lib/searchSource.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
@@ -297,6 +299,7 @@ export function LeadsPage() {
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule'|'reschedule' }
   const [deadlineTarget, setDeadlineTarget] = useState(null); // { lead, title, suggestedDate, onConfirm }
   const [bookingTarget, setBookingTarget] = useState(null);
+  const [createStudentTarget, setCreateStudentTarget] = useState(null); // AddToGroupModal — «Создать студента» после галочки у «Касание»
   const [resetTarget, setResetTarget] = useState(null);
   const [dismissTarget, setDismissTarget] = useState(null);
 
@@ -596,38 +599,7 @@ export function LeadsPage() {
       return;
     }
 
-    if (result === 'reschedule') {
-      setDeadlineTarget({
-        lead,
-        title: 'Задача — перенос пробного',
-        suggestedDate: unreachableCallDueAt(),
-        requireTask: true,
-        onConfirm: async (dueDate, outcome, nextStep) => {
-          await patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), unreachableNextCallDueAt: dueDate });
-          onRescheduleCb?.();
-        },
-      });
-      return;
-    }
-    if (attemptsExhausted) {
-      setDeadlineTarget({
-        lead,
-        title: 'Дедлайн следующего звонка',
-        suggestedDate: unreachableCallDueAt(),
-        requireTask: true,
-        onConfirm: (dueDate, outcome, nextStep) =>
-          patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), unreachableNextCallDueAt: dueDate }),
-      });
-      return;
-    }
-    setDeadlineTarget({
-      lead,
-      title: 'Следующая задача:',
-      suggestedDate: unreachableCallDueAt(),
-      requireTask: true,
-      onConfirm: (dueDate, outcome, nextStep) =>
-        patch(lead, { unreachableAttempts: buildAttempts(outcome, nextStep), unreachableNextCallDueAt: dueDate }),
-    });
+    markTrialUnreachable({ lead, result, onRescheduleCb, user, patch, setDeadlineTarget });
   };
 
   const openAddForm = () => setFormLead({});
@@ -646,6 +618,7 @@ export function LeadsPage() {
     onResetToNew: (lead) => setResetTarget(lead),
     onScheduleTrial: (lead) => setTrialTarget({ lead, mode: 'schedule' }),
     onRescheduleTrial: (lead) => setTrialTarget({ lead, mode: 'reschedule' }),
+    onCreateStudent: (lead) => setCreateStudentTarget(lead),
     onOpenBooking: (lead) => setBookingTarget(lead),
     // Только «Оплачено» — убирает карточку с доски, студент остаётся в
     // системе (просто не рендерится больше в этом списке, см. leads выше).
@@ -751,6 +724,7 @@ export function LeadsPage() {
       <DismissFromBoardModal lead={dismissTarget} onClose={() => setDismissTarget(null)} />
       <TrialFormModal target={trialTarget} timeSlots={branchSettings?.trialTimeSlots} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
+      <AddToGroupModal open={Boolean(createStudentTarget)} student={createStudentTarget} onClose={() => setCreateStudentTarget(null)} />
       <GroupBookingModal lead={bookingTarget} allLeads={allLeads} onClose={() => setBookingTarget(null)} />
     </div>
   );

@@ -5,6 +5,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, ClipboardCheck, Users, X, Settings, ChevronUp, ChevronDown } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
+import { Modal } from '../ui/Modal.jsx';
 import { LeadFormDataModal } from './LeadFormDataModal.jsx';
 import { COLUMNS, isForwardAllowed } from './columns.js';
 import { isPriorityLead, isTrialDay, contactDueDate, stageDeadline, overdueReasonLabel, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
@@ -699,10 +700,12 @@ function LeadInfoPopover({ items }) {
  * @param {() => void} onDecline
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
-function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDueAt }) {
+function UnreachableBlock({ lead, onMark, onReschedule, onDecline, onCreateStudent, nextAttemptDueAt }) {
   const attempts = lead.unreachableAttempts ?? [];
 
-  const rescheduleUsed = attempts.some((a) => a.result === 'reschedule');
+  // Перенос пробного — один раз за весь цикл: либо уже был «Перенос» среди
+  // касаний, либо дату пробного двигали через форму (rescheduleCount).
+  const rescheduleUsed = attempts.some((a) => a.result === 'reschedule') || (lead.rescheduleCount ?? 0) >= 1;
   const failStreak = attempts.filter((a) => a.result === 'fail').length;
 
   // Задачу теперь всегда спрашивает markUnreachable (DeadlineModal) — тут
@@ -711,9 +714,17 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
   const pick = (result) => onMark(result, onReschedule);
   const deadlineLabel = nextAttemptDueAt ? formatDateTimeShort(nextAttemptDueAt) : null;
 
-  let pendingRow;
+  // «Касание» → галочка/крестик (как в «Дозвоне» и «Дожиме»). Крестик — неуспешная
+  // попытка связаться; галочка — дозвонились, дальше выбор: создать студента
+  // или перенести пробное (один раз).
+  const [confirming, setConfirming] = useState(false);
+  const [choiceOpen, setChoiceOpen] = useState(false);
+  const [size, setSize] = useState(null);
+  const btnRef = useRef(null);
+  const dismiss = useCallback(() => setConfirming(false), []);
+
   if (failStreak >= UNREACHABLE_MAX_ATTEMPTS) {
-    pendingRow = (
+    return (
       <button
         type="button"
         onClick={onDecline}
@@ -723,28 +734,71 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
         Отказ
       </button>
     );
-  } else {
-    pendingRow = (
-      <DropdownMenu
-        items={[
-          ...(rescheduleUsed ? [] : [{ label: 'Перенос', onClick: () => pick('reschedule') }]),
-          { label: 'Неуспешно', danger: true, onClick: () => pick('fail') },
-        ]}
-        trigger={({ ref, toggle }) => (
-          <TouchActionButton
-            ref={ref}
-            text={`Касание ${attempts.length}/${UNREACHABLE_MAX_ATTEMPTS}`}
-            time={deadlineLabel}
-            onClick={toggle}
-            ariaLabel={`Касание ${attempts.length + 1}: связаться`}
-            compact
-          />
-        )}
-      />
-    );
   }
 
-  return pendingRow;
+  return (
+    <>
+      {confirming ? (
+        <ResultChoice
+          onSuccess={() => {
+            setConfirming(false);
+            setChoiceOpen(true);
+          }}
+          onFail={() => {
+            setConfirming(false);
+            pick('fail');
+          }}
+          onDismiss={dismiss}
+          size={size}
+        />
+      ) : (
+        <TouchActionButton
+          ref={btnRef}
+          text={`Касание ${attempts.length}/${UNREACHABLE_MAX_ATTEMPTS}`}
+          time={deadlineLabel}
+          onClick={() => {
+            const r = btnRef.current?.getBoundingClientRect();
+            if (r) setSize({ width: r.width, height: r.height });
+            setConfirming(true);
+          }}
+          ariaLabel={`Касание ${attempts.length + 1}: отметить результат`}
+          compact
+        />
+      )}
+      {/* Портал: события всплывают по React-дереву — без stopPropagation клик в окне
+          дошёл бы до карточки и открыл её. */}
+      <span className="absolute" onClick={(e) => e.stopPropagation()}>
+        <Modal open={choiceOpen} onClose={() => setChoiceOpen(false)} title="Пробное занятие">
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setChoiceOpen(false);
+                onCreateStudent?.(lead);
+              }}
+              className="h-11 rounded-field bg-navy px-5 text-[15px] font-bold text-white hover:bg-navy-hover"
+            >
+              Создать студента
+            </button>
+            <button
+              type="button"
+              disabled={rescheduleUsed}
+              onClick={() => {
+                setChoiceOpen(false);
+                pick('reschedule');
+              }}
+              className="h-11 rounded-field border border-navy bg-white px-5 text-[15px] font-bold text-navy hover:bg-orange-soft/40 disabled:cursor-not-allowed disabled:border-border-strong disabled:text-muted disabled:hover:bg-white"
+            >
+              Перенести пробное занятие
+            </button>
+            <p className="text-center text-[12px] text-muted">
+              {rescheduleUsed ? 'Пробное уже переносили — второй раз нельзя.' : 'Перенести можно только 1 раз.'}
+            </p>
+          </div>
+        </Modal>
+      </span>
+    </>
+  );
 }
 
 /**
@@ -761,6 +815,7 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, nextAttemptDu
  * @param {(lead: Object) => void} props.onDelete полное удаление, только для status=='lead'
  * @param {(lead: Object) => void} props.onScheduleTrial
  * @param {(lead: Object) => void} props.onRescheduleTrial
+ * @param {(lead: Object) => void} [props.onCreateStudent] «Создать студента» в окне после галочки у «Касание» на «Пробный назначен»
  * @param {(lead: Object) => void} props.onMarkTouch
  * @param {(lead: Object, stageKey: string) => void} props.onMove
  * @param {(lead: Object, result: 'success'|'fail') => void} props.onMarkAttempt
@@ -780,6 +835,7 @@ export function LeadCard({
   onDelete,
   onScheduleTrial,
   onRescheduleTrial,
+  onCreateStudent,
   onMarkTouch,
   onMove,
   onMarkAttempt,
@@ -1025,6 +1081,7 @@ export function LeadCard({
               onMark={(result, onRescheduleCb) => onMarkUnreachable(lead, result, onRescheduleCb)}
               onReschedule={() => onRescheduleTrial(lead)}
               onDecline={() => onDecline(lead)}
+              onCreateStudent={onCreateStudent}
               nextAttemptDueAt={lead.unreachableNextCallDueAt}
             />
           ) : (

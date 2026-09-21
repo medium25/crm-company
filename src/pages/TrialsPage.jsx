@@ -1,7 +1,7 @@
 // src/pages/TrialsPage.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, getDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, query, updateDoc, serverTimestamp, where } from 'firebase/firestore';
 import { ChevronDown, ChevronRight, Search, Plus } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -9,7 +9,10 @@ import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx';
-import { TrialLeadCard } from '../components/leads/TrialLeadCard.jsx';
+import { LeadCard } from '../components/leads/LeadCard.jsx';
+import { DeclineLeadModal } from '../components/students/DeclineLeadModal.jsx';
+import { ResetLeadModal } from '../components/leads/ResetLeadModal.jsx';
+import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { TrialCompletedCard } from '../components/leads/TrialCompletedCard.jsx';
 import { groupLeadsByTrialDay } from '../components/leads/LeadColumn.jsx';
 import { COLUMNS } from '../components/leads/columns.js';
@@ -20,6 +23,7 @@ import { DeadlineModal } from '../components/leads/DeadlineModal.jsx';
 import { AddToGroupModal } from '../components/students/AddToGroupModal.jsx';
 import { AddPaymentModal } from '../components/students/AddPaymentModal.jsx';
 import { advanceStage, firstTouchDueAt } from '../lib/leadFunnel.js';
+import { markTrialUnreachable } from '../lib/trialContact.js';
 import { archiveStudent } from '../lib/students.js';
 import { formatPhone } from '../lib/format.js';
 import { locateLead } from '../lib/leadLocation.js';
@@ -229,6 +233,9 @@ export function TrialsPage() {
   const [manualCompletedTarget, setManualCompletedTarget] = useState(null); // {} — StudentFormModal (createMode="trial_completed")
   const [trialTarget, setTrialTarget] = useState(null); // { lead, mode: 'schedule' } — TrialFormModal
   const [deferTarget, setDeferTarget] = useState(null); // DeadlineModal
+  const [declineTarget, setDeclineTarget] = useState(null); // DeclineLeadModal
+  const [resetTarget, setResetTarget] = useState(null); // ResetLeadModal
+  const [bookingTarget, setBookingTarget] = useState(null); // GroupBookingModal
   const [paymentTarget, setPaymentTarget] = useState(null); // AddPaymentModal
   const [archiveTarget, setArchiveTarget] = useState(null); // ConfirmDialog
   const [archiving, setArchiving] = useState(false);
@@ -313,6 +320,45 @@ export function TrialsPage() {
   }, [highlightId]);
   const onOpen = (lead) => navigate(`/students/${lead.id}`);
 
+  const patchLead = async (lead, data) => {
+    try {
+      await updateDoc(doc(db, 'students', lead.id), { ...data, updatedAt: serverTimestamp() });
+    } catch {
+      showToast('Не удалось обновить лид.', { type: 'error' });
+    }
+  };
+
+  // Колонка «Записи» — та же карточка LeadCard, что на доске «Заявки» на стадии «Пробный
+  // назначен», с теми же действиями. Касание: галочка → «Создать студента» / «Перенести
+  // пробное» (1 раз), крестик — неуспешное касание.
+  const renderScheduledCard = (lead, op) => (
+    <LeadCard
+      lead={lead}
+      operatorColor={op?.color}
+      operatorName={op?.name}
+      onOpen={onOpen}
+      onEdit={setEditTarget}
+      onDecline={setDeclineTarget}
+      onDelete={setDeleteTarget}
+      onResetToNew={setResetTarget}
+      onScheduleTrial={(l) => setTrialTarget({ lead: l, mode: 'schedule' })}
+      onRescheduleTrial={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })}
+      onCreateStudent={setCreateStudentTarget}
+      onOpenBooking={setBookingTarget}
+      onMove={(l, stageKey) => {
+        if (stageKey === 'lost') setDeclineTarget(l);
+        else advanceStage(db, l, stageKey, {}, user).catch(() => showToast('Не удалось обновить лид.', { type: 'error' }));
+      }}
+      onMarkUnreachable={(l, result, onRescheduleCb) =>
+        markTrialUnreachable({ lead: l, result, onRescheduleCb, user, patch: patchLead, setDeadlineTarget: setDeferTarget })
+      }
+      onMarkTouch={() => {}}
+      onMarkAttempt={() => {}}
+      onToggleCallReminder={() => {}}
+      onDismissFromBoard={() => {}}
+    />
+  );
+
   const handleManualCreated = async (id) => {
     const snap = await getDoc(doc(db, 'students', id));
     if (snap.exists()) setTrialTarget({ lead: { id: snap.id, ...snap.data() }, mode: 'schedule' });
@@ -360,9 +406,7 @@ export function TrialsPage() {
               operatorByUid={operatorByUid}
               highlightId={highlightId}
               defaultOpen
-              renderCard={(lead, op) => (
-                <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
-              )}
+              renderCard={renderScheduledCard}
             />
           )}
           <TrialGroup
@@ -371,27 +415,21 @@ export function TrialsPage() {
             operatorByUid={operatorByUid}
             highlightId={highlightId}
             defaultOpen
-            renderCard={(lead, op) => (
-              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
-            )}
+            renderCard={renderScheduledCard}
           />
           <TrialGroup
             title="Завтра"
             leads={groups.tomorrow}
             operatorByUid={operatorByUid}
             highlightId={highlightId}
-            renderCard={(lead, op) => (
-              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
-            )}
+            renderCard={renderScheduledCard}
           />
           <TrialGroup
             title="Другой день"
             leads={groups.other}
             operatorByUid={operatorByUid}
             highlightId={highlightId}
-            renderCard={(lead, op) => (
-              <TrialLeadCard lead={lead} operatorColor={op?.color} operatorName={op?.name} onOpen={onOpen} onCreateStudent={setCreateStudentTarget} onReschedule={(l) => setTrialTarget({ lead: l, mode: 'reschedule' })} />
-            )}
+            renderCard={renderScheduledCard}
           />
         </div>
 
@@ -477,6 +515,9 @@ export function TrialsPage() {
       />
       <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deferTarget} onClose={() => setDeferTarget(null)} />
+      <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} callMaxAttempts={COLUMNS.find((c) => c.key === 'calling')?.maxTouches ?? 5} />
+      <ResetLeadModal lead={resetTarget} onClose={() => setResetTarget(null)} />
+      <GroupBookingModal lead={bookingTarget} allLeads={rawLeads} onClose={() => setBookingTarget(null)} />
       <AddPaymentModal open={Boolean(paymentTarget)} student={paymentTarget} enrollments={paymentEnrollments} onClose={() => setPaymentTarget(null)} />
       <ConfirmDialog
         open={Boolean(archiveTarget)}
