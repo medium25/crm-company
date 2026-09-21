@@ -19,6 +19,7 @@ import { DropdownMenu } from '../ui/DropdownMenu.jsx';
  * @param {string} [props.operatorName]
  * @param {string} [props.teacherName]
  * @param {string} [props.groupCode]
+ * @param {{label: string, color: string}} [props.closingStage] название и цвет колонки «Дожим» из настроек филиала (её могли переименовать)
  * @param {(lead: Object) => void} props.onOpen
  * @param {(lead: Object) => void} props.onPay
  * @param {(lead: Object) => void} props.onDeferPayment
@@ -32,6 +33,7 @@ export function TrialCompletedCard({
   operatorName,
   teacherName,
   groupCode,
+  closingStage = { label: 'Дожим', color: '#7C5CBF' },
   onOpen,
   onPay,
   onDeferPayment,
@@ -61,7 +63,14 @@ export function TrialCompletedCard({
       <div className="-mx-3.5 -mt-3.5 flex items-center justify-between gap-2 rounded-t-xl bg-card-head px-3.5 pb-2 pt-2.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
-          {inClosing && <span className="shrink-0 rounded-badge bg-[#7C5CBF]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#7C5CBF]">Дожим</span>}
+          {inClosing && (
+            <span
+              className="shrink-0 rounded-badge px-1.5 py-0.5 text-[10px] font-bold"
+              style={{ backgroundColor: `${closingStage.color}26`, color: closingStage.color }}
+            >
+              {closingStage.label}
+            </span>
+          )}
           {overdue && (
             <span className="shrink-0 rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger">
               {formatOverdueBy(secondLessonDate) || 'Просрочено'}

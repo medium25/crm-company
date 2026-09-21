@@ -501,7 +501,7 @@ export function LeadsPage() {
     if (stageKey === 'closing') {
       setDeadlineTarget({
         lead,
-        title: 'Дедлайн первого касания в «Дожиме»',
+        title: `Дедлайн первого касания: ${resolvedColumns.find((c) => c.key === 'closing')?.label ?? 'Дожим'}`,
         suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
         onConfirm: (dueDate) => commit({ closingTouchNumber: 0, nextTouchAt: dueDate, unreachableAttempts: [], closingTouchLog: [] }),
       });

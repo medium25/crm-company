@@ -329,6 +329,7 @@ export function TrialsPage() {
   const resolvedColumns = useMemo(() => withStageOverrides(branchSettings?.leadStageOverrides), [branchSettings]);
   const trialMaxTouches = resolvedColumns.find((c) => c.key === 'trial_scheduled')?.maxTouches ?? 3;
   const callMaxAttempts = resolvedColumns.find((c) => c.key === 'calling')?.maxTouches ?? 5;
+  const closingStage = resolvedColumns.find((c) => c.key === 'closing');
 
   const patchLead = async (lead, data) => {
     try {
@@ -378,7 +379,7 @@ export function TrialsPage() {
   const confirmDeferPayment = (lead) => {
     setDeferTarget({
       lead,
-      title: 'Дедлайн первого касания в «Дожиме»',
+      title: `Дедлайн первого касания: ${closingStage?.label ?? 'Дожим'}`,
       suggestedDate: firstTouchDueAt(lead.trialDate?.toDate?.()),
       onConfirm: (dueDate) =>
         advanceStage(db, lead, 'closing', { closingTouchNumber: 0, nextTouchAt: dueDate, unreachableAttempts: [] }, user).catch(() =>
@@ -477,6 +478,7 @@ export function TrialsPage() {
                   operatorName={op?.name}
                   teacherName={enrollment?.teacherName}
                   groupCode={enrollment?.groupCode}
+                  closingStage={closingStage}
                   onOpen={onOpen}
                   onPay={setPaymentTarget}
                   onDeferPayment={confirmDeferPayment}
@@ -502,6 +504,7 @@ export function TrialsPage() {
                   operatorName={op?.name}
                   teacherName={enrollment?.teacherName}
                   groupCode={enrollment?.groupCode}
+                  closingStage={closingStage}
                   onOpen={onOpen}
                   onPay={setPaymentTarget}
                   onDeferPayment={confirmDeferPayment}
