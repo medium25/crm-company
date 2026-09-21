@@ -208,7 +208,7 @@ function TouchActionButton({ ref, onClick, ariaLabel, text, time, compact, over 
       onClick={onClick}
       aria-label={ariaLabel}
       className={`flex flex-col items-center justify-center gap-0.5 rounded-field text-[13px] font-bold leading-tight text-white ${
-        over ? 'bg-[#7B1E3A] hover:bg-[#661830]' : 'bg-navy hover:bg-navy-hover'
+        over ? 'bg-[#8E4A5E] hover:bg-[#7D4053]' : 'bg-navy hover:bg-navy-hover'
       } ${
         compact ? 'shrink-0 px-3 py-1.5' : 'w-1/2 py-1'
       }`}
