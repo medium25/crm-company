@@ -28,6 +28,7 @@ import { markTrialUnreachable } from '../lib/trialContact.js';
 import { setSearchSource, clearSearchSource } from '../lib/searchSource.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
+import { recentMonths } from '../lib/lostMonths.js';
 
 /**
  * Заявки — 7-стадийная воронка продаж (2026-08-13-leads-funnel-redesign.md).
@@ -124,8 +125,18 @@ export function LeadsPage() {
   const [lostLeads, setLostLeads] = useState([]);
   const [lostReady, setLostReady] = useState(false);
   const [lostCount, setLostCount] = useState(null);
+  // «Отказ» по месяцам: до раскрытия колонки видны карточки последних месяцев с числом
+  // отказов (серверный счётчик по lostAt — ≈1 чтение на месяц); документы месяца
+  // читаются только по клику на его карточку. monthCounts: ключ месяца → число,
+  // requestedMonths: какие месяцы уже открыли, monthLeads: их лиды.
+  const lostMonthList = useMemo(() => recentMonths(), []);
+  const [monthCounts, setMonthCounts] = useState(null);
+  const [requestedMonths, setRequestedMonths] = useState([]);
+  const [monthLeads, setMonthLeads] = useState({});
   useEffect(() => {
     setLostRequested(false);
+    setRequestedMonths([]);
+    setMonthLeads({});
   }, [activeBranchId]);
   const lostQuery = useMemo(
     () =>
@@ -155,7 +166,6 @@ export function LeadsPage() {
       () => setLostReady(true),
     );
   }, [lostQuery]);
-  const allLeads = useMemo(() => [...activeLeads, ...lostLeads], [activeLeads, lostLeads]);
 
   // Звук нового лида — играет только тем, у кого сейчас открыта эта
   // страница, при появлении лида в «Новый лид» (вручную или из синка
@@ -229,24 +239,62 @@ export function LeadsPage() {
         ? null
         : operatorFilter;
 
+  // Открытые по клику месяцы «Отказа» — по подписке на месяц (lostAt внутри месяца).
+  const monthKey = requestedMonths.join(',');
+  useEffect(() => {
+    if (!db || !activeBranchId || lostRequested || requestedMonths.length === 0) return undefined;
+    const unsubs = requestedMonths.map((key) => {
+      const m = lostMonthList.find((x) => x.key === key);
+      const constraints = [where('branchId', '==', activeBranchId), where('isArchived', '==', false), where('funnelStage', '==', 'lost')];
+      if (scopedOperatorUid) constraints.push(where('assignedOperator', '==', scopedOperatorUid));
+      constraints.push(where('lostAt', '>=', m.start), where('lostAt', '<', m.end), orderBy('lostAt', 'desc'));
+      return onSnapshot(
+        query(collection(db, 'students'), ...constraints),
+        (snap) => setMonthLeads((prev) => ({ ...prev, [key]: snap.docs.map((d) => ({ id: d.id, ...d.data() })) })),
+        () => setMonthLeads((prev) => ({ ...prev, [key]: prev[key] ?? [] })),
+      );
+    });
+    return () => unsubs.forEach((u) => u());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId, lostRequested, monthKey, scopedOperatorUid]);
+  const allLeads = useMemo(() => {
+    if (lostRequested) return [...activeLeads, ...lostLeads];
+    const seen = new Set();
+    const monthly = Object.values(monthLeads).flat().filter((l) => !seen.has(l.id) && seen.add(l.id));
+    return [...activeLeads, ...monthly];
+  }, [activeLeads, lostLeads, lostRequested, monthLeads]);
+
   // Число отказов для шапки, пока колонка не раскрыта. Пересчитывается при смене
   // фильтра оператора и когда меняется набор живых лидов (лид мог уехать в отказ).
   useEffect(() => {
     if (!db || !activeBranchId || lostRequested) return undefined;
     let cancelled = false;
-    const constraints = [where('branchId', '==', activeBranchId), where('isArchived', '==', false), where('funnelStage', '==', 'lost')];
-    if (scopedOperatorUid) constraints.push(where('assignedOperator', '==', scopedOperatorUid));
-    getCountFromServer(query(collection(db, 'students'), ...constraints))
+    const base = [where('branchId', '==', activeBranchId), where('isArchived', '==', false), where('funnelStage', '==', 'lost')];
+    if (scopedOperatorUid) base.push(where('assignedOperator', '==', scopedOperatorUid));
+    const students = collection(db, 'students');
+    getCountFromServer(query(students, ...base))
       .then((snap) => {
         if (!cancelled) setLostCount(snap.data().count);
       })
       .catch(() => {
         if (!cancelled) setLostCount(null);
       });
+    // По месяцам — если индекса ещё нет или счётчик отклонён, остаётся общая кнопка «Показать отказы».
+    Promise.all(
+      lostMonthList.map((m) =>
+        getCountFromServer(query(students, ...base, where('lostAt', '>=', m.start), where('lostAt', '<', m.end))).then((snap) => [m.key, snap.data().count]),
+      ),
+    )
+      .then((pairs) => {
+        if (!cancelled) setMonthCounts(Object.fromEntries(pairs));
+      })
+      .catch(() => {
+        if (!cancelled) setMonthCounts(null);
+      });
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, lostRequested, scopedOperatorUid, activeLeads.length]);
+  }, [activeBranchId, lostRequested, scopedOperatorUid, activeLeads.length, lostMonthList]);
 
   // Лид из поиска / со страницы «Задачи» может лежать в «Отказе» — если его нет среди живых, догружаем отказы.
   useEffect(() => {
@@ -703,6 +751,18 @@ export function LeadsPage() {
                     loading: lostRequested && !lostReady,
                     onLoad: () => setLostRequested(true),
                     count: lostReady ? byColumn.lost.length : lostCount,
+                    // Карточки месяцев — только когда счётчики получены.
+                    months: monthCounts
+                      ? lostMonthList.map((m) => ({
+                          key: m.key,
+                          label: m.label,
+                          isCurrent: m.isCurrent,
+                          count: monthCounts[m.key] ?? 0,
+                          loaded: requestedMonths.includes(m.key) && monthLeads[m.key] !== undefined,
+                          loading: requestedMonths.includes(m.key) && monthLeads[m.key] === undefined,
+                        }))
+                      : null,
+                    onLoadMonth: (key) => setRequestedMonths((prev) => (prev.includes(key) ? prev : [...prev, key])),
                   }
                 : undefined
             }

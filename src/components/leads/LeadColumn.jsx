@@ -288,6 +288,27 @@ function LeadGroup({ title, subtitle, leads, operatorByUid, cardActions, default
   );
 }
 
+/** Карточка месяца «Отказ», лиды которого ещё не читались — крупная иконка, название и число; клик загружает месяц. */
+function LostPlaceholder({ title, count, tone, loading, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="relative flex min-h-[215px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card px-3.5 py-4 text-center shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-navy/15 disabled:cursor-wait"
+    >
+      <ChevronRight className="absolute right-3.5 top-3.5 h-3.5 w-3.5 text-muted" />
+      <span className={`flex h-14 w-14 items-center justify-center rounded-full ${tone}`}>
+        <XCircle className="h-6 w-6" />
+      </span>
+      <span className="text-[17px] font-extrabold text-text">{title}</span>
+      <span className="text-[13px] font-semibold text-muted">
+        {loading ? 'Загрузка…' : `${count} ${pluralize(count, ['отказ', 'отказа', 'отказов'])}`}
+      </span>
+    </button>
+  );
+}
+
 /**
  * Раскладывает лидов «Пробный назначен» по дню пробного — Сегодня/Завтра/
  * Другой день (включая уже прошедшие и те, что дальше завтра). Порядок
@@ -480,7 +501,63 @@ export function LeadColumn({ column, leads, lazy, operatorByUid, onAdd, onDropLe
         }}
         className={`flex-1 space-y-2 border-t px-3 py-3 ${dragOver ? 'border-navy bg-orange-soft/30' : 'border-transparent'}`}
       >
-        {lazy && !lazy.loaded ? (
+        {lazy && !lazy.loaded && lazy.months ? (
+          // «Отказ» по месяцам: число — серверным счётчиком, лиды месяца читаются по клику.
+          // Ранее / без даты — всё, чего нет в показанных месяцах, грузится общей кнопкой.
+          <>
+            {lazy.months.filter((m) => m.count > 0 || m.isCurrent || m.loaded).map((month) => {
+              if (month.loaded) {
+                const monthLeads = leads.filter((l) => {
+                  const d = firstLeadDate(l, ['lostAt', 'updatedAt']);
+                  return d && `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === month.key;
+                });
+                return (
+                  <LeadGroup
+                    key={month.key}
+                    title={month.label}
+                    leads={monthLeads}
+                    cardActions={cardActions}
+                    defaultOpen
+                    closedIcon={XCircle}
+                    closedIconClassName={month.isCurrent ? TONE_DANGER : TONE_MUTED}
+                    closedCaption={`${monthLeads.length} ${pluralize(monthLeads.length, ['отказ', 'отказа', 'отказов'])}`}
+                  >
+                    <div className="space-y-2">
+                      {groupLeadsByReason(monthLeads).map((reason) => (
+                        <LeadGroup
+                          key={reason.key}
+                          title={reason.label}
+                          subtitle={`${reason.percent}% ·`}
+                          leads={reason.leads}
+                          operatorByUid={operatorByUid}
+                          cardActions={cardActions}
+                          defaultOpen={false}
+                        />
+                      ))}
+                    </div>
+                  </LeadGroup>
+                );
+              }
+              return (
+                <LostPlaceholder
+                  key={month.key}
+                  title={month.label}
+                  count={month.count}
+                  tone={month.isCurrent ? TONE_DANGER : TONE_MUTED}
+                  loading={month.loading}
+                  onClick={() => lazy.onLoadMonth(month.key)}
+                />
+              );
+            })}
+            {(() => {
+              const shown = lazy.months.reduce((sum, m) => sum + m.count, 0);
+              const rest = lazy.count == null ? 0 : lazy.count - shown;
+              return rest > 0 ? (
+                <LostPlaceholder title="Ранее и без даты" count={rest} tone={TONE_MUTED} loading={lazy.loading} onClick={lazy.onLoad} />
+              ) : null;
+            })()}
+          </>
+        ) : lazy && !lazy.loaded ? (
           <button
             type="button"
             onClick={lazy.onLoad}
