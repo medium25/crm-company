@@ -528,12 +528,6 @@ export function TasksPage() {
   );
   const { data: allLeads, loading } = useCollection(leadsQuery);
 
-  // Поиск в шапке ищет по этим же уже загруженным лидам (без своей подписки).
-  useEffect(() => {
-    setSearchSource('leads', { items: allLeads });
-  }, [allLeads]);
-  useEffect(() => () => clearSearchSource('leads'), []);
-
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
     [activeBranchId],
@@ -708,6 +702,27 @@ export function TasksPage() {
     }
     return result;
   }, [buckets, completed]);
+
+  // Поиск в шапке на этой странице ищет по ЗАДАЧАМ, которые сейчас на странице (карточки
+  // трёх колонок, включая выполненные сегодня) — по имени, телефону и тексту задачи.
+  // Своей подписки на базу нет: берём то, что страница уже показывает.
+  useEffect(() => {
+    const items = BUCKETS.flatMap((bucket) =>
+      columnItems[bucket.key].map((item) => {
+        const text = item.done ? item.taskText : pendingTaskText(item.lead);
+        return {
+          id: `${item.done ? 'done' : 'open'}-${item.lead.id}`,
+          leadId: item.lead.id,
+          fullName: item.lead.fullName,
+          phone: item.lead.phone,
+          text,
+          place: `${bucket.title} · ${item.done ? 'выполнено · ' : ''}${text}`,
+        };
+      }),
+    );
+    setSearchSource('tasks', { items });
+  }, [columnItems]);
+  useEffect(() => () => clearSearchSource('tasks'), []);
 
   // Возврат с доски «Заявки» (кнопка «← К задачам», ?focus=leadId) — открываем ту
   // задачу, над которой только что работали: выполненную (она стоит до конца дня)

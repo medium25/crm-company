@@ -17,13 +17,15 @@ const LEAD_STAGES = COLUMNS.filter((c) => c.key !== 'won').map((c) => c.key);
 /** Где ищем — по разделу, в котором сейчас пользователь. */
 const SCOPES = {
   leads: { label: 'Заявки', placeholder: 'Поиск по заявкам' },
+  tasks: { label: 'Задачи', placeholder: 'Поиск по задачам' },
   trials: { label: 'Пробные', placeholder: 'Поиск по пробным' },
   students: { label: 'Студенты', placeholder: 'Поиск по студентам' },
   groups: { label: 'Группы', placeholder: 'Поиск по группам' },
 };
 
 function scopeOf(pathname) {
-  if (pathname.startsWith('/leads') || pathname.startsWith('/tasks')) return 'leads';
+  if (pathname.startsWith('/tasks')) return 'tasks';
+  if (pathname.startsWith('/leads')) return 'leads';
   if (pathname.startsWith('/trials')) return 'trials';
   if (['/teachers-groups', '/groups', '/teachers', '/courses', '/rooms'].some((p) => pathname.startsWith(p))) return 'groups';
   return 'students';
@@ -31,7 +33,7 @@ function scopeOf(pathname) {
 
 /**
  * Поиск в шапке — ⌘K/Ctrl+K или клик. Ищет ТОЛЬКО в том разделе, где
- * пользователь сейчас: в «Заявках» и «Задачах» — по лидам доски, в «Пробных» —
+ * пользователь сейчас: в «Заявках» — по лидам доски, в «Задачах» — по задачам, в «Пробных» —
  * по пробным, в «Учителях и группах» — по группам, в остальных — по студентам.
  * Заявки/Задачи/Пробные ищут по данным, которые страница уже загрузила (см.
  * searchSource.js), — своей подписки на базу нет, лишних чтений ноль. Студенты и
@@ -51,6 +53,7 @@ export function GlobalSearch() {
   const scope = scopeOf(pathname);
   const leadsSource = useSearchSource('leads');
   const trialsSource = useSearchSource('trials');
+  const tasksSource = useSearchSource('tasks');
 
   // Только реальные студенты (не лиды на доске): active/trial/paused/left,
   // без тех, кто пока ещё на стадии воронки.
@@ -106,6 +109,13 @@ export function GlobalSearch() {
         .slice(0, 8)
         .map((s) => ({ id: s.id, title: s.fullName, right: formatPhone(s.phone), ...locateLead(s, canSeeAllLeads, user?.uid) }));
     }
+    if (scope === 'tasks') {
+      // Задача — карточка на странице «Задачи»; клик прокручивает к ней и обводит рамкой.
+      return (tasksSource?.items ?? [])
+        .filter((t) => matchPerson(t) || t.text?.toLowerCase().includes(term))
+        .slice(0, 8)
+        .map((t) => ({ id: t.id, title: t.fullName, right: formatPhone(t.phone), place: t.place, path: `/tasks?focus=${t.leadId}` }));
+    }
     if (scope === 'trials') {
       return (trialsSource?.items ?? [])
         .filter(matchPerson)
@@ -129,7 +139,7 @@ export function GlobalSearch() {
       .slice(0, 8)
       .map((s) => ({ id: s.id, title: s.fullName, right: formatPhone(s.phone), place: `Студенты · ${STUDENT_STATUS[s.status] ?? 'ученик'}`, path: `/students/${s.id}` }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [term, scope, leadsSource, trialsSource, groups, studentDocs, canSeeAllLeads, user?.uid]);
+  }, [term, scope, leadsSource, trialsSource, tasksSource, groups, studentDocs, canSeeAllLeads, user?.uid]);
 
   // «Отказ» на доске грузится по кнопке — если результатов нет, предлагаем поискать и там.
   const lost = scope === 'leads' ? leadsSource?.lost : null;
