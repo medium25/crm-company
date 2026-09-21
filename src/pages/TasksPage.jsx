@@ -1,7 +1,7 @@
 // src/pages/TasksPage.jsx
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
+import { isToday, isTomorrow, format, subDays, subMonths, startOfMonth } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { collection, doc, query, where, orderBy, setDoc } from 'firebase/firestore';
 import { AlertTriangle, Clock, CalendarDays, Settings, Check } from 'lucide-react';
@@ -14,7 +14,7 @@ import { useToast } from '../components/ui/Toast.jsx';
 import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { COLUMNS } from '../components/leads/columns.js';
 import { overdueReasonLabel } from '../lib/leadFunnel.js';
-import { priorityLevel, taskPlacement } from '../lib/leadTasks.js';
+import { compareTasks, priorityLevel, taskPlacement } from '../lib/leadTasks.js';
 import { formatRelativeDeadline, pluralize } from '../lib/format.js';
 import { pickGreeting } from '../lib/greeting.js';
 import { setSearchSource, clearSearchSource } from '../lib/searchSource.js';
@@ -663,12 +663,15 @@ export function TasksPage() {
         level = priorityLevel({ funnelStage: wasStage }, bucket === 'overdue');
         deadlineMs = expected || msOf(first.at);
       }
+      // Свежий (новый лид, пришёл сегодня) — наверху и с приоритетом 1, как до отметки.
+      const fresh = wasStage === 'new' && Boolean(lead.createdAt?.toDate) && isToday(lead.createdAt.toDate());
       result[bucket].push({
         done: true,
         lead,
         entries: mine,
         taskText: taskTextBefore(all, first, wasStage),
-        level,
+        level: fresh ? 1 : level,
+        fresh,
         deadlineMs: deadlineMs || msOf(first.at),
       });
     }
@@ -685,7 +688,7 @@ export function TasksPage() {
       if (placement) result[placement.bucket].push({ lead, ...placement });
     }
     for (const key of Object.keys(result)) {
-      result[key].sort((a, b) => a.level - b.level || a.deadline - b.deadline);
+      result[key].sort(compareTasks);
     }
     return result;
   }, [allLeads, scopedOperatorUid]);
@@ -698,7 +701,7 @@ export function TasksPage() {
       result[key] = [
         ...buckets[key].map((it) => ({ ...it, done: false, deadlineMs: it.deadline.getTime() })),
         ...completed[key],
-      ].sort((a, b) => a.level - b.level || a.deadlineMs - b.deadlineMs);
+      ].sort(compareTasks);
     }
     return result;
   }, [buckets, completed]);
