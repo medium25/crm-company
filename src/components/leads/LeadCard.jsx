@@ -316,25 +316,10 @@ function buildFullHistory(lead) {
 function buildTimelineNodes(history, pendingDueAt, currentStage) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const interactions = history.filter((item) => item.type === 'entry');
-  // Номер на кружке — счёт ВНУТРИ столбца, в котором касание реально
-  // произошло (по stageHistory, не по тому, в каком массиве оно хранится —
-  // «Не выходит на связь» пишет в один массив что на пробном, что в
-  // дожиме). Столбец касания — последний переход стадии НЕ ПОЗЖЕ его
-  // времени. Лента при этом по-прежнему показывает всю историю целиком.
-  const transitions = history.filter((item) => item.type === 'stage').sort((a, b) => msOf(a.at) - msOf(b.at));
-  const stageAt = (at) => {
-    let stage = transitions[0]?.stage ?? currentStage;
-    for (const t of transitions) {
-      if (msOf(t.at) > msOf(at)) break;
-      stage = t.stage;
-    }
-    return stage;
-  };
-  const stepByStage = {};
+  // Номер на кружке — сквозной по всей ленте (1, 2, 3 …), при переходе между
+  // столбцами не начинается заново.
   const nodes = interactions.map((item, i) => {
     const timing = responseTiming(item, fallbackAt);
-    const stage = stageAt(item.at);
-    stepByStage[stage] = (stepByStage[stage] ?? 0) + 1;
     // Крупная строка — «что произошло → следующий шаг» этого касания; мелкая —
     // какая задача стояла + вовремя ли её сделали. Старые записи без текста
     // показывают вместо строки только оценку срока.
@@ -345,13 +330,12 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
       task: [standingTask, line ? timing?.label : null].filter(Boolean).join(' · ') || null,
       result: line || timing?.label || 'Без задачи',
       at: item.at,
-      step: stepByStage[stage],
+      step: i + 1,
     };
   });
   // Последняя поставленная задача (nextStep последнего касания) ещё не
   // отработана — отдельный выделенный узел в конце ленты, не такой же
-  // серый пункт, как уже сделанные. Номер — следующий в счёте ТЕКУЩЕГО
-  // столбца (тот же счёт, что у кнопки касания под лентой).
+  // серый пункт, как уже сделанные. Номер — следующий в сквозном счёте ленты.
   // До первого звонка своего nextStep ещё нет ни у кого — задача на этот
   // случай фиксированная, та же, что у самого первого касания (i === 0
   // выше), с дедлайном «через 30 минут после создания лида».
@@ -364,7 +348,7 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
   const pendingDue =
     interactions.length === 0 && fallbackAt ? new Date(msOf(fallbackAt) + 30 * 60000) : (pendingDueAt ?? null);
   if (pendingTask) {
-    nodes.push({ type: 'pending', task: pendingTask, dueAt: pendingDue, step: (stepByStage[currentStage] ?? 0) + 1 });
+    nodes.push({ type: 'pending', task: pendingTask, dueAt: pendingDue, step: interactions.length + 1 });
   }
   return nodes;
 }
