@@ -68,9 +68,13 @@ export async function countDebtors(db, branchId) {
  * @returns {Promise<{activeStudents: number, trial: number, debtors: number}>}
  */
 export async function countStudentBuckets(db, branchId) {
-  const snap = await getDocs(
-    query(collection(db, 'students'), where('branchId', '==', branchId), where('status', 'in', ['active', 'trial', 'paused']), where('isArchived', '==', false)),
-  );
+  const [snap, trialEnrollments] = await Promise.all([
+    getDocs(query(collection(db, 'students'), where('branchId', '==', branchId), where('status', 'in', ['active', 'trial', 'paused']), where('isArchived', '==', false))),
+    getDocs(query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', '==', 'trial'), where('isArchived', '==', false))),
+  ]);
+  // Пробный «в уроке» — только тот, кто уже записан к учителю (есть запись-enrollment
+  // с учителем). Лиды, лишь записанные на пробный дату без учителя, в счёт не идут.
+  const withTeacher = new Set(trialEnrollments.docs.filter((e) => e.data().teacherId).map((e) => e.data().studentId));
   let activeStudents = 0;
   let trial = 0;
   let debtors = 0;
@@ -79,8 +83,8 @@ export async function countStudentBuckets(db, branchId) {
   for (const d of snap.docs) {
     const s = d.data();
     if (s.status === 'active') activeStudents += 1;
-    // «В пробном уроке» — только пробные текущего месяца (по дате пробного урока).
-    if (s.status === 'trial') {
+    // «В пробном уроке» — только пробные с учителем и датой урока в текущем месяце.
+    if (s.status === 'trial' && withTeacher.has(d.id)) {
       const at = (s.trialDate ?? s.trialAt)?.toDate?.();
       if (at && at >= monthStart && at < nextMonthStart) trial += 1;
     }
