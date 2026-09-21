@@ -63,7 +63,6 @@ export const COLUMNS = [
     key: 'trial_completed',
     label: 'Пробный проведён',
     color: '#0F9D8C',
-    maxTouches: 2,
     hint: {
       summary: 'Студент уже создан (страница «Пробные») — дождитесь оплаты или переведите вручную в «Дожим».',
       steps: [
@@ -145,7 +144,13 @@ export const STAGE_COLOR_SWATCHES = [
  */
 export function withStageOverrides(overrides) {
   if (!overrides) return COLUMNS;
-  return COLUMNS.map((c) => (overrides[c.key] ? { ...c, ...overrides[c.key] } : c));
+  return COLUMNS.map((c) => {
+    if (!overrides[c.key]) return c;
+    const { maxTouches, ...rest } = overrides[c.key];
+    // Число касаний — только у стадий, где оно что-то значит (в колонке нет кнопки «Касание» —
+    // старая сохранённая правка не должна возвращать бессмысленную настройку).
+    return { ...c, ...rest, ...(c.maxTouches !== undefined && maxTouches !== undefined ? { maxTouches } : {}) };
+  });
 }
 
 /**

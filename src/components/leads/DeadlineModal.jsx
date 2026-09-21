@@ -234,7 +234,6 @@ export function DeadlineModal({ target, onClose }) {
           <>
             <Input
               label="Что произошло?"
-              placeholder="не поднял трубку"
               required
               value={outcome}
               onChange={(e) => {
@@ -244,7 +243,6 @@ export function DeadlineModal({ target, onClose }) {
             />
             <Input
               label="Следующий шаг"
-              placeholder="перезвоню через 30 минут"
               required
               value={nextStep}
               onChange={(e) => {

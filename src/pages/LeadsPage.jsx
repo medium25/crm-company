@@ -188,6 +188,9 @@ export function LeadsPage() {
   // колонки «Дозвон» (см. columns.js), читают markAttempt/nextCallDueAt
   // ниже вместо жёстко зашитого 5.
   const callMaxAttempts = resolvedColumns.find((c) => c.key === 'calling')?.maxTouches ?? 5;
+  // «Дожим» и «Пробный назначен» — тоже регулируются через ⚙ (раньше 2 и 3 были зашиты в код).
+  const closingMaxTouches = resolvedColumns.find((c) => c.key === 'closing')?.maxTouches ?? 2;
+  const trialMaxTouches = resolvedColumns.find((c) => c.key === 'trial_scheduled')?.maxTouches ?? 3;
   // Чек-лист первого разговора — список пунктов редактируемый (⚙ на панели
   // чек-листа в LeadCard.jsx), хранится тут же в settings/{branchId}.
   const resolvedChecklistItems = branchSettings?.checklistItems ?? DEFAULT_CHECKLIST_ITEMS;
@@ -521,7 +524,7 @@ export function LeadsPage() {
   const markTouch = (lead) => {
     const snapshot = taskSnapshot(lead);
     const nextNumber = (lead.closingTouchNumber ?? 0) + 1;
-    const isFinal = nextNumber >= 2;
+    const isFinal = nextNumber >= closingMaxTouches;
     // closingTouchLog — параллельно counter'у closingTouchNumber, только
     // для разбора отклонений при отказе (leadDeviationAnalysis.js): сам
     // счётчик не хранит, КОГДА было касание и был ли дедлайн, лог хранит.
@@ -544,8 +547,8 @@ export function LeadsPage() {
     }
     setDeadlineTarget({
       lead,
-      title: 'Дедлайн второго касания',
-      suggestedDate: secondTouchDueAt(lead.trialDate?.toDate?.()),
+      title: `Дедлайн касания ${nextNumber + 1}`,
+      suggestedDate: nextNumber === 1 ? secondTouchDueAt(lead.trialDate?.toDate?.()) : unreachableCallDueAt(),
       requireTask: true,
       onConfirm: (dueDate, outcome, nextStep) =>
         patch(
@@ -599,7 +602,7 @@ export function LeadsPage() {
       return;
     }
 
-    markTrialUnreachable({ lead, result, onRescheduleCb, user, patch, setDeadlineTarget });
+    markTrialUnreachable({ lead, result, onRescheduleCb, user, patch, setDeadlineTarget, maxAttempts: trialMaxTouches });
   };
 
   const openAddForm = () => setFormLead({});

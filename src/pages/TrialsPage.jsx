@@ -7,6 +7,7 @@ import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
+import { useDoc } from '../hooks/useDoc.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx';
 import { LeadCard } from '../components/leads/LeadCard.jsx';
@@ -15,7 +16,7 @@ import { ResetLeadModal } from '../components/leads/ResetLeadModal.jsx';
 import { GroupBookingModal } from '../components/leads/GroupBookingModal.jsx';
 import { TrialCompletedCard } from '../components/leads/TrialCompletedCard.jsx';
 import { groupLeadsByTrialDay } from '../components/leads/LeadColumn.jsx';
-import { COLUMNS } from '../components/leads/columns.js';
+import { COLUMNS, withStageOverrides } from '../components/leads/columns.js';
 import { StudentFormModal } from '../components/students/StudentFormModal.jsx';
 import { DeleteLeadModal } from '../components/students/DeleteLeadModal.jsx';
 import { TrialFormModal } from '../components/leads/TrialFormModal.jsx';
@@ -320,6 +321,14 @@ export function TrialsPage() {
   }, [highlightId]);
   const onOpen = (lead) => navigate(`/students/${lead.id}`);
 
+  // Названия/цвета стадий и макс. касаний — из настроек филиала (⚙ на доске «Заявки»),
+  // чтобы «Касание N/M» здесь считалось так же, как на доске.
+  const branchSettingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
+  const { data: branchSettings } = useDoc(branchSettingsRef);
+  const resolvedColumns = useMemo(() => withStageOverrides(branchSettings?.leadStageOverrides), [branchSettings]);
+  const trialMaxTouches = resolvedColumns.find((c) => c.key === 'trial_scheduled')?.maxTouches ?? 3;
+  const callMaxAttempts = resolvedColumns.find((c) => c.key === 'calling')?.maxTouches ?? 5;
+
   const patchLead = async (lead, data) => {
     try {
       await updateDoc(doc(db, 'students', lead.id), { ...data, updatedAt: serverTimestamp() });
@@ -336,6 +345,7 @@ export function TrialsPage() {
       lead={lead}
       operatorColor={op?.color}
       operatorName={op?.name}
+      columns={resolvedColumns}
       onOpen={onOpen}
       onEdit={setEditTarget}
       onDecline={setDeclineTarget}
@@ -350,7 +360,7 @@ export function TrialsPage() {
         else advanceStage(db, l, stageKey, {}, user).catch(() => showToast('Не удалось обновить лид.', { type: 'error' }));
       }}
       onMarkUnreachable={(l, result, onRescheduleCb) =>
-        markTrialUnreachable({ lead: l, result, onRescheduleCb, user, patch: patchLead, setDeadlineTarget: setDeferTarget })
+        markTrialUnreachable({ lead: l, result, onRescheduleCb, user, patch: patchLead, setDeadlineTarget: setDeferTarget, maxAttempts: trialMaxTouches })
       }
       onMarkTouch={() => {}}
       onMarkAttempt={() => {}}
@@ -515,7 +525,7 @@ export function TrialsPage() {
       />
       <TrialFormModal target={trialTarget} onClose={() => setTrialTarget(null)} />
       <DeadlineModal target={deferTarget} onClose={() => setDeferTarget(null)} />
-      <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} callMaxAttempts={COLUMNS.find((c) => c.key === 'calling')?.maxTouches ?? 5} />
+      <DeclineLeadModal lead={declineTarget} onClose={() => setDeclineTarget(null)} callMaxAttempts={callMaxAttempts} />
       <ResetLeadModal lead={resetTarget} onClose={() => setResetTarget(null)} />
       <GroupBookingModal lead={bookingTarget} allLeads={rawLeads} onClose={() => setBookingTarget(null)} />
       <AddPaymentModal open={Boolean(paymentTarget)} student={paymentTarget} enrollments={paymentEnrollments} onClose={() => setPaymentTarget(null)} />

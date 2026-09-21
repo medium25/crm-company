@@ -190,6 +190,7 @@ export function trialScheduleLabel(lead) {
   return course ? `${course} - ${weekdayCap} - ${time}` : `${weekdayCap} - ${time}`;
 }
 
+// Значение по умолчанию; реальное берётся из настройки колонки «Пробный назначен» (⚙ → макс. касаний).
 const UNREACHABLE_MAX_ATTEMPTS = 3;
 
 /**
@@ -700,7 +701,7 @@ function LeadInfoPopover({ items }) {
  * @param {() => void} onDecline
  * @param {import('firebase/firestore').Timestamp|null} [nextAttemptDueAt] дедлайн следующей попытки — на пробном unreachableNextCallDueAt, в дожиме nextTouchAt
  */
-function UnreachableBlock({ lead, onMark, onReschedule, onDecline, onCreateStudent, nextAttemptDueAt }) {
+function UnreachableBlock({ lead, onMark, onReschedule, onDecline, onCreateStudent, nextAttemptDueAt, maxAttempts = UNREACHABLE_MAX_ATTEMPTS }) {
   const attempts = lead.unreachableAttempts ?? [];
 
   // Перенос пробного — один раз за весь цикл: либо уже был «Перенос» среди
@@ -723,7 +724,7 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, onCreateStude
   const btnRef = useRef(null);
   const dismiss = useCallback(() => setConfirming(false), []);
 
-  if (failStreak >= UNREACHABLE_MAX_ATTEMPTS) {
+  if (failStreak >= maxAttempts) {
     return (
       <button
         type="button"
@@ -754,7 +755,7 @@ function UnreachableBlock({ lead, onMark, onReschedule, onDecline, onCreateStude
       ) : (
         <TouchActionButton
           ref={btnRef}
-          text={`Касание ${attempts.length}/${UNREACHABLE_MAX_ATTEMPTS}`}
+          text={`Касание ${attempts.length}/${maxAttempts}`}
           time={deadlineLabel}
           onClick={() => {
             const r = btnRef.current?.getBoundingClientRect();
@@ -1083,6 +1084,7 @@ export function LeadCard({
               onDecline={() => onDecline(lead)}
               onCreateStudent={onCreateStudent}
               nextAttemptDueAt={lead.unreachableNextCallDueAt}
+              maxAttempts={columns.find((c) => c.key === 'trial_scheduled')?.maxTouches ?? UNREACHABLE_MAX_ATTEMPTS}
             />
           ) : (
             <span />

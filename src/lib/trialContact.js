@@ -15,14 +15,15 @@ import { unreachableCallDueAt } from './leadFunnel.js';
  * @param {{uid: string}} args.user
  * @param {(lead: Object, data: Object) => Promise<void>|void} args.patch запись полей лида
  * @param {(target: Object) => void} args.setDeadlineTarget открыть DeadlineModal
+ * @param {number} [args.maxAttempts] макс. касаний колонки «Пробный назначен» (⚙), по умолчанию 3
  */
-export function markTrialUnreachable({ lead, result, onRescheduleCb, user, patch, setDeadlineTarget }) {
+export function markTrialUnreachable({ lead, result, onRescheduleCb, user, patch, setDeadlineTarget, maxAttempts = 3 }) {
   const snapshot = taskSnapshot(lead);
   // expectedBy — дедлайн, действовавший до этой попытки (нужен разбору отклонений при отказе).
   const expectedBy = lead.unreachableNextCallDueAt ?? null;
   const priorAttempts = lead.unreachableAttempts ?? [];
   const buildAttempts = (outcome, nextStep) => [...priorAttempts, { result, at: new Date(), expectedBy, outcome, nextStep, by: user.uid, ...snapshot }];
-  const attemptsExhausted = priorAttempts.length + 1 >= 3;
+  const attemptsExhausted = priorAttempts.length + 1 >= maxAttempts;
 
   if (result === 'reschedule') {
     setDeadlineTarget({
