@@ -431,12 +431,12 @@ function CompletedTaskCard({ lead, taskText, entries, focused }) {
         style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'none' }}
       >
         <div
-          className={`${face} flex items-center justify-between gap-3 rounded-field border border-border bg-card p-3`}
+          className={`${face} flex h-[96px] items-center justify-between gap-3 rounded-field border border-border bg-card p-3`}
           style={{ pointerEvents: flipped ? 'none' : 'auto' }}
         >
           <div className="min-w-0">
             <p className="truncate text-[13px] font-bold leading-snug text-text">{lead.fullName}</p>
-            <p className="text-[12px] leading-snug text-text">{taskText}</p>
+            <p className="line-clamp-2 text-[12px] leading-snug text-text" title={taskText}>{taskText}</p>
             <p className="mt-0.5 text-[11px] text-muted">сегодня в {timeOf(last)}</p>
           </div>
           <button
@@ -449,7 +449,7 @@ function CompletedTaskCard({ lead, taskText, entries, focused }) {
           </button>
         </div>
         <div
-          className={`${face} rounded-field border border-border bg-surface-alt p-3`}
+          className={`${face} h-[96px] overflow-y-auto rounded-field border border-border bg-surface-alt p-3`}
           style={{ transform: 'rotateY(180deg)', pointerEvents: flipped ? 'auto' : 'none' }}
         >
           <div className="flex items-start justify-between gap-3">
@@ -824,7 +824,7 @@ export function TasksPage() {
                     <div
                       key={lead.id}
                       id={`task-open-${lead.id}`}
-                      className={`relative flex items-center justify-between gap-3 rounded-field border bg-card p-3 ${
+                      className={`relative flex h-[96px] items-center justify-between gap-3 rounded-field border bg-card p-3 ${
                         mark ? '' : 'border-border'
                       } ${focusKey === `open-${lead.id}` ? 'ring-4 ring-navy ring-offset-2' : ''}`}
                       style={mark ? { borderColor: mark.color } : undefined}
@@ -839,7 +839,7 @@ export function TasksPage() {
                       )}
                       <div className="min-w-0">
                         <p className="truncate text-[13px] font-bold leading-snug text-text">{lead.fullName}</p>
-                        <p className="text-[12px] leading-snug text-text">{pendingTaskText(lead)}</p>
+                        <p className="line-clamp-2 text-[12px] leading-snug text-text" title={pendingTaskText(lead)}>{pendingTaskText(lead)}</p>
                         <p className={`mt-0.5 text-[11px] ${bucket.key === 'overdue' ? 'font-bold text-danger' : 'text-muted'}`}>
                           {pinnedToday ? 'сегодня' : formatRelativeDeadline(deadline)}
                         </p>

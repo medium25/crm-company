@@ -56,7 +56,7 @@ export function TrialCompletedCard({
       tabIndex={0}
       onClick={() => onOpen(lead)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(lead)}
-      className={`flex h-[300px] cursor-pointer flex-col gap-2.5 rounded-xl border bg-card p-3.5 pb-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`flex h-[237px] cursor-pointer flex-col gap-2.5 rounded-xl border bg-card p-3.5 pb-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         overdue ? 'border-danger ring-1 ring-danger/40' : 'border-border hover:border-navy/20'
       }`}
     >
