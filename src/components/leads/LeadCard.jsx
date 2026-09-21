@@ -309,10 +309,9 @@ function buildFullHistory(lead) {
 
 // Только реальные взаимодействия (касания) — переходы стадий/передачи
 // оператору в ленту не попадают, это служебные события, не задачи.
-// Каждый узел — пара «какая задача стояла» (task, мелким) + «что вышло →
-// следующий шаг» (result, крупным): task — это nextStep ПРЕДЫДУЩЕГО касания (что решили
-// сделать дальше тогда — это и есть задача, которую сейчас выполнили),
-// у самого первого касания задачи в данных нет — это всегда стартовый SLA.
+// Каждый узел — две строки: мелкая сверху (насколько опоздали / вовремя — task) и под
+// ней крупный текст (result): «что произошло → следующий шаг», а если его нет — текст
+// задачи, что стояла (nextStep ПРЕДЫДУЩЕГО касания; у самого первого — стартовый SLA).
 function buildTimelineNodes(history, pendingDueAt, currentStage) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const interactions = history.filter((item) => item.type === 'entry');
@@ -320,15 +319,15 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
   // столбцами не начинается заново.
   const nodes = interactions.map((item, i) => {
     const timing = responseTiming(item, fallbackAt);
-    // Крупная строка — «что произошло → следующий шаг» этого касания; мелкая —
-    // какая задача стояла + вовремя ли её сделали. Старые записи без текста
-    // показывают вместо строки только оценку срока.
+    // Мелкая строка сверху — только насколько опоздали / вовремя; под ней крупно текст:
+    // «что произошло → следующий шаг» этого касания, а у старых записей без текста —
+    // текст задачи, что стояла (nextStep предыдущего касания, для первого — стартовый SLA).
     const line = [item.outcome, item.nextStep].filter(Boolean).join(' → ');
     const standingTask = i === 0 ? 'Позвонить в первые 30 минут' : (interactions[i - 1].nextStep ?? null);
     return {
       type: 'entry',
-      task: [standingTask, line ? timing?.label : null].filter(Boolean).join(' · ') || null,
-      result: line || timing?.label || 'Без задачи',
+      task: timing?.label ?? null,
+      result: line || standingTask || (timing ? null : 'Без задачи'),
       at: item.at,
       step: i + 1,
     };
@@ -455,15 +454,17 @@ export function HistoryTimeline({ lead }) {
             </div>
             <div className="min-w-0 flex-1">
               {node.task && <p className="text-[9px] leading-tight text-muted">{node.task}</p>}
-              <p
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggle(i);
-                }}
-                className={`cursor-pointer text-[11px] leading-tight text-text ${expanded.has(i) ? '' : 'truncate'}`}
-              >
-                {node.result}
-              </p>
+              {node.result && (
+                <p
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggle(i);
+                  }}
+                  className={`cursor-pointer text-[11px] leading-tight text-text ${expanded.has(i) ? '' : 'truncate'}`}
+                >
+                  {node.result}
+                </p>
+              )}
             </div>
           </div>
         ),
