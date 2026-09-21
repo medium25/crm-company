@@ -449,7 +449,18 @@ export function LeadColumn({ column, leads, lazy, operatorByUid, onAdd, onDropLe
   // переезда) — но max у каждой стадии свой, регулируется независимо.
   const maxTouchesColumn = (columns ?? []).find((c) => c.key === column.key) ?? column;
   // Число в шапке: у лениво грузимой колонки до раскрытия — заранее посчитанное, иначе по загруженным.
-  const columnCount = lazy && !lazy.loaded ? lazy.count : leads.length;
+  // «Оплачено»/«Отказ» — число и сумма в шапке только за ТЕКУЩИЙ месяц (старые месяцы
+  // остаются карточками ниже, в сумму не идут). У «Отказа» до раскрытия — серверный счётчик месяца.
+  const currentMonth = monthGroups?.find((m) => m.isCurrent);
+  const columnCount = isWon
+    ? (currentMonth?.leads.length ?? 0)
+    : isLost
+      ? lazy && !lazy.loaded
+        ? (lazy.months ? (lazy.months.find((m) => m.isCurrent)?.count ?? 0) : lazy.count)
+        : (currentMonth?.leads.length ?? 0)
+      : lazy && !lazy.loaded
+        ? lazy.count
+        : leads.length;
 
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card bg-surface-alt">
@@ -470,7 +481,10 @@ export function LeadColumn({ column, leads, lazy, operatorByUid, onAdd, onDropLe
           ) : (
             <span className="truncate text-[15px] font-bold uppercase tracking-wide text-text">{column.label}</span>
           )}
-          <span className="block whitespace-nowrap text-center text-[11px] font-semibold leading-[13px] text-muted">
+          <span
+            title={isWon || isLost ? 'За текущий месяц' : undefined}
+            className="block whitespace-nowrap text-center text-[11px] font-semibold leading-[13px] text-muted"
+          >
             {columnCount == null ? '…' : `${columnCount} ${pluralize(columnCount, ['сделка', 'сделки', 'сделок'])} · ${formatSum(columnCount * LEAD_VALUE_UZS)}`}
           </span>
         </span>
