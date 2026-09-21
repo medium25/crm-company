@@ -6,8 +6,10 @@ import { secondLessonAt } from '../../lib/leadFunnel.js';
 import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 
 /**
- * Карточка лида на стадии «Пробный проведён» (студент уже создан на
- * «Пробные», ждёт оплаты) — 3 действия вместо операторского меню.
+ * Карточка лида на стадиях «Пробный проведён» (студент уже создан на
+ * «Пробные», ждёт оплаты) и «Дожим» (тот же ждёт оплаты, оператор с ним
+ * работает касаниями; помечен бейджем «Дожим», «Перенос» скрыт) — 3 действия
+ * вместо операторского меню.
  * Просрочена (красная рамка + бейдж), если с начала времени «второго
  * урока» (trialDate + 2 дня, см. secondLessonAt) по карточке ничего не
  * сделали — она бы тогда так и осталась тут висеть.
@@ -42,7 +44,9 @@ export function TrialCompletedCard({
 
   const trialDateJs = lead.trialDate?.toDate?.();
   const secondLessonDate = trialDateJs ? secondLessonAt(trialDateJs) : null;
-  const overdue = secondLessonDate ? Date.now() > secondLessonDate.getTime() : false;
+  const inClosing = lead.funnelStage === 'closing';
+  // В «Дожиме» срок второго урока уже не показатель — карточка не красная.
+  const overdue = !inClosing && secondLessonDate ? Date.now() > secondLessonDate.getTime() : false;
 
   return (
     <div
@@ -57,6 +61,7 @@ export function TrialCompletedCard({
       <div className="-mx-3.5 -mt-3.5 flex items-center justify-between gap-2 rounded-t-xl bg-card-head px-3.5 pb-2 pt-2.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
+          {inClosing && <span className="shrink-0 rounded-badge bg-[#7C5CBF]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#7C5CBF]">Дожим</span>}
           {overdue && (
             <span className="shrink-0 rounded-badge bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger">
               {formatOverdueBy(secondLessonDate) || 'Просрочено'}
@@ -110,14 +115,16 @@ export function TrialCompletedCard({
             >
               Оплата
             </button>
-            <button
-              type="button"
-              onClick={() => onDeferPayment(lead)}
-              title="Перенос оплаты"
-              className="min-w-0 flex-1 truncate rounded-field border border-navy/40 px-1.5 py-1 text-[11px] font-bold text-navy hover:bg-navy/5"
-            >
-              Перенос
-            </button>
+            {!inClosing && (
+              <button
+                type="button"
+                onClick={() => onDeferPayment(lead)}
+                title="Перенос оплаты"
+                className="min-w-0 flex-1 truncate rounded-field border border-navy/40 px-1.5 py-1 text-[11px] font-bold text-navy hover:bg-navy/5"
+              >
+                Перенос
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onArchive(lead)}

@@ -190,7 +190,7 @@ export function TrialsPage() {
             collection(db, 'students'),
             where('branchId', '==', activeBranchId),
             where('isArchived', '==', false),
-            where('funnelStage', 'in', ['trial_scheduled', 'trial_completed']),
+            where('funnelStage', 'in', ['trial_scheduled', 'trial_completed', 'closing']),
           )
         : null,
     [activeBranchId],
@@ -208,7 +208,8 @@ export function TrialsPage() {
     [rawLeads],
   );
   const scheduledLeads = useMemo(() => sorted.filter((l) => l.funnelStage === 'trial_scheduled'), [sorted]);
-  const completedLeadsAll = useMemo(() => sorted.filter((l) => l.funnelStage === 'trial_completed'), [sorted]);
+  // Колонка «Пробные» — все лиды всех операторов, уже прошедшие пробный: «Пробный проведён» и «Дожим».
+  const completedLeadsAll = useMemo(() => sorted.filter((l) => l.funnelStage === 'trial_completed' || l.funnelStage === 'closing'), [sorted]);
 
   const [completedSearch, setCompletedSearch] = useState('');
   const completedTerm = completedSearch.trim().toLowerCase();
