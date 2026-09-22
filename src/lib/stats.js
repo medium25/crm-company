@@ -1,4 +1,4 @@
-import { collection, getCountFromServer, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getCountFromServer, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { addMonths, format, startOfMonth, startOfQuarter, startOfYear, subMonths, getDaysInMonth } from 'date-fns';
 
 /**
@@ -153,10 +153,27 @@ export async function countPaidThisMonth(db, branchId, month, payments) {
  * между группами (TransferGroupModal), либо архивация одной дублирующей
  * записи при живом основном enrollment'е (bulkArchive/StudentDetailPage
  * иногда чистят так). Уникальные студенты.
+ *
+ * `leftAt` теперь ограничен периодом ПРЯМО В ЗАПРОСЕ (диапазон дат в
+ * Firestore), а не читается вся коллекция `enrollments` целиком с фильтром
+ * по датам в JS после скачивания — раньше это было главным пожирателем
+ * квоты чтений на дашборде (см. 2026-09-22, коллекция росла с каждым новым
+ * ушедшим студентом, читалась заново на каждой незакэшированной загрузке).
+ * Документы без `leftAt` Firestore сам не отдаёт на диапазонном фильтре —
+ * тот же эффект, что у прежней проверки `if (!churnedAt) continue`.
+ * Нужен составной индекс `enrollments`: branchId + status + leftAt.
  */
 export async function countLeftActiveGroup(db, branchId, periodStart, periodEnd) {
   const [leftSnap, openSnap] = await Promise.all([
-    getDocs(query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', 'in', ['left', 'archived']))),
+    getDocs(
+      query(
+        collection(db, 'enrollments'),
+        where('branchId', '==', branchId),
+        where('status', 'in', ['left', 'archived']),
+        where('leftAt', '>=', Timestamp.fromDate(periodStart)),
+        where('leftAt', '<=', Timestamp.fromDate(periodEnd)),
+      ),
+    ),
     getDocs(query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', 'in', ['active', 'trial', 'paused']), where('isArchived', '==', false))),
   ]);
   const stillEnrolled = new Set(openSnap.docs.map((d) => d.data().studentId));
@@ -166,10 +183,7 @@ export async function countLeftActiveGroup(db, branchId, periodStart, periodEnd)
     const e = d.data();
     if (!e.activatedAt) continue;
     if (stillEnrolled.has(e.studentId)) continue;
-    const churnedAt = e.leftAt;
-    if (!churnedAt) continue;
-    const date = churnedAt.toDate();
-    if (date >= periodStart && date <= periodEnd) studentIds.add(e.studentId);
+    studentIds.add(e.studentId);
   }
   return studentIds.size;
 }
@@ -179,14 +193,23 @@ export async function countLeftActiveGroup(db, branchId, periodStart, periodEnd)
  * `leftAt` в периоде, и ни одна из их записей никогда не была активирована.
  * Кандидатов сперва отбираем по студентам, «никогда не был active» проверяем
  * их enrollments (параллельно, по кандидату — не по всей коллекции).
+ *
+ * `leftAt` ограничен периодом в самом запросе (см. countLeftActiveGroup выше) —
+ * раньше читались ВСЕ когда-либо ушедшие студенты филиала, фильтр по датам
+ * шёл в JS. Нужен составной индекс `students`: branchId + isArchived + status + leftAt.
  */
 export async function countLeftAfterTrial(db, branchId, periodStart, periodEnd) {
   const snap = await getDocs(
-    query(collection(db, 'students'), where('branchId', '==', branchId), where('isArchived', '==', false), where('status', '==', 'left')),
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('isArchived', '==', false),
+      where('status', '==', 'left'),
+      where('leftAt', '>=', Timestamp.fromDate(periodStart)),
+      where('leftAt', '<=', Timestamp.fromDate(periodEnd)),
+    ),
   );
-  const candidates = snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((s) => s.trialAt && s.leftAt && s.leftAt.toDate() >= periodStart && s.leftAt.toDate() <= periodEnd);
+  const candidates = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => s.trialAt);
 
   const results = await Promise.all(
     candidates.map(async (student) => {
