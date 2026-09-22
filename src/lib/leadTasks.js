@@ -1,6 +1,6 @@
 // src/lib/leadTasks.js
-import { isToday, isTomorrow } from 'date-fns';
-import { stageDeadline } from './leadFunnel.js';
+import { isToday, isTomorrow, differenceInCalendarDays } from 'date-fns';
+import { stageDeadline, isTrialDay, contactDueDate } from './leadFunnel.js';
 
 /** Новый лид (стадия «Новый лид»), пришедший сегодня. */
 export function isFreshLead(lead) {
@@ -48,16 +48,50 @@ export function priorityLevel(lead, isOverdue) {
  * @returns {{bucket: 'overdue'|'today'|'tomorrow', level: number, deadline: Date, pinnedToday: boolean, fresh?: boolean}|null}
  */
 export function taskPlacement(lead, now = new Date()) {
-  const deadline = stageDeadline(lead);
-  if (!deadline) return null;
-  if ((lead.funnelStage ?? 'new') === 'new') {
+  const stage = lead.funnelStage ?? 'new';
+  if (stage === 'new') {
+    const deadline = stageDeadline(lead);
+    if (!deadline) return null;
     return { bucket: 'today', level: priorityLevel(lead, false), deadline, pinnedToday: true, fresh: isFreshLead(lead) };
   }
+  if (stage === 'trial_scheduled') return trialScheduledPlacement(lead, now);
+  const deadline = stageDeadline(lead);
+  if (!deadline) return null;
   const isOverdue = deadline.getTime() < now.getTime();
   const level = priorityLevel(lead, isOverdue);
   if (isOverdue) return { bucket: 'overdue', level, deadline, pinnedToday: false };
   if (isToday(deadline)) return { bucket: 'today', level, deadline, pinnedToday: false };
   if (isTomorrow(deadline)) return { bucket: 'tomorrow', level, deadline, pinnedToday: false };
+  return null;
+}
+
+/**
+ * «Пробный назначен» — та же логика, что «Просроченные» на доске/«Пробных» (см.
+ * groupLeadsByTrialDay в LeadColumn.jsx): просрочено, только если прошёл сам
+ * день пробного, или если оператор сам назначил повторный звонок на конкретное
+ * время (unreachableNextCallDueAt) и это время уже прошло — реально пропущенное
+ * обещание перезвонить. Расплывчатое напоминание «позвонить накануне раннего
+ * слота» (contactDueDate — на день раньше самого пробного) само по себе
+ * никогда не просрочивает: пока идёт этот день, задача лежит в «Сегодня»/
+ * «Завтра», не в «Просроченные» — раньше она попадала туда с первой минуты
+ * дня (stageDeadline брал начало суток), даже если до пробного ещё далеко.
+ */
+function trialScheduledPlacement(lead, now) {
+  const trialDate = lead.trialDate?.toDate?.();
+  if (!trialDate) return null;
+  const unreachableDue = lead.unreachableNextCallDueAt?.toDate?.() ?? null;
+  const trialLate = differenceInCalendarDays(now, trialDate) > 0;
+  const callbackLate = Boolean(unreachableDue) && unreachableDue.getTime() < now.getTime();
+  const isOverdue = trialLate || callbackLate;
+  const level = priorityLevel(lead, isOverdue);
+  if (isOverdue) {
+    return { bucket: 'overdue', level, deadline: trialLate ? trialDate : unreachableDue, pinnedToday: false };
+  }
+  // День, на который сейчас ориентируемся: назначенный звонок — если он есть, иначе
+  // «накануне» для непройденного контактного дня, иначе сам день пробного.
+  const dueDay = unreachableDue ?? (isTrialDay(trialDate) && !lead.callReminderDone ? contactDueDate(trialDate) : trialDate);
+  if (isToday(dueDay)) return { bucket: 'today', level, deadline: dueDay, pinnedToday: false };
+  if (isTomorrow(dueDay)) return { bucket: 'tomorrow', level, deadline: dueDay, pinnedToday: false };
   return null;
 }
 
