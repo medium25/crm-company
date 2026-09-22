@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isToday, isTomorrow, isSameMonth, format } from 'date-fns';
+import { isToday, isTomorrow, isSameMonth, format, differenceInCalendarDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ChevronDown, ChevronRight, Settings, Plus, CheckCircle2, XCircle, AlertTriangle, Sun, Clock, Calendar } from 'lucide-react';
 import { LeadCard } from './LeadCard.jsx';
 import { STAGE_COLOR_SWATCHES, LEAD_VALUE_UZS } from './columns.js';
-import { stageDeadline, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
+import { LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { pluralize } from '../../lib/format.js';
 
 // Цвет круга-иконки в свёрнутой LeadGroup (см. closedIconClassName) — общие
@@ -314,16 +314,25 @@ function LostPlaceholder({ title, count, tone, loading, onClick }) {
  * Другой день (включая уже прошедшие и те, что дальше завтра). Порядок
  * внутри групп лиды приносят уже отсортированным (LeadsPage сортирует весь
  * список по trialDate раньше).
+ *
+ * «Просроченные» — только те, у кого прошёл САМ ДЕНЬ пробного (trialDate
+ * раньше сегодняшнего календарного дня). Раньше сюда же попадали лиды с
+ * пробным ЗАВТРА или позже, если у них истёк промежуточный дедлайн задачи
+ * (stageDeadline — контактный день для раннего слота на день раньше самого
+ * пробного, или дедлайн повторного звонка после «не выходит на связь»):
+ * лид с пробным в среду мог попасть в «Просроченные» уже во вторник, хотя
+ * сам пробный ещё не наступил. Дедлайн задачи по-прежнему красит бейдж «!»
+ * на самой карточке (см. LeadCard.jsx, stageDeadline) — тут же группа
+ * только про сам пробный урок.
  * @param {Array<Object>} leads
- * @returns {{today: Array, tomorrow: Array, other: Array}}
+ * @returns {{overdue: Array, today: Array, tomorrow: Array, other: Array}}
  */
 export function groupLeadsByTrialDay(leads) {
   const groups = { overdue: [], today: [], tomorrow: [], other: [] };
-  const now = Date.now();
+  const now = new Date();
   for (const lead of leads) {
     const d = lead.trialDate?.toDate?.();
-    const deadline = stageDeadline(lead);
-    if (deadline && now > deadline.getTime() && !(d && isToday(d))) {
+    if (d && differenceInCalendarDays(now, d) > 0) {
       groups.overdue.push(lead);
       continue;
     }
