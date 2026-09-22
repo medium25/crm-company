@@ -1,6 +1,6 @@
 // src/pages/TrialsPage.jsx
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, getDoc, query, updateDoc, serverTimestamp, where } from 'firebase/firestore';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { db } from '../firebase.js';
@@ -91,6 +91,7 @@ function TrialGroup({ title, leads, operatorByUid, renderCard, highlightId, defa
  */
 export function TrialsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, staff } = useAuth();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
@@ -199,20 +200,20 @@ export function TrialsPage() {
 
   const groups = useMemo(() => groupLeadsByTrialDay(scheduledLeads), [scheduledLeads]);
 
-  // Выбор лида в поиске «по всей базе» — только находим его карточку и выделяем рамкой:
-  // на этой странице, если лид среди пробных, иначе ведём на его место (доска «Заявки»
-  // или страница ученика). Окно записи на пробный само не открывается.
+  // Клик по результату поиска в шапке (?focus=id&t=...) — находим карточку среди
+  // «Записей»/«Пробных» (поиск в шапке ищет только среди них, см. GlobalSearch.jsx),
+  // прокручиваем к ней и на пару секунд обводим рамкой. Повторный поиск того же лида
+  // (t меняется) срабатывает заново, даже если highlightId не менялся.
+  const focusId = searchParams.get('focus');
+  const focusNonce = searchParams.get('t');
   const [highlightId, setHighlightId] = useState(null);
-  const focusLead = (lead, where) => {
-    if (rawLeads.some((l) => l.id === lead.id)) setHighlightId(lead.id);
-    else navigate(where.path);
-  };
   useEffect(() => {
-    if (!highlightId) return undefined;
+    if (!focusId) return;
+    setHighlightId(focusId);
     let tries = 0;
     const poll = setInterval(() => {
       tries += 1;
-      const el = document.getElementById(`trial-card-${highlightId}`);
+      const el = document.getElementById(`trial-card-${focusId}`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         clearInterval(poll);
@@ -220,12 +221,16 @@ export function TrialsPage() {
         clearInterval(poll);
       }
     }, 150);
-    const clear = setTimeout(() => setHighlightId(null), 3500);
+    const clear = setTimeout(() => {
+      setHighlightId(null);
+      setSearchParams({}, { replace: true });
+    }, 3500);
     return () => {
       clearInterval(poll);
       clearTimeout(clear);
     };
-  }, [highlightId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, focusNonce]);
   const onOpen = (lead) => navigate(`/students/${lead.id}`);
 
   // Названия/цвета стадий и макс. касаний — из настроек филиала (⚙ на доске «Заявки»),

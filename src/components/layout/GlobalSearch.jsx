@@ -117,6 +117,8 @@ export function GlobalSearch() {
         .map((t) => ({ id: t.id, title: t.fullName, right: formatPhone(t.phone), place: t.place, path: `/tasks?focus=${t.leadId}` }));
     }
     if (scope === 'trials') {
+      // Ищем только среди уже показанных на странице («Записи» + «Пробные») —
+      // клик прокручивает к нужной карточке и обводит её рамкой, а не уводит со страницы.
       return (trialsSource?.items ?? [])
         .filter(matchPerson)
         .slice(0, 8)
@@ -125,7 +127,7 @@ export function GlobalSearch() {
           title: s.fullName,
           right: formatPhone(s.phone),
           place: `Пробные · ${COLUMNS.find((c) => c.key === s.funnelStage)?.label ?? ''}`,
-          path: `/students/${s.id}`,
+          path: `/trials?focus=${s.id}&t=${Date.now()}`,
         }));
     }
     if (scope === 'groups') {
