@@ -313,17 +313,15 @@ export function TrialsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Записи" count={scheduledLeads.length} color={TRIAL_SCHEDULED_COLOR} />
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setManualLeadTarget({})}
-              aria-label="Новый лид с пробным (пришёл не от операторов)"
-              title="Новый лид с пробным (пришёл не от операторов)"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong bg-white text-text transition hover:bg-surface-alt"
-            >
-              <Plus className="h-5 w-5" strokeWidth={2.5} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setManualLeadTarget({})}
+            title="Новый лид с пробным (пришёл не от операторов)"
+            className="flex h-10 w-full items-center justify-center gap-1.5 rounded-field border border-border-strong bg-white text-[13px] font-bold text-text transition hover:bg-surface-alt"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Записать на пробный
+          </button>
           {groups.overdue.length > 0 && (
             <TrialGroup
               title="Просроченные"
@@ -360,17 +358,15 @@ export function TrialsPage() {
 
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Пробные" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setManualCompletedTarget({})}
-              aria-label="Пробный без записи оператором — сразу студентом сюда"
-              title="Пробный без записи оператором — сразу студентом сюда"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong bg-white text-text transition hover:bg-surface-alt"
-            >
-              <Plus className="h-5 w-5" strokeWidth={2.5} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setManualCompletedTarget({})}
+            title="Пробный без записи оператором — сразу студентом сюда"
+            className="flex h-10 w-full items-center justify-center gap-1.5 rounded-field border border-border-strong bg-white text-[13px] font-bold text-text transition hover:bg-surface-alt"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Сразу студентом
+          </button>
           <TrialGroup
             title="Чётные"
             leads={completedLeadsByParity.even}
