@@ -320,7 +320,7 @@ export function TrialsPage() {
             className="flex h-10 w-full items-center justify-center gap-1.5 rounded-field border border-border-strong bg-white text-[13px] font-bold text-text transition hover:bg-surface-alt"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Записать на пробный
+            Добавить запись
           </button>
           {groups.overdue.length > 0 && (
             <TrialGroup
@@ -365,7 +365,7 @@ export function TrialsPage() {
             className="flex h-10 w-full items-center justify-center gap-1.5 rounded-field border border-border-strong bg-white text-[13px] font-bold text-text transition hover:bg-surface-alt"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Сразу студентом
+            Добавить пробного
           </button>
           <TrialGroup
             title="Чётные"
