@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, getDoc, query, updateDoc, serverTimestamp, where } from 'firebase/firestore';
-import { ChevronDown, ChevronRight, Search, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -83,94 +83,6 @@ function TrialGroup({ title, leads, operatorByUid, renderCard, highlightId, defa
   );
 }
 
-/** Поле поиска — общий визуал для LeadSearch и CompletedSearch. */
-function SearchField({ value, onChange, onFocus, placeholder, trailing }) {
-  return (
-    <div className="flex gap-2">
-      <div className="relative flex-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-        <input
-          value={value}
-          onChange={onChange}
-          onFocus={onFocus}
-          placeholder={placeholder}
-          className="h-10 w-full rounded-field border border-border-strong bg-white pl-9 pr-3 text-[14px] text-text focus:border-navy focus:outline-none"
-        />
-      </div>
-      {trailing}
-    </div>
-  );
-}
-
-/** Поиск лида по всей базе (не только среди «Пробный назначен»): находит его карточку и выделяет её — на этой странице или на доске «Заявки». */
-function LeadSearch({ onPick, onManualAdd }) {
-  const { activeBranchId } = useBranch();
-  const { user, staff } = useAuth();
-  const canSeeAllLeads = staff?.role === 'ceo' || staff?.role === 'manager' || staff?.role === 'test';
-  const [active, setActive] = useState(false);
-  const [q, setQ] = useState('');
-
-  const searchQuery = useMemo(
-    () => (db && activeBranchId && active ? query(collection(db, 'students'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
-    [activeBranchId, active],
-  );
-  const { data: allLeads } = useCollection(searchQuery);
-
-  const term = q.trim().toLowerCase();
-  const results = term ? allLeads.filter((s) => s.fullName?.toLowerCase().includes(term) || s.phone?.includes(term)).slice(0, 8) : [];
-
-  return (
-    <div className="relative">
-      <SearchField
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onFocus={() => setActive(true)}
-        placeholder="Найти лида по всей базе"
-        trailing={
-          <button
-            type="button"
-            onClick={onManualAdd}
-            aria-label="Новый лид с пробным (пришёл не от операторов)"
-            title="Новый лид с пробным (пришёл не от операторов)"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong bg-white text-text transition hover:bg-surface-alt"
-          >
-            <Plus className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-        }
-      />
-      {active && term && (
-        <div className="absolute inset-x-0 top-11 z-20 max-h-72 overflow-y-auto rounded-field border border-border bg-surface py-1 shadow-hover">
-          {results.length === 0 ? (
-            <p className="px-3 py-2 text-[13px] text-muted">Ничего не найдено</p>
-          ) : (
-            results.map((lead) => {
-              const where = locateLead(lead, canSeeAllLeads, user?.uid);
-              return (
-                <button
-                  key={lead.id}
-                  type="button"
-                  onClick={() => {
-                    onPick(lead, where);
-                    setQ('');
-                    setActive(false);
-                  }}
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[14px] hover:bg-surface-alt"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-text">{lead.fullName}</span>
-                    <span className="block truncate text-[11px] text-muted">{where.place}</span>
-                  </span>
-                  <span className="shrink-0 text-muted">{formatPhone(lead.phone)}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /**
  * «Пробные» — 2 колонки: «Пробный назначен» (все операторы, поиск по всей
  * базе + ручная запись на пробный в обход операторов) и «Пробный проведён»
@@ -210,12 +122,6 @@ export function TrialsPage() {
   const scheduledLeads = useMemo(() => sorted.filter((l) => l.funnelStage === 'trial_scheduled'), [sorted]);
   // Колонка «Пробные» — все лиды всех операторов, уже прошедшие пробный: «Пробный проведён» и «Дожим».
   const completedLeadsAll = useMemo(() => sorted.filter((l) => l.funnelStage === 'trial_completed' || l.funnelStage === 'closing'), [sorted]);
-
-  const [completedSearch, setCompletedSearch] = useState('');
-  const completedTerm = completedSearch.trim().toLowerCase();
-  const completedSearched = completedTerm
-    ? completedLeadsAll.filter((l) => l.fullName?.toLowerCase().includes(completedTerm) || l.phone?.includes(completedTerm))
-    : completedLeadsAll;
 
   const staffQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId)) : null),
@@ -279,13 +185,13 @@ export function TrialsPage() {
   }, [branchGroups]);
   const completedLeadsByParity = useMemo(() => {
     const buckets = { even: [], odd: [] };
-    for (const lead of completedSearched) {
+    for (const lead of completedLeadsAll) {
       const groupId = enrollmentByStudent.get(lead.id)?.groupId;
       const scheduleType = groupId ? scheduleTypeByGroupId.get(groupId) : null;
       buckets[scheduleType === 'odd' ? 'odd' : 'even'].push(lead);
     }
     return buckets;
-  }, [completedSearched, enrollmentByStudent, scheduleTypeByGroupId]);
+  }, [completedLeadsAll, enrollmentByStudent, scheduleTypeByGroupId]);
   // Пн/Ср/Пт — нечётные дни группы (см. ODD_WEEKDAYS в lib/schedule.js),
   // остальные (включая вс) — чётные. Открываем по умолчанию ту вкладку,
   // что актуальна сегодня.
@@ -407,10 +313,17 @@ export function TrialsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Записи" count={scheduledLeads.length} color={TRIAL_SCHEDULED_COLOR} />
-          <LeadSearch
-            onPick={focusLead}
-            onManualAdd={() => setManualLeadTarget({})}
-          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setManualLeadTarget({})}
+              aria-label="Новый лид с пробным (пришёл не от операторов)"
+              title="Новый лид с пробным (пришёл не от операторов)"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong bg-white text-text transition hover:bg-surface-alt"
+            >
+              <Plus className="h-5 w-5" strokeWidth={2.5} />
+            </button>
+          </div>
           {groups.overdue.length > 0 && (
             <TrialGroup
               title="Просроченные"
@@ -447,22 +360,17 @@ export function TrialsPage() {
 
         <div className="flex flex-col gap-3">
           <TrialColumnHeader label="Пробные" count={completedLeadsAll.length} color={TRIAL_COMPLETED_COLOR} />
-          <SearchField
-            value={completedSearch}
-            onChange={(e) => setCompletedSearch(e.target.value)}
-            placeholder="Найти среди пробных"
-            trailing={
-              <button
-                type="button"
-                onClick={() => setManualCompletedTarget({})}
-                aria-label="Пробный без записи оператором — сразу студентом сюда"
-                title="Пробный без записи оператором — сразу студентом сюда"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong bg-white text-text transition hover:bg-surface-alt"
-              >
-                <Plus className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-            }
-          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setManualCompletedTarget({})}
+              aria-label="Пробный без записи оператором — сразу студентом сюда"
+              title="Пробный без записи оператором — сразу студентом сюда"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field border border-border-strong bg-white text-text transition hover:bg-surface-alt"
+            >
+              <Plus className="h-5 w-5" strokeWidth={2.5} />
+            </button>
+          </div>
           <TrialGroup
             title="Чётные"
             leads={completedLeadsByParity.even}
