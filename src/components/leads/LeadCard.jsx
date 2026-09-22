@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { format } from 'date-fns';
+import { format, differenceInCalendarDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { doc, updateDoc } from 'firebase/firestore';
 import { CheckCircle2, XCircle, ArrowRight, PhoneOff, Info, ClipboardCheck, Users, X, Settings, ChevronUp, ChevronDown } from 'lucide-react';
@@ -877,8 +877,15 @@ export function LeadCard({
   // контактный день (см. contactDueDate в leadFunnel.js — обычно день
   // пробного, для слота 9:00 — днём раньше) — до этого связываться ещё рано.
   const trialDay = stage === 'trial_scheduled' && lead.trialDate?.toDate ? isTrialDay(lead.trialDate.toDate()) : false;
-  const deadline = stageDeadline(lead);
-  const overdue = deadline ? Date.now() > deadline.getTime() : false;
+  // «Пробный назначен» — красный бейдж «!» только если прошёл САМ ДЕНЬ пробного,
+  // не промежуточный дедлайн задачи (контактный день/повторный звонок — см.
+  // stageDeadline в leadFunnel.js): иначе лид с пробным завтра выглядел бы
+  // просроченным уже сегодня. Задача при этом никуда не девается — она
+  // по-прежнему видна синей плашкой под лентой истории (UnreachableBlock).
+  const trialDateForOverdue = stage === 'trial_scheduled' ? lead.trialDate?.toDate?.() : null;
+  const trialLate = trialDateForOverdue ? differenceInCalendarDays(new Date(), trialDateForOverdue) > 0 : false;
+  const deadline = stage === 'trial_scheduled' ? (trialLate ? trialDateForOverdue : null) : stageDeadline(lead);
+  const overdue = stage === 'trial_scheduled' ? trialLate : Boolean(deadline && Date.now() > deadline.getTime());
   // priority — метка «лид пришёл вне рабочих часов», актуальна только пока
   // не отработан первый SLA на стадии 'new'; дальше по воронке не показываем.
   const priority = stage === 'new' && createdAt ? isPriorityLead(createdAt) : false;
@@ -957,7 +964,7 @@ export function LeadCard({
           <p className="min-w-0 truncate text-[13px] font-bold leading-tight text-text">{lead.fullName}</p>
           {overdue ? (
             <OverdueBadge
-              reason={overdueReasonLabel(lead)}
+              reason={stage === 'trial_scheduled' ? 'Пробный урок просрочен — лид не продвинут дальше' : overdueReasonLabel(lead)}
               deadline={deadline ? format(deadline, 'dd.MM.yyyy HH:mm', { locale: ru }) : null}
               overdueBy={deadline ? formatOverdueBy(deadline) : null}
             />
