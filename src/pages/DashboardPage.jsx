@@ -12,6 +12,28 @@ import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.
 import { RoomScheduleGrid } from '../components/dashboard/RoomScheduleGrid.jsx';
 import { getMonthlyRevenue } from '../lib/stats.js';
 
+const cacheKey = (branchId) => `icon-crm:dashboardStats:${branchId}`;
+
+function readCache(branchId) {
+  try {
+    const raw = localStorage.getItem(cacheKey(branchId));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(branchId, stats) {
+  try {
+    localStorage.setItem(
+      cacheKey(branchId),
+      JSON.stringify({ ...stats, updatedAt: stats.updatedAt?.toDate?.().toISOString() ?? null }),
+    );
+  } catch {
+    // нет localStorage / переполнен — просто без запасных цифр на следующий заход
+  }
+}
+
 /**
  * 6 KPI-плиток и график «Сравнение» — раньше страница сама на каждом заходе
  * читала enrollments/students/transactions (это и раздувало квоту чтений,
@@ -23,19 +45,40 @@ import { getMonthlyRevenue } from '../lib/stats.js';
  * обновление документа, не больше ~17 раз в сутки (число реальных запусков
  * триггера в рабочие часы), сколько бы раз сотрудник ни заходил на дашборд.
  *
+ * Последние полученные от Apps Script цифры дублируются в localStorage —
+ * пока подписка ещё не отдала свежий документ (первая загрузка страницы)
+ * или пока триггер вообще ни разу не отработал после только что настроенной
+ * интеграции, вместо пустого «Цифры ещё не посчитаны» показываются цифры
+ * прошлого обновления с пометкой, что они могут быть устаревшими.
+ *
  * `monthlyRevenue` (годовой график) остаётся отдельным лёгким запросом —
  * это и раньше был предпосчитанный агрегат, трогать не нужно.
- *
- * Цифры на плитках свежие с точностью до часа (когда посчитал Apps Script),
- * не «прямо сейчас» — для дневных KPI этого достаточно, значение написано
- * рядом («обновлено N назад»).
  */
 export function DashboardPage() {
   const navigate = useNavigate();
   const { activeBranchId } = useBranch();
 
   const statsRef = useMemo(() => (db && activeBranchId ? doc(db, 'dashboardStats', activeBranchId) : null), [activeBranchId]);
-  const { data: stats, loading: statsLoading } = useDoc(statsRef);
+  const { data: liveStats, loading: statsLoading } = useDoc(statsRef);
+
+  // cachedStats — то, что показываем, пока не пришёл свежий документ: сразу при
+  // смене филиала подхватывает то, что осталось с прошлого раза, а как только
+  // liveStats приходит — обновляется и сам кэш, и то, что видно на экране.
+  const [cachedStats, setCachedStats] = useState(() => (activeBranchId ? readCache(activeBranchId) : null));
+  useEffect(() => {
+    setCachedStats(activeBranchId ? readCache(activeBranchId) : null);
+  }, [activeBranchId]);
+  useEffect(() => {
+    if (liveStats && activeBranchId) {
+      writeCache(activeBranchId, liveStats);
+      setCachedStats(liveStats);
+    }
+  }, [liveStats, activeBranchId]);
+
+  const stats = liveStats ?? cachedStats;
+  // Показанные цифры устарели, если это не то, что только что пришло по подписке
+  // (либо это вообще кэш, либо подписка ещё грузится и мы показываем старое, пока ждём).
+  const isStale = Boolean(stats) && !liveStats;
 
   const [monthly, setMonthly] = useState(null);
   const [monthlyError, setMonthlyError] = useState(false);
@@ -54,7 +97,8 @@ export function DashboardPage() {
     };
   }, [activeBranchId]);
 
-  const updatedAgo = useAgoLabel(stats?.updatedAt);
+  const updatedAt = liveStats?.updatedAt?.toDate ? liveStats.updatedAt.toDate() : stats?.updatedAt ? new Date(stats.updatedAt) : null;
+  const updatedAgo = useAgoLabel(updatedAt);
 
   const cards = stats
     ? [
@@ -86,7 +130,11 @@ export function DashboardPage() {
               <StatCard key={c.label} icon={c.icon} label={c.label} value={c.value} onClick={() => navigate(c.to)} />
             ))}
           </div>
-          {updatedAgo && <p className="mt-2 text-[12px] text-muted">Обновлено {updatedAgo}</p>}
+          {updatedAgo && (
+            <p className="mt-2 text-[12px] text-muted">
+              {isStale ? `Цифры последнего обновления (${updatedAgo}) — сейчас, возможно, устарели` : `Обновлено ${updatedAgo}`}
+            </p>
+          )}
         </>
       )}
 
@@ -109,15 +157,15 @@ export function DashboardPage() {
   );
 }
 
-/** «5 минут назад» / «2 часа назад» по updatedAt документа dashboardStats — без лишней библиотеки. */
-function useAgoLabel(timestamp) {
+/** «5 минут назад» / «2 часа назад» по дате последнего обновления — без лишней библиотеки. */
+function useAgoLabel(date) {
   const [, force] = useState(0);
   useEffect(() => {
     const id = setInterval(() => force((n) => n + 1), 60_000);
     return () => clearInterval(id);
   }, []);
-  if (!timestamp?.toDate) return null;
-  const ms = Date.now() - timestamp.toDate().getTime();
+  if (!date) return null;
+  const ms = Date.now() - date.getTime();
   const minutes = Math.round(ms / 60_000);
   if (minutes < 1) return 'только что';
   if (minutes < 60) return `${minutes} мин назад`;
