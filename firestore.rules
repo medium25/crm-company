@@ -132,6 +132,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Предпосчитанные плитки/график дашборда (id — branchId) — считает Apps Script
+    // раз в час (appsscript/DashboardStats.gs) под сервис-аккаунтом, который эти
+    // правила не подчиняют. Клиент только читает, никогда не пишет напрямую.
+    match /dashboardStats/{id} {
+      allow read:  if isAdmin();
+      allow write: if isAdmin();
+    }
+
     match /billingRuns/{id} {
       allow read:  if isAdmin();
       allow write: if isAdmin();

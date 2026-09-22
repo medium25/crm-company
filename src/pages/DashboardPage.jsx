@@ -10,119 +10,51 @@ import { StatCard } from '../components/ui/StatCard.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
 import { RoomScheduleGrid } from '../components/dashboard/RoomScheduleGrid.jsx';
-import { loadDashboardStats, getDailyRevenueComparison, getMonthlyRevenue, fetchDashboardPayments } from '../lib/stats.js';
+import { getMonthlyRevenue } from '../lib/stats.js';
 
 /**
- * 6 KPI-карточек — переходы по клику из «04 · Экраны» §2. Формулы — «03 ·
- * Бизнес-логика» §5.
+ * 6 KPI-плиток и график «Сравнение» — раньше страница сама на каждом заходе
+ * читала enrollments/students/transactions (это и раздувало квоту чтений,
+ * см. 2026-09-22: раздел «Дашборд» — 100 618 чтений из 148 026 за сутки).
+ * Теперь эти 6 чисел и данные графика считает Apps Script раз в час, одним
+ * запуском на весь филиал (appsscript/DashboardStats.gs), и кладёт в
+ * `dashboardStats/{branchId}` — страница только ПОДПИСАНА на этот один
+ * документ (useDoc — onSnapshot): 1 чтение на открытие + 1 на каждое
+ * обновление документа, не больше ~17 раз в сутки (число реальных запусков
+ * триггера в рабочие часы), сколько бы раз сотрудник ни заходил на дашборд.
  *
- * Плитки и график грузятся независимо друг от друга: у каждого свой
- * индикатор, своя ошибка и «Повторить» — одна упавшая/зависшая выборка
- * больше не оставляет на серых заглушках весь дашборд. Последние цифры
- * кэшируются в браузере: страница показывает их сразу, а Firestore
- * опрашивается только если кэшу больше 3 минут (то есть повторные заходы
- * подряд не читают базу вовсе). Платежи месяца читаются один раз на обе
- * части, когда обновляются обе.
+ * `monthlyRevenue` (годовой график) остаётся отдельным лёгким запросом —
+ * это и раньше был предпосчитанный агрегат, трогать не нужно.
+ *
+ * Цифры на плитках свежие с точностью до часа (когда посчитал Apps Script),
+ * не «прямо сейчас» — для дневных KPI этого достаточно, значение написано
+ * рядом («обновлено N назад»).
  */
-const CACHE_TTL_MS = 180_000;
-const LOAD_TIMEOUT_MS = 20_000;
-const cacheKey = (branchId, churnPeriod) => `icon-crm:dashboard:${branchId}:${churnPeriod}`;
-
-function readCache(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(key, patch) {
-  try {
-    localStorage.setItem(key, JSON.stringify({ ...(readCache(key) ?? {}), ...patch }));
-  } catch {
-    // нет localStorage / переполнен — просто без кэша
-  }
-}
-
-// Зависший запрос не должен держать заглушки вечно — через 20 с показываем ошибку с «Повторить».
-const withTimeout = (promise) =>
-  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), LOAD_TIMEOUT_MS))]);
-
-function LoadError({ onRetry }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-card border border-border-strong bg-card p-4 text-[14px] text-muted">
-      <span>Не удалось загрузить данные.</span>
-      <button type="button" onClick={onRetry} className="rounded-full bg-navy px-4 py-1.5 text-[13px] font-bold text-white hover:bg-navy-hover">
-        Повторить
-      </button>
-    </div>
-  );
-}
-
 export function DashboardPage() {
   const navigate = useNavigate();
   const { activeBranchId } = useBranch();
 
-  const settingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
-  const { data: settings } = useDoc(settingsRef);
-  const churnPeriod = settings?.churnPeriod ?? 'year';
+  const statsRef = useMemo(() => (db && activeBranchId ? doc(db, 'dashboardStats', activeBranchId) : null), [activeBranchId]);
+  const { data: stats, loading: statsLoading } = useDoc(statsRef);
 
-  const [stats, setStats] = useState(null);
-  const [chart, setChart] = useState(null); // { comparison, monthly }
-  const [statsError, setStatsError] = useState(false);
-  const [chartError, setChartError] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-
+  const [monthly, setMonthly] = useState(null);
+  const [monthlyError, setMonthlyError] = useState(false);
   useEffect(() => {
-    if (!db || !activeBranchId) return undefined;
-    const key = cacheKey(activeBranchId, churnPeriod);
-    const cached = readCache(key);
-    const forced = reloadKey > 0;
-    const fresh = (at) => !forced && Date.now() - (at ?? 0) < CACHE_TTL_MS;
-    const needStats = !(cached?.stats && fresh(cached.statsAt));
-    const needChart = !(cached?.chart && fresh(cached.chartAt));
-
-    setStats(cached?.stats ?? null);
-    setChart(cached?.chart ?? null);
-    setStatsError(false);
-    setChartError(false);
-
+    if (!db || !activeBranchId) return;
     let cancelled = false;
-    // Платежи — один запрос на обе части, только когда нужны обе (иначе плитка
-    // читает лишь текущий месяц, как раньше — без лишних чтений).
-    const shared = needStats && needChart ? fetchDashboardPayments(db, activeBranchId) : undefined;
-    shared?.catch(() => {});
-
-    if (needStats) {
-      withTimeout(loadDashboardStats(db, activeBranchId, churnPeriod, shared))
-        .then((s) => {
-          if (cancelled) return;
-          setStats(s);
-          writeCache(key, { stats: s, statsAt: Date.now() });
-        })
-        .catch(() => {
-          if (!cancelled) setStatsError(true);
-        });
-    }
-    if (needChart) {
-      withTimeout(Promise.all([getDailyRevenueComparison(db, activeBranchId, new Date(), shared), getMonthlyRevenue(db, activeBranchId)]))
-        .then(([comparison, monthly]) => {
-          if (cancelled) return;
-          const next = { comparison, monthly: monthly.map(({ month, amount, paymentsCount }) => ({ month, amount, paymentsCount })) };
-          setChart(next);
-          writeCache(key, { chart: next, chartAt: Date.now() });
-        })
-        .catch(() => {
-          if (!cancelled) setChartError(true);
-        });
-    }
+    getMonthlyRevenue(db, activeBranchId)
+      .then((rows) => {
+        if (!cancelled) setMonthly(rows.map(({ month, amount, paymentsCount }) => ({ month, amount, paymentsCount })));
+      })
+      .catch(() => {
+        if (!cancelled) setMonthlyError(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, churnPeriod, reloadKey]);
+  }, [activeBranchId]);
 
-  const retry = () => setReloadKey((k) => k + 1);
+  const updatedAgo = useAgoLabel(stats?.updatedAt);
 
   const cards = stats
     ? [
@@ -137,8 +69,10 @@ export function DashboardPage() {
 
   return (
     <>
-      {!stats && statsError ? (
-        <LoadError onRetry={retry} />
+      {!stats && !statsLoading ? (
+        <div className="flex items-center justify-between gap-3 rounded-card border border-border-strong bg-card p-4 text-[14px] text-muted">
+          <span>Цифры дашборда ещё не посчитаны — Apps Script считает их раз в час.</span>
+        </div>
       ) : !stats ? (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -146,18 +80,23 @@ export function DashboardPage() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {cards.map((c) => (
-            <StatCard key={c.label} icon={c.icon} label={c.label} value={c.value} onClick={() => navigate(c.to)} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+            {cards.map((c) => (
+              <StatCard key={c.label} icon={c.icon} label={c.label} value={c.value} onClick={() => navigate(c.to)} />
+            ))}
+          </div>
+          {updatedAgo && <p className="mt-2 text-[12px] text-muted">Обновлено {updatedAgo}</p>}
+        </>
       )}
 
       <Card className="mt-6">
-        {chart ? (
-          <RevenueOverviewChart comparison={chart.comparison} monthly={chart.monthly} />
-        ) : chartError ? (
-          <LoadError onRetry={retry} />
+        {stats?.comparison ? (
+          <RevenueOverviewChart comparison={stats.comparison} monthly={monthly ?? []} />
+        ) : monthlyError ? (
+          <div className="flex items-center justify-between gap-3 rounded-card border border-border-strong bg-card p-4 text-[14px] text-muted">
+            <span>Не удалось загрузить график.</span>
+          </div>
         ) : (
           <Skeleton className="h-64 w-full rounded-card" />
         )}
@@ -168,4 +107,20 @@ export function DashboardPage() {
       </div>
     </>
   );
+}
+
+/** «5 минут назад» / «2 часа назад» по updatedAt документа dashboardStats — без лишней библиотеки. */
+function useAgoLabel(timestamp) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => force((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  if (!timestamp?.toDate) return null;
+  const ms = Date.now() - timestamp.toDate().getTime();
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return 'только что';
+  if (minutes < 60) return `${minutes} мин назад`;
+  const hours = Math.round(minutes / 60);
+  return `${hours} ч назад`;
 }
