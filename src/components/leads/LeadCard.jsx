@@ -224,18 +224,6 @@ function TouchActionButton({ ref, onClick, ariaLabel, text, time, compact, over 
 // поступления/наступления.
 const IDEAL_RESPONSE_MINUTES = 30;
 
-function pluralHours(hours) {
-  const mod10 = hours % 10;
-  const mod100 = hours % 100;
-  return mod10 === 1 && mod100 !== 11 ? 'час' : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'часа' : 'часов';
-}
-
-function pluralMinutes(minutes) {
-  const mod10 = minutes % 10;
-  const mod100 = minutes % 100;
-  return mod10 === 1 && mod100 !== 11 ? 'минуту' : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'минуты' : 'минут';
-}
-
 function pluralDays(days) {
   const mod10 = days % 10;
   const mod100 = days % 100;
@@ -256,17 +244,18 @@ function responseTiming(entry, fallbackAt) {
   const expected = expectedRaw?.toDate ? expectedRaw.toDate() : expectedRaw;
   const at = entry.at?.toDate ? entry.at.toDate() : entry.at;
   if (!expected || !at) return null;
+  // Подпись: «надо 22.09 15:00 → сделано 22.09 21:12 (опоздали на 6 ч)» — когда надо было,
+  // когда выполнили, а насколько опоздали — в скобках.
+  const text = `надо ${format(expected, 'dd.MM HH:mm')} → сделано ${format(at, 'dd.MM HH:mm')}`;
   const minutes = Math.round((at.getTime() - expected.getTime()) / 60000);
-  if (minutes <= IDEAL_RESPONSE_MINUTES) {
-    return { tone: 'good', label: minutes <= 0 ? 'Обработано вовремя' : `Обработано вовремя — за ${minutes} ${pluralMinutes(minutes)}` };
-  }
+  if (minutes <= IDEAL_RESPONSE_MINUTES) return { tone: 'good', text, note: 'вовремя' };
   const hours = Math.round(minutes / 60);
-  if (hours <= 0) return { tone: 'good', label: 'Обработано вовремя' };
+  if (hours <= 0) return { tone: 'good', text, note: 'вовремя' };
   if (hours > 24) {
     const days = Math.round(hours / 24);
-    return { tone: 'bad', label: `Опоздали на ${days} ${pluralDays(days)}` };
+    return { tone: 'bad', text, note: `опоздали на ${days} ${pluralDays(days)}` };
   }
-  return { tone: 'bad', label: `Опоздали на ${hours} ${pluralHours(hours)}` };
+  return { tone: 'bad', text, note: `опоздали на ${hours} ч` };
 }
 
 function msOf(v) {
@@ -326,7 +315,9 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
     const standingTask = i === 0 ? 'Позвонить в первые 30 минут' : (interactions[i - 1].nextStep ?? null);
     return {
       type: 'entry',
-      task: timing?.label ?? null,
+      task: timing?.text ?? null,
+      taskNote: timing?.note ?? null,
+      taskTone: timing?.tone ?? null,
       result: line || standingTask || (timing ? null : 'Без задачи'),
       at: item.at,
       step: i + 1,
@@ -464,7 +455,12 @@ export function HistoryTimeline({ lead }) {
                   {node.result}
                 </p>
               )}
-              {node.task && <p className="text-[9px] leading-tight text-muted">{node.task}</p>}
+              {node.task && (
+                <p className="text-[9px] leading-tight text-muted">
+                  {node.task}
+                  {node.taskNote && <span className={node.taskTone === 'bad' ? 'text-danger' : 'text-success'}> ({node.taskNote})</span>}
+                </p>
+              )}
             </div>
           </div>
         ),
