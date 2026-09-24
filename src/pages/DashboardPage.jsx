@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc } from 'firebase/firestore';
-import { GraduationCap, AlertTriangle, Timer, Handshake, LogOut, UserX } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { Card } from '../components/ui/Card.jsx';
-import { StatCard } from '../components/ui/StatCard.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
 import { RoomScheduleGrid } from '../components/dashboard/RoomScheduleGrid.jsx';
@@ -54,6 +53,49 @@ function writeCache(branchId, stats) {
  * `monthlyRevenue` (годовой график) остаётся отдельным лёгким запросом —
  * это и раньше был предпосчитанный агрегат, трогать не нужно.
  */
+
+const TONE_CLASS = { danger: 'text-danger', success: 'text-success', muted: 'text-muted' };
+
+/** Один сегмент внутри MetricGroup — крупное число + мелкая подпись. */
+function MetricSegment({ value, label, tone, onClick }) {
+  const Tag = onClick ? 'button' : 'div';
+  return (
+    <Tag
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`flex-1 text-center ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
+    >
+      <p className={`text-[26px] leading-[32px] ${TONE_CLASS[tone] ?? 'text-navy-num'}`}>{value}</p>
+      <p className="mt-0.5 text-[12px] leading-[16px] text-muted">{label}</p>
+    </Tag>
+  );
+}
+
+/** Тонкая вертикальная граница между сегментами одной группы — без причинности между ними. */
+function MetricDivider() {
+  return <div className="mx-1 w-px self-stretch bg-border" aria-hidden="true" />;
+}
+
+/** Стрелка между сегментами, где второй — следствие первого (план → факт). */
+function MetricArrow() {
+  return <ArrowRight className="mx-2 h-4 w-4 shrink-0 self-center text-muted" aria-hidden="true" />;
+}
+
+/** Бейдж процента конверсии, приклеенный к последнему сегменту группы. */
+function PercentBadge({ value }) {
+  return <span className="ml-2 shrink-0 rounded-full bg-navy/10 px-2.5 py-1 text-[12px] font-bold text-navy">{value}%</span>;
+}
+
+/** Карточка группы связанных метрик — заголовок + ряд сегментов. */
+function MetricGroup({ title, children }) {
+  return (
+    <div className="flex flex-col rounded-card border border-border-strong bg-card p-4 shadow-card">
+      <p className="mb-3 text-[12px] text-muted">{title}</p>
+      <div className="flex items-center justify-center">{children}</div>
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const { activeBranchId } = useBranch();
@@ -100,16 +142,9 @@ export function DashboardPage() {
   const updatedAt = liveStats?.updatedAt?.toDate ? liveStats.updatedAt.toDate() : stats?.updatedAt ? new Date(stats.updatedAt) : null;
   const updatedAgo = useAgoLabel(updatedAt);
 
-  const cards = stats
-    ? [
-        { icon: GraduationCap, label: 'Активные студенты', value: stats.activeStudents, to: '/students?section=all&allView=list&status=active' },
-        { icon: Handshake, label: 'Оплатили в текущем месяце', value: stats.paidThisMonth, to: '/payments' },
-        { icon: AlertTriangle, label: 'Должники', value: stats.debtors, to: '/students?section=debtors' },
-        { icon: LogOut, label: 'Ушли из активной группы', value: stats.leftActiveGroup, to: '/students?section=left' },
-        { icon: Timer, label: 'В пробном уроке', value: stats.trial, to: '/students?section=trial' },
-        { icon: UserX, label: 'Ушли после пробного периода', value: stats.leftAfterTrial, to: '/students?section=left' },
-      ]
-    : [];
+  const netGrowth = (stats?.newStudents ?? 0) - (stats?.leftActiveGroup ?? 0);
+  const trialTodayPct =
+    stats?.trialToday?.planned > 0 ? Math.round(((stats.trialToday.came ?? 0) / stats.trialToday.planned) * 100) : null;
 
   return (
     <>
@@ -118,17 +153,56 @@ export function DashboardPage() {
           <span>Цифры дашборда ещё не посчитаны — Apps Script считает их раз в час.</span>
         </div>
       ) : !stats ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full rounded-card" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-card" />
           ))}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-            {cards.map((c) => (
-              <StatCard key={c.label} icon={c.icon} label={c.label} value={c.value} onClick={() => navigate(c.to)} />
-            ))}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <MetricGroup title="Ученики">
+              <MetricSegment
+                value={stats.activeStudents}
+                label="активные"
+                onClick={() => navigate('/students?section=all&allView=list&status=active')}
+              />
+              <MetricDivider />
+              <MetricSegment value={stats.paidThisMonth} label="оплатили" onClick={() => navigate('/payments')} />
+              <MetricDivider />
+              <MetricSegment
+                value={stats.debtors}
+                label="должники"
+                tone="danger"
+                onClick={() => navigate('/students?section=debtors')}
+              />
+            </MetricGroup>
+
+            <MetricGroup title="Движение">
+              <MetricSegment
+                value={`−${stats.leftActiveGroup}`}
+                label="ушли"
+                tone="danger"
+                onClick={() => navigate('/students?section=left')}
+              />
+              <MetricArrow />
+              <MetricSegment value={`+${stats.newStudents ?? 0}`} label="добавились" tone="success" />
+              <MetricDivider />
+              <MetricSegment value={`${netGrowth >= 0 ? '+' : ''}${netGrowth}`} label="чистый рост" />
+            </MetricGroup>
+
+            <MetricGroup title="Пробный сегодня">
+              <MetricSegment value={stats.trialToday?.planned ?? 0} label="планировали" tone="muted" />
+              <MetricArrow />
+              <MetricSegment value={stats.trialToday?.came ?? 0} label="пришли" />
+              {trialTodayPct !== null && <PercentBadge value={trialTodayPct} />}
+            </MetricGroup>
+
+            <MetricGroup title="Пробные за месяц">
+              <MetricSegment value={stats.trialMonth?.total ?? 0} label="было пробных" tone="muted" />
+              <MetricArrow />
+              <MetricSegment value={`${stats.trialMonth?.retainedPct ?? 0}%`} label="остались" tone="success" />
+            </MetricGroup>
           </div>
           {updatedAgo && (
             <p className="mt-2 text-[12px] text-muted">

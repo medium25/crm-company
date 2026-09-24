@@ -141,6 +141,46 @@ function computeLeftAfterTrial_(branchId, start, end) {
   return count;
 }
 
+/** «Добавились» — копия countNewStudents из stats.js. */
+function computeNewStudents_(branchId, start, end) {
+  return runQuery_('students', [
+    { field: 'branchId', op: 'EQUAL', value: branchId },
+    { field: 'funnelStage', op: 'EQUAL', value: 'won' },
+    { field: 'paidAt', op: 'GREATER_THAN_OR_EQUAL', value: start },
+    { field: 'paidAt', op: 'LESS_THAN_OR_EQUAL', value: end },
+  ]).length;
+}
+
+/** «Пробный сегодня» (план/факт) — копия countTrialToday из stats.js. */
+function computeTrialToday_(branchId, now) {
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+  const docs = runQuery_('students', [
+    { field: 'branchId', op: 'EQUAL', value: branchId },
+    { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: dayStart },
+    { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: dayEnd },
+  ]);
+  const planned = docs.length;
+  const came = docs.filter((s) => ['trial_completed', 'closing', 'won'].indexOf(s.funnelStage) !== -1).length;
+  return { planned: planned, came: came };
+}
+
+/** «Пробные за месяц» (было/остались %) — копия countTrialMonthRetention из stats.js. */
+function computeTrialMonth_(branchId, now) {
+  const monthStart = startOfMonth_(now);
+  const monthEnd = new Date(addMonths_(monthStart, 1).getTime() - 1);
+  const docs = runQuery_('students', [
+    { field: 'branchId', op: 'EQUAL', value: branchId },
+    { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
+    { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
+  ]);
+  const happened = docs.filter((s) => ['new', 'calling', 'trial_scheduled'].indexOf(s.funnelStage) === -1);
+  const total = happened.length;
+  if (total === 0) return { total: 0, retainedPct: 0 };
+  const retained = happened.filter((s) => s.funnelStage !== 'lost' && s.status !== 'left').length;
+  return { total: total, retainedPct: Math.round((retained / total) * 100) };
+}
+
 /**
  * Платежи текущего и прошлого месяца — ОДИН запрос на «Оплатили в текущем
  * месяце» (уникальные студенты) И на график «Сравнение» по дням (копия
@@ -205,6 +245,9 @@ function refreshDashboardStatsForBranch_(branchId) {
   const buckets = computeStudentBuckets_(branchId, now);
   const leftActiveGroup = computeLeftActiveGroup_(branchId, start, end);
   const leftAfterTrial = computeLeftAfterTrial_(branchId, start, end);
+  const newStudents = computeNewStudents_(branchId, start, end);
+  const trialToday = computeTrialToday_(branchId, now);
+  const trialMonth = computeTrialMonth_(branchId, now);
   const { paidThisMonth, comparison } = computePaymentsAndChart_(branchId, now);
 
   const fields = toFsFields_({
@@ -214,6 +257,9 @@ function refreshDashboardStatsForBranch_(branchId) {
     paidThisMonth,
     leftActiveGroup,
     leftAfterTrial,
+    newStudents,
+    trialToday,
+    trialMonth,
     comparison,
   });
   fields.updatedAt = { timestampValue: new Date().toISOString() };

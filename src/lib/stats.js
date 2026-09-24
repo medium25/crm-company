@@ -222,7 +222,84 @@ export async function countLeftAfterTrial(db, branchId, periodStart, periodEnd) 
 }
 
 /**
- * Все 8 KPI дашборда одним вызовом — «03 · Бизнес-логика» §5.
+ * Добавились: лиды, ставшие оплаченным студентом (funnelStage 'won') в
+ * периоде — симметрично «Ушли из активной группы» по духу (тот же период),
+ * но источник другой: не enrollments.activatedAt, а сам момент оплаты
+ * (`students.paidAt`, ставится в billing.js recordPayment при первом
+ * переходе в 'won'). Нужен составной индекс `students`: branchId +
+ * funnelStage + paidAt.
+ */
+export async function countNewStudents(db, branchId, periodStart, periodEnd) {
+  return count(
+    db,
+    'students',
+    where('branchId', '==', branchId),
+    where('funnelStage', '==', 'won'),
+    where('paidAt', '>=', Timestamp.fromDate(periodStart)),
+    where('paidAt', '<=', Timestamp.fromDate(periodEnd)),
+  );
+}
+
+/**
+ * Пробный сегодня: сколько лидов планировали прийти (trialDate — сегодня) и
+ * сколько из них реально дошли до конца пробного (funnelStage уже за
+ * пределами 'trial_scheduled' — trial_completed/closing/won; 'lost' тоже
+ * считаем «не дошёл», раз ушли в отказ раньше конца пробного). Один запрос
+ * по диапазону дня, дальше делится в памяти — не нужен отдельный индекс под
+ * funnelStage. Нужен составной индекс `students`: branchId + trialDate.
+ * @returns {Promise<{planned: number, came: number}>}
+ */
+export async function countTrialToday(db, branchId, today = new Date()) {
+  const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+  const snap = await getDocs(
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('trialDate', '>=', Timestamp.fromDate(dayStart)),
+      where('trialDate', '<=', Timestamp.fromDate(dayEnd)),
+    ),
+  );
+  const planned = snap.docs.length;
+  const came = snap.docs.filter((d) => ['trial_completed', 'closing', 'won'].includes(d.data().funnelStage)).length;
+  return { planned, came };
+}
+
+/**
+ * Пробные за месяц: сколько лидов с trialDate в текущем календарном месяце
+ * УЖЕ прошли пробный (funnelStage вне 'new'/'calling'/'trial_scheduled' —
+ * то есть день пробного уже случился, независимо от исхода), и какой у них
+ * % «остались» — не оказались в отказе (funnelStage 'lost') и не ушли уже
+ * ПОСЛЕ оплаты (`status` 'left', отдельное поле от funnelStage — общий
+ * статус студента, см. countLeftActiveGroup). Метрика живая: студент,
+ * пробный которого был 20-го, а решение (пришёл на следующий урок или нет)
+ * стало известно уже в следующем месяце — до этого решения просто ещё
+ * висит в числителе «остались», как и должно быть.
+ * @returns {Promise<{total: number, retainedPct: number}>}
+ */
+export async function countTrialMonthRetention(db, branchId, monthDate = new Date()) {
+  const monthStart = startOfMonth(monthDate);
+  const monthEnd = new Date(addMonths(monthStart, 1).getTime() - 1);
+  const snap = await getDocs(
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('trialDate', '>=', Timestamp.fromDate(monthStart)),
+      where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
+    ),
+  );
+  const happened = snap.docs.filter((d) => !['new', 'calling', 'trial_scheduled'].includes(d.data().funnelStage));
+  const total = happened.length;
+  if (total === 0) return { total: 0, retainedPct: 0 };
+  const retained = happened.filter((d) => {
+    const s = d.data();
+    return s.funnelStage !== 'lost' && s.status !== 'left';
+  }).length;
+  return { total, retainedPct: Math.round((retained / total) * 100) };
+}
+
+/**
+ * Все KPI дашборда одним вызовом — «03 · Бизнес-логика» §5.
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} branchId
  * @param {'month'|'quarter'|'year'} [churnPeriod]
@@ -235,14 +312,25 @@ export async function loadDashboardStats(db, branchId, churnPeriod = 'year', pay
 
   // Активные лиды и группы дашборд не показывает — не считаем (countActiveLeads/
   // countActiveGroups остаются для других экранов).
-  const [{ activeStudents, trial, debtors }, paidThisMonth, leftActiveGroup, leftAfterTrial] = await Promise.all([
+  const [
+    { activeStudents, trial, debtors },
+    paidThisMonth,
+    leftActiveGroup,
+    leftAfterTrial,
+    newStudents,
+    trialToday,
+    trialMonth,
+  ] = await Promise.all([
     countStudentBuckets(db, branchId),
     countPaidThisMonth(db, branchId, month, payments),
     countLeftActiveGroup(db, branchId, start, end),
     countLeftAfterTrial(db, branchId, start, end),
+    countNewStudents(db, branchId, start, end),
+    countTrialToday(db, branchId),
+    countTrialMonthRetention(db, branchId),
   ]);
 
-  return { activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial };
+  return { activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial, newStudents, trialToday, trialMonth };
 }
 
 /**
