@@ -458,7 +458,7 @@ export function HistoryTimeline({ lead }) {
               {node.task && (
                 <p className="text-[9px] leading-tight text-muted">
                   {node.task}
-                  {node.taskNote && <span className={node.taskTone === 'bad' ? 'text-danger' : 'text-success'}> ({node.taskNote})</span>}
+                  {node.taskNote && <span className={`block ${node.taskTone === 'bad' ? 'text-danger' : 'text-success'}`}>({node.taskNote})</span>}
                 </p>
               )}
             </div>
