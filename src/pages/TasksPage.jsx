@@ -698,8 +698,13 @@ export function TasksPage() {
   const columnItems = useMemo(() => {
     const result = {};
     for (const key of Object.keys(buckets)) {
+      // Один лид — одна карточка в колонке: если задачу по нему уже выполнили (карточка «Выполнено»),
+      // её же невыполненная копия в ТОЙ ЖЕ колонке не показывается (раньше, например, у лида с
+      // прошедшим днём пробного после отметки оставалась и «Выполнено», и «Выполнить» рядом).
+      // Новая задача по лиду появится в своей колонке, когда до неё дойдёт срок.
+      const doneIds = new Set(completed[key].map((c) => c.lead.id));
       result[key] = [
-        ...buckets[key].map((it) => ({ ...it, done: false, deadlineMs: it.deadline.getTime() })),
+        ...buckets[key].filter((it) => !doneIds.has(it.lead.id)).map((it) => ({ ...it, done: false, deadlineMs: it.deadline.getTime() })),
         ...completed[key],
       ].sort(compareTasks);
     }
@@ -807,7 +812,7 @@ export function TasksPage() {
                 <span className="flex items-center gap-1.5 text-[14px] font-bold uppercase tracking-wide text-text">
                   <bucket.icon className="h-4 w-4 shrink-0" style={{ color: bucket.accent }} />
                   {bucket.title}
-                  <span className="ml-auto text-[13px] font-bold text-muted">{buckets[bucket.key].length}</span>
+                  <span className="ml-auto text-[13px] font-bold text-muted">{columnItems[bucket.key].filter((i) => !i.done).length}</span>
                 </span>
               </div>
               <div className="flex flex-col gap-2 p-3">

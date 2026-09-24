@@ -438,7 +438,11 @@ function humanizeReasonKey(key) {
  * @param {(leadId: string, columnKey: string) => void} props.onDropLead
  * @param {(columnKey: string, patch: {label: string, color: string}) => void} props.onEditColumn
  */
-export function LeadColumn({ column, leads, lazy, operatorByUid, onAdd, onDropLead, onEditColumn, columns, ...cardActions }) {
+export function LeadColumn({ column, leads, lazy, operatorByUid, onAdd, onDropLead, onEditColumn, columns, ...restActions }) {
+  // Карточки внутри групп («Просроченные/Сегодня/…», месяцы «Оплачено»/«Отказ») рисует LeadGroup
+  // и передаёт им только cardActions — без `columns` они брали бы настройки колонок по умолчанию
+  // (например 3 касания вместо заданного в ⚙), поэтому columns кладём в cardActions.
+  const cardActions = { ...restActions, columns };
   const [dragOver, setDragOver] = useState(false);
   const [stageEditOpen, setStageEditOpen] = useState(false);
   const isTrialScheduled = column.key === 'trial_scheduled';
@@ -690,7 +694,7 @@ export function LeadColumn({ column, leads, lazy, operatorByUid, onAdd, onDropLe
         ) : (
           leads.map((lead) => {
             const op = operatorByUid.get(lead.assignedOperator);
-            return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} columns={columns} {...cardActions} />;
+            return <LeadCard key={lead.id} lead={lead} operatorColor={op?.color} operatorName={op?.name} {...cardActions} />;
           })
         )}
       </div>
