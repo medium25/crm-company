@@ -36,7 +36,7 @@ const SOURCE_LABELS = {
   target_manual: 'Таргет (р)',
   instagram: 'Инстаграм',
   street: 'Улица',
-  word_of_mouth: 'Сарафан',
+  word_of_mouth: 'Рекомендации',
   returned: 'Вернулся',
   other: 'Другое',
   telegram: 'Telegram',

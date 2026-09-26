@@ -134,7 +134,9 @@ service cloud.firestore {
 
     // Предпосчитанные плитки/график дашборда (id — branchId) — считает Apps Script
     // раз в час (appsscript/DashboardStats.gs) под сервис-аккаунтом, который эти
-    // правила не подчиняют. Клиент только читает, никогда не пишет напрямую.
+    // правила не подчиняют. Клиент обычно только читает; кнопка «Обновить сейчас»
+    // на дашборде (DashboardPage.jsx manualRefresh) пишет сюда же той же формулой
+    // (stats.js) — тем же полям, что и триггер, так что запись безопасна.
     match /dashboardStats/{id} {
       allow read:  if isAdmin();
       allow write: if isAdmin();

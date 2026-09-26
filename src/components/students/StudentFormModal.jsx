@@ -20,7 +20,7 @@ const SOURCE_OPTIONS = [
   { value: 'target_manual', label: 'Таргет (р)' },
   { value: 'instagram', label: 'Инстаграм' },
   { value: 'street', label: 'Улица' },
-  { value: 'word_of_mouth', label: 'Сарафан' },
+  { value: 'word_of_mouth', label: 'Рекомендации' },
   { value: 'returned', label: 'Вернулся' },
   { value: 'other', label: 'Другое' },
 ];
@@ -101,7 +101,28 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
     [activeBranchId, needsOperatorPick],
   );
   const { data: staffList } = useCollection(staffQuery);
-  const operatorOptions = [...staffList].sort((a, b) => a.fullName.localeCompare(b.fullName)).map((s) => ({ value: s.id, label: s.fullName }));
+  // Rushana ведёт и звонки (оператор), и пришедших с улицы без звонка
+  // (администратор на месте) — если в форме выбрать источник «Улица»/оставить
+  // «Не указан» и не выбрать ответственного, задача зависает ни на ком.
+  // Поэтому у нeё в списке — два явных пункта под обе роли, оба пишут её же
+  // id: как бы её ни выбрали, ответственный не потеряется.
+  const DUAL_ROLE_STAFF_NAME = 'Rushana Karimxodjayeva';
+  const operatorOptions = [...staffList]
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+    .flatMap((s) =>
+      s.fullName === DUAL_ROLE_STAFF_NAME
+        ? [
+            { value: `${s.id}::operator`, label: `${s.fullName} (оператор)` },
+            { value: `${s.id}::admin`, label: `${s.fullName} (администратор)` },
+          ]
+        : [{ value: s.id, label: s.fullName }],
+    );
+  const resolvedOperatorId = form.assignedOperator ? form.assignedOperator.split('::')[0] : '';
+  // Роль, в которой ответственный вёл именно этого лида (оператор/администратор
+  // у Rushana, см. DUAL_ROLE_STAFF_NAME выше) — нужна отдельно от staff.role,
+  // чтобы дашборд мог разделить её звонковых и уличных лидов в разбивке
+  // «по операторам» (src/lib/reports.js groupCountByOperator).
+  const resolvedOperatorRole = form.assignedOperator?.includes('::') ? form.assignedOperator.split('::')[1] : null;
   // При создании — обязательно 2 номера, без второго лид не заводится (это
   // не про редактирование старых карточек, у которых его могло не быть).
   const missingSecondPhone = !isEdit && !form.phone2.trim();
@@ -204,7 +225,8 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           photoUrl: null,
           status: 'trial',
           statusReason: null,
-          assignedOperator: form.assignedOperator || null,
+          assignedOperator: resolvedOperatorId || null,
+          assignedOperatorRole: resolvedOperatorRole,
           balance: 0,
           balanceUpdatedAt: serverTimestamp(),
           note: '',
@@ -234,7 +256,8 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           photoUrl: null,
           status: 'trial',
           statusReason: null,
-          assignedOperator: form.assignedOperator || null,
+          assignedOperator: resolvedOperatorId || null,
+          assignedOperatorRole: resolvedOperatorRole,
           funnelStage: 'trial_completed',
           stageHistory: [{ stage: 'trial_completed', enteredAt: new Date() }],
           attended: true,
@@ -255,7 +278,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
         onCreated?.(created.id);
         onClose();
       } else {
-        const assignedOperator = form.assignedOperator || null;
+        const assignedOperator = resolvedOperatorId || null;
         const created = await addDoc(collection(db, 'students'), {
           ...payload,
           branchId: activeBranchId,
@@ -267,6 +290,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           statusReason: null,
           funnelStage: 'new',
           assignedOperator,
+          assignedOperatorRole: resolvedOperatorRole,
           stageHistory: [{ stage: 'new', enteredAt: new Date() }],
           balance: 0,
           balanceUpdatedAt: serverTimestamp(),

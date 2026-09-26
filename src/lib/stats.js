@@ -266,15 +266,32 @@ export async function countTrialToday(db, branchId, today = new Date()) {
 }
 
 /**
+ * Пробный реально состоялся: лид дошёл (сейчас или когда-либо по
+ * stageHistory) хотя бы до 'trial_completed', ИЛИ отказ оформлен с причиной
+ * `no_agreement` («Не смогли договориться» — выбирается вручную ПОСЛЕ
+ * разговора о цене/условиях, то есть пробный уже был). Просто 'lost' без
+ * этого не значит «пробный прошёл» — лид мог слиться ДО пробного (no_show,
+ * no_answer после trial_scheduled, или бывшая массовая архивация с причиной
+ * `archived_unpaid` — она вешается на любую нетерминальную стадию, включая
+ * ещё не начавшийся пробный, так что сама по себе ничего не доказывает).
+ */
+export function hasTrialHappened(student) {
+  if (['trial_completed', 'closing', 'won'].includes(student.funnelStage)) return true;
+  if (student.funnelStage !== 'lost') return false;
+  if (student.lostReason === 'no_agreement') return true;
+  return (student.stageHistory ?? []).some((h) => ['trial_completed', 'closing', 'won'].includes(h.stage));
+}
+
+/**
  * Пробные за месяц: сколько лидов с trialDate в текущем календарном месяце
- * УЖЕ прошли пробный (funnelStage вне 'new'/'calling'/'trial_scheduled' —
- * то есть день пробного уже случился, независимо от исхода), и какой у них
- * % «остались» — не оказались в отказе (funnelStage 'lost') и не ушли уже
- * ПОСЛЕ оплаты (`status` 'left', отдельное поле от funnelStage — общий
- * статус студента, см. countLeftActiveGroup). Метрика живая: студент,
- * пробный которого был 20-го, а решение (пришёл на следующий урок или нет)
- * стало известно уже в следующем месяце — до этого решения просто ещё
- * висит в числителе «остались», как и должно быть.
+ * РЕАЛЬНО дошли до пробного (см. hasTrialHappened — не просто «стадия уже не
+ * trial_scheduled», лид мог слиться до пробного и всё равно оказаться
+ * 'lost'), и какой у них % «остались» — не оказались в отказе (funnelStage
+ * 'lost') и не ушли уже ПОСЛЕ оплаты (`status` 'left', отдельное поле от
+ * funnelStage — общий статус студента, см. countLeftActiveGroup). Метрика
+ * живая: студент, пробный которого был 20-го, а решение (пришёл на
+ * следующий урок или нет) стало известно уже в следующем месяце — до этого
+ * решения просто ещё висит в числителе «остались», как и должно быть.
  * @returns {Promise<{total: number, retainedPct: number}>}
  */
 export async function countTrialMonthRetention(db, branchId, monthDate = new Date()) {
@@ -288,7 +305,7 @@ export async function countTrialMonthRetention(db, branchId, monthDate = new Dat
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  const happened = snap.docs.filter((d) => !['new', 'calling', 'trial_scheduled'].includes(d.data().funnelStage));
+  const happened = snap.docs.filter((d) => hasTrialHappened(d.data()));
   const total = happened.length;
   if (total === 0) return { total: 0, retainedPct: 0 };
   const retained = happened.filter((d) => {

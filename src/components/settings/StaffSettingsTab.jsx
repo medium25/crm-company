@@ -234,10 +234,39 @@ export function StaffSettingsTab() {
     },
   ];
 
+  // Визуальные папки по роли — ролей в базе пока 5 (ceo/manager/admin/teacher/
+  // test, см. lib/roles.js), «Администратор» и «Оператор» — одна и та же роль
+  // 'admin' (call-center в этой CRM ведут те же люди, что числятся
+  // администраторами), поэтому их папка объединена. «Маркетологи» — такой
+  // роли в системе ещё нет, папка стоит пустой заглушкой, пока не заведут.
+  const STAFF_GROUPS = [
+    { title: 'Менеджмент', match: (m) => m.role === 'ceo' || m.role === 'manager' },
+    { title: 'Администраторы / Операторы', match: (m) => m.role === 'admin' },
+    { title: 'Учителя', match: (m) => m.role === 'teacher' },
+    { title: 'Маркетологи', match: () => false },
+    { title: 'Тестовые', match: (m) => m.role === 'test' },
+  ];
+
   return (
     <>
       {addButton}
-      <Table columns={columns} rows={staffList} />
+      <div className="flex flex-col gap-6">
+        {STAFF_GROUPS.map((group) => {
+          const rows = staffList.filter(group.match);
+          return (
+            <div key={group.title}>
+              <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-muted">{group.title}</h3>
+              {rows.length > 0 ? (
+                <Table columns={columns} rows={rows} />
+              ) : (
+                <p className="rounded-row bg-surface px-5 py-4 text-[13px] text-muted shadow-card">
+                  {group.title === 'Маркетологи' ? 'Пока нет — для этой роли нужно завести отдельное значение в базе.' : 'Никого нет.'}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
       {modal}
       <ConfirmDialog
         open={Boolean(deleteTarget)}

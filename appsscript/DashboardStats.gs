@@ -165,6 +165,26 @@ function computeTrialToday_(branchId, now) {
   return { planned: planned, came: came };
 }
 
+/**
+ * Пробный реально состоялся — копия hasTrialHappened из stats.js. 'lost' сам
+ * по себе не значит «пробный прошёл»: лид мог слиться ДО пробного (no_show,
+ * no_answer после trial_scheduled, или массовая архивация archived_unpaid —
+ * она вешается на любую нетерминальную стадию) и всё равно оказаться
+ * funnelStage 'lost'. Считаем состоявшимся, если по stageHistory когда-либо
+ * дошёл до trial_completed/closing/won, ИЛИ причина отказа no_agreement
+ * («Не смогли договориться» — выбирается вручную после пробного).
+ */
+function hasTrialHappened_(s) {
+  if (['trial_completed', 'closing', 'won'].indexOf(s.funnelStage) !== -1) return true;
+  if (s.funnelStage !== 'lost') return false;
+  if (s.lostReason === 'no_agreement') return true;
+  const history = s.stageHistory || [];
+  for (let i = 0; i < history.length; i++) {
+    if (['trial_completed', 'closing', 'won'].indexOf(history[i].stage) !== -1) return true;
+  }
+  return false;
+}
+
 /** «Пробные за месяц» (было/остались %) — копия countTrialMonthRetention из stats.js. */
 function computeTrialMonth_(branchId, now) {
   const monthStart = startOfMonth_(now);
@@ -174,7 +194,7 @@ function computeTrialMonth_(branchId, now) {
     { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
     { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
   ]);
-  const happened = docs.filter((s) => ['new', 'calling', 'trial_scheduled'].indexOf(s.funnelStage) === -1);
+  const happened = docs.filter(hasTrialHappened_);
   const total = happened.length;
   if (total === 0) return { total: 0, retainedPct: 0 };
   const retained = happened.filter((s) => s.funnelStage !== 'lost' && s.status !== 'left').length;

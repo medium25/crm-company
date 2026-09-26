@@ -1,6 +1,50 @@
 import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, addMonths, startOfMonth, getDaysInMonth } from 'date-fns';
 import { stageDeadline } from './leadFunnel.js';
+import { hasTrialHappened } from './stats.js';
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/** Считает вхождения `item[field]` (или fallbackKey, если поле пустое), сортирует по убыванию. */
+function groupCount(items, field, fallbackKey = 'unassigned') {
+  const map = new Map();
+  for (const item of items) {
+    const key = item[field] || fallbackKey;
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+  return [...map.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
+}
+
+/** `target_manual` (ручной ввод оператором) и `meta_target` (из таблицы) — один и тот же канал «Таргет» для отчётности. */
+const SOURCE_MERGE = { target_manual: 'meta_target' };
+function groupCountBySource(items) {
+  return groupCount(
+    items.map((item) => ({ source: SOURCE_MERGE[item.source] ?? item.source })),
+    'source',
+    'none',
+  );
+}
+
+/**
+ * Группировка по оператору с учётом `assignedOperatorRole` (StudentFormModal
+ * DUAL_ROLE_STAFF_NAME — Rushana ведёт и звонки, и уличных без записи):
+ * ключ `${assignedOperator}::${assignedOperatorRole}`, если роль указана,
+ * иначе просто `assignedOperator` — так один человек в двух ипостасях не
+ * схлопывается в одну строку разбивки на дашборде.
+ */
+function groupCountByOperator(items) {
+  return groupCount(
+    items.map((item) => ({
+      operatorKey: item.assignedOperator ? (item.assignedOperatorRole ? `${item.assignedOperator}::${item.assignedOperatorRole}` : item.assignedOperator) : null,
+    })),
+    'operatorKey',
+    'unassigned',
+  );
+}
 
 /**
  * Отчёты — раздел 04 §11: выручка по курсам/учителям, посещаемость по
@@ -279,4 +323,173 @@ export async function remarketingCandidates(db, branchId, today = new Date()) {
     .filter((s) => s.lostAt && s.lostAt.toDate().getTime() <= cutoff)
     .map((s) => ({ studentId: s.id, studentName: s.fullName, phone: s.phone, lostReason: s.lostReason, lostAt: s.lostAt.toDate() }))
     .sort((a, b) => b.lostAt - a.lostAt);
+}
+
+/**
+ * Разбивка карточки «Добавились» по оператору и источнику — та же выборка
+ * won-лидов в периоде, что `countNewStudents` в stats.js; `assignedOperator`/
+ * `source` уже прямо на самом документе лида, джойн не нужен.
+ */
+export async function newStudentsBreakdown(db, branchId, periodStart, periodEnd) {
+  const snap = await getDocs(
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('funnelStage', '==', 'won'),
+      where('paidAt', '>=', Timestamp.fromDate(periodStart)),
+      where('paidAt', '<=', Timestamp.fromDate(periodEnd)),
+    ),
+  );
+  const students = snap.docs.map((d) => d.data());
+  return {
+    byOperator: groupCountByOperator(students),
+    bySource: groupCountBySource(students),
+  };
+}
+
+/**
+ * Разбивка карточки «Ушли из активной группы» по учителю — та же выборка,
+ * что `countLeftActiveGroup` в stats.js (enrollments left/archived с
+ * activatedAt, без живого другого enrollment'а), `teacherName` уже
+ * денормализовано прямо на enrollment — джойн не нужен.
+ */
+export async function leftActiveGroupByTeacher(db, branchId, periodStart, periodEnd) {
+  const [leftSnap, openSnap] = await Promise.all([
+    getDocs(
+      query(
+        collection(db, 'enrollments'),
+        where('branchId', '==', branchId),
+        where('status', 'in', ['left', 'archived']),
+        where('leftAt', '>=', Timestamp.fromDate(periodStart)),
+        where('leftAt', '<=', Timestamp.fromDate(periodEnd)),
+      ),
+    ),
+    getDocs(query(collection(db, 'enrollments'), where('branchId', '==', branchId), where('status', 'in', ['active', 'trial', 'paused']), where('isArchived', '==', false))),
+  ]);
+  const stillEnrolled = new Set(openSnap.docs.map((d) => d.data().studentId));
+
+  const seen = new Set();
+  const rows = [];
+  for (const d of leftSnap.docs) {
+    const e = d.data();
+    if (!e.activatedAt) continue;
+    if (stillEnrolled.has(e.studentId)) continue;
+    if (seen.has(e.studentId)) continue;
+    seen.add(e.studentId);
+    rows.push({ teacherName: e.teacherName || 'Без учителя' });
+  }
+  return groupCount(rows, 'teacherName', 'Без учителя').map(({ key, count }) => ({ teacherName: key, count }));
+}
+
+/**
+ * Разбивка карточки «Пробный сегодня» по оператору — та же выборка, что
+ * `countTrialToday` в stats.js, план/факт на каждого `assignedOperator`.
+ */
+export async function trialTodayByOperator(db, branchId, today = new Date()) {
+  const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+  const snap = await getDocs(
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('trialDate', '>=', Timestamp.fromDate(dayStart)),
+      where('trialDate', '<=', Timestamp.fromDate(dayEnd)),
+    ),
+  );
+  const byOperator = new Map();
+  for (const d of snap.docs) {
+    const s = d.data();
+    const opId = s.assignedOperator ? (s.assignedOperatorRole ? `${s.assignedOperator}::${s.assignedOperatorRole}` : s.assignedOperator) : 'unassigned';
+    if (!byOperator.has(opId)) byOperator.set(opId, { planned: 0, came: 0 });
+    const bucket = byOperator.get(opId);
+    bucket.planned += 1;
+    if (['trial_completed', 'closing', 'won'].includes(s.funnelStage)) bucket.came += 1;
+  }
+  return [...byOperator.entries()].map(([operatorId, v]) => ({ operatorId, ...v })).sort((a, b) => b.planned - a.planned);
+}
+
+/**
+ * Разбивка карточки «Пробные за месяц» по оператору и по источнику — та же
+ * выборка `happened`, что `countTrialMonthRetention` в stats.js (пробный
+ * день уже прошёл, независимо от исхода).
+ */
+export async function trialMonthBreakdown(db, branchId, monthDate = new Date()) {
+  const monthStart = startOfMonth(monthDate);
+  const monthEnd = new Date(addMonths(monthStart, 1).getTime() - 1);
+  const snap = await getDocs(
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('trialDate', '>=', Timestamp.fromDate(monthStart)),
+      where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
+    ),
+  );
+  const happened = snap.docs.map((d) => d.data()).filter(hasTrialHappened);
+  // По дням месяца — для графика (те же документы, без лишних чтений). Дни после
+  // сегодняшнего — null: пробных там ещё не было, линия на них не рисуется.
+  const perDay = {};
+  for (const s of happened) {
+    const d = s.trialDate?.toDate?.();
+    if (d) perDay[d.getDate()] = (perDay[d.getDate()] ?? 0) + 1;
+  }
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === monthStart.getFullYear() && today.getMonth() === monthStart.getMonth();
+  const lastDay = isCurrentMonth ? today.getDate() : getDaysInMonth(monthStart);
+  const byDay = Array.from({ length: getDaysInMonth(monthStart) }, (_, i) => ({ day: i + 1, count: i + 1 <= lastDay ? (perDay[i + 1] ?? 0) : null }));
+  return {
+    byOperator: groupCountByOperator(happened),
+    bySource: groupCountBySource(happened),
+    byDay,
+  };
+}
+
+/**
+ * Разбивка карточки «Пробные за месяц» по учителю: количество и % «остались»
+ * на каждого учителя. Учитель у пробного — не поле лида, а `teacherName`
+ * записи-enrollment (StudentFormModal при назначении группы под пробный);
+ * если пробному так и не назначили группу — «Без учителя». Предпочитаем
+ * запись, которая дошла до активации, если их несколько (перевод из
+ * пробной группы в другую пробную и т.п.).
+ */
+export async function trialMonthByTeacher(db, branchId, monthDate = new Date()) {
+  const monthStart = startOfMonth(monthDate);
+  const monthEnd = new Date(addMonths(monthStart, 1).getTime() - 1);
+  const snap = await getDocs(
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('trialDate', '>=', Timestamp.fromDate(monthStart)),
+      where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
+    ),
+  );
+  const happened = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(hasTrialHappened);
+  if (happened.length === 0) return [];
+
+  const enrollments = [];
+  for (const ids of chunk(happened.map((s) => s.id), 30)) {
+    const esnap = await getDocs(query(collection(db, 'enrollments'), where('studentId', 'in', ids)));
+    enrollments.push(...esnap.docs.map((d) => d.data()));
+  }
+  const teacherByStudent = new Map();
+  for (const e of enrollments) {
+    if (!e.teacherName) continue;
+    const existing = teacherByStudent.get(e.studentId);
+    if (!existing || (e.activatedAt && !existing.activatedAt)) teacherByStudent.set(e.studentId, e);
+  }
+
+  const byTeacher = new Map();
+  for (const s of happened) {
+    // Приоритет — реальная запись в группу (enrollments.teacherName): она точнее,
+    // т.к. ставится при фактическом зачислении. `trialTeacherName` — то, что
+    // указал оператор в «Отказе» сразу после пробного (DeclineLeadModal),
+    // для лидов, так и не дошедших до записи в группу.
+    const teacherName = teacherByStudent.get(s.id)?.teacherName || s.trialTeacherName || 'Без учителя';
+    if (!byTeacher.has(teacherName)) byTeacher.set(teacherName, { total: 0, retained: 0 });
+    const bucket = byTeacher.get(teacherName);
+    bucket.total += 1;
+    if (s.funnelStage !== 'lost' && s.status !== 'left') bucket.retained += 1;
+  }
+  return [...byTeacher.entries()]
+    .map(([teacherName, { total, retained }]) => ({ teacherName, total, retained, retainedPct: total > 0 ? Math.round((retained / total) * 100) : 0 }))
+    .sort((a, b) => b.total - a.total);
 }

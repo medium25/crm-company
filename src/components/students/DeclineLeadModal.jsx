@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { useBranch } from '../../hooks/useBranch.js';
+import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { advanceStage, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { analyzeLeadDeviations } from '../../lib/leadDeviationAnalysis.js';
@@ -10,6 +12,7 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Select.jsx';
 import { Input } from '../ui/Input.jsx';
+import { GroupOptions } from '../ui/GroupOptions.jsx';
 
 /**
  * «Отказ» лида — причина строго из фиксированного списка
@@ -29,18 +32,31 @@ import { Input } from '../ui/Input.jsx';
  */
 export function DeclineLeadModal({ lead, onClose, callMaxAttempts }) {
   const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [reason, setReason] = useState(LOST_REASON_OPTIONS[0].value);
   const [detail, setDetail] = useState('');
+  const [groupId, setGroupId] = useState('');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null); // {fullName, items, totalPoints} | null
 
   const selectedOption = LOST_REASON_OPTIONS.find((o) => o.value === reason);
   const detailRequired = Boolean(selectedOption?.requiresDetail);
 
+  // Пробный уже случился (лид дошёл до 'trial_scheduled') — просим отметить, в
+  // какой группе/у какого учителя он был: иначе у отказавших после пробного
+  // не остаётся вообще никакой привязки к учителю (enrollments для них не
+  // заводится, см. 2026-09-24 «Без учителя» в разбивке дашборда).
+  const askTrialGroup = lead?.funnelStage === 'trial_scheduled';
+  const groupsQuery =
+    db && activeBranchId && askTrialGroup ? query(collection(db, 'groups'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null;
+  const { data: groups } = useCollection(groupsQuery);
+  const selectedGroup = groups.find((g) => g.id === groupId);
+
   const reset = () => {
     setReason(LOST_REASON_OPTIONS[0].value);
     setDetail('');
+    setGroupId('');
     setResult(null);
   };
 
@@ -52,6 +68,7 @@ export function DeclineLeadModal({ lead, onClose, callMaxAttempts }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (detailRequired && !detail.trim()) return;
+    if (askTrialGroup && !groupId) return;
     setSaving(true);
     try {
       await advanceStage(
@@ -63,6 +80,14 @@ export function DeclineLeadModal({ lead, onClose, callMaxAttempts }) {
           lostReason: reason,
           lostReasonDetail: detailRequired ? detail.trim() : null,
           lostAt: serverTimestamp(),
+          ...(askTrialGroup
+            ? {
+                trialGroupId: selectedGroup.id,
+                trialGroupCode: selectedGroup.code,
+                trialTeacherId: selectedGroup.teacherId,
+                trialTeacherName: selectedGroup.teacherName,
+              }
+            : {}),
         },
         user,
       );
@@ -113,7 +138,12 @@ export function DeclineLeadModal({ lead, onClose, callMaxAttempts }) {
           <Button variant="secondary" onClick={close}>
             Отмена
           </Button>
-          <Button variant="danger" onClick={handleSubmit} loading={saving} disabled={detailRequired && !detail.trim()}>
+          <Button
+            variant="danger"
+            onClick={handleSubmit}
+            loading={saving}
+            disabled={(detailRequired && !detail.trim()) || (askTrialGroup && !groupId)}
+          >
             Отказать
           </Button>
         </>
@@ -130,6 +160,11 @@ export function DeclineLeadModal({ lead, onClose, callMaxAttempts }) {
             setDetail('');
           }}
         />
+        {askTrialGroup && (
+          <Select label="Группа пробного" required value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+            <GroupOptions items={groups} placeholder="Выбрать группу" />
+          </Select>
+        )}
         {detailRequired && (
           <Input
             label="Что именно случилось"
