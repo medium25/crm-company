@@ -442,10 +442,7 @@ export function LeadsPage() {
     const stageAttempts = attempts.filter(
       (a) => columnKeyOf(lead) !== 'calling' || !callingEnteredAt || toMs(a.at) > toMs(callingEnteredAt),
     );
-    if (stageAttempts.length >= callMaxAttempts) {
-      showToast(`Уже ${stageAttempts.length} из ${callMaxAttempts} касаний — переведите лида дальше («→») или откажите через «⋮».`, { type: 'error' });
-      return;
-    }
+    // Лимита на число касаний нет: «Касание N/M» — только рекомендация (при N > M кнопка бордовая).
     // expectedBy — дедлайн, действовавший НА МОМЕНТ этой попытки (тот, что
     // уже лежал на лиде до неё) — нужен для разбора отклонений при отказе
     // (см. src/lib/leadDeviationAnalysis.js): «просрочка при звонке N»
@@ -483,29 +480,6 @@ export function LeadsPage() {
     // (Думает/Запись на пробный/Отказ, CallSuccessOutcomeModal) убран по
     // просьбе, запись на пробный/отказ теперь только через «⋮» на карточке.
     const stagePreview = [...stageAttempts, { result }];
-    const isCold = result === 'fail' && stagePreview.length === callMaxAttempts && stageAttempts.every((a) => a.result === 'fail');
-    if (isCold) {
-      // терминальная стадия «Отказ» — дедлайну взяться неоткуда, но задача
-      // (итог последней попытки) всё равно обязательна — noDate-модалка.
-      setDeadlineTarget({
-        lead,
-        title: `Задача — итог ${callMaxAttempts}-й попытки`,
-        noDate: true,
-        requireTask: true,
-        onConfirm: (_date, outcome, nextStep) => {
-          const at = new Date();
-          return commitCallAttempt(lead, buildAttempts(outcome, nextStep, at), result, {
-            stageFields: {
-              funnelStage: 'lost',
-              lostReason: 'cold_lead',
-              lostAt: serverTimestamp(),
-              stageHistory: [...(lead.stageHistory ?? []), { stage: 'lost', enteredAt: at }],
-            },
-          });
-        },
-      });
-      return;
-    }
     setDeadlineTarget({
       lead,
       title: 'Следующая задача:',

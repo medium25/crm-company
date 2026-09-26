@@ -97,15 +97,16 @@ function endOfDayIn(daysAhead) {
  * лида при каждой отметке попытки (`markAttempt`), чтобы карточка не
  * «зависала» в «Дозвоне» незамеченной. `max` — максимум рекомендуемых
  * попыток (см. columns.js `calling.maxTouches`, регулируется через ⚙ в
- * шапке колонки «Дозвон»); `null` — попыток не осталось.
+ * шапке колонки «Дозвон»); при попытках сверх max предлагает конец завтрашнего дня, `null` — попыток ещё не было.
  * @param {Array<{result: 'success'|'fail'}>} attempts
  * @param {number} [max]
  * @returns {Date|null}
  */
 export function nextCallDueAt(attempts, max = 5) {
   const n = attempts.length;
-  if (n === 0 || n >= max) return null;
-  const daysAhead = Math.floor(n / 2);
+  if (n === 0) return null;
+  // Касаний может быть больше рекомендуемого max — тогда предлагаем конец завтрашнего дня.
+  const daysAhead = n >= max ? 1 : Math.floor(n / 2);
   return endOfDayIn(daysAhead);
 }
 
