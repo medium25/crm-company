@@ -434,7 +434,18 @@ export function LeadsPage() {
   const markAttempt = (lead, result) => {
     const snapshot = taskSnapshot(lead);
     const attempts = lead.callAttempts ?? [];
-    if (attempts.length >= callMaxAttempts) return;
+    // Считаем ТЕ ЖЕ попытки, что показывает кнопка «Касание N/M» (LeadCard): в «Дозвоне» — только
+    // сделанные после входа в «Дозвон». Раньше тут считались все попытки лида, включая сделанные ещё
+    // в «Новом лиде», — у карточки с «Касание 1/2» галочка и крестик молча ничего не делали.
+    const callingEnteredAt = (lead.stageHistory ?? []).filter((h) => h.stage === 'calling').at(-1)?.enteredAt;
+    const toMs = (v) => (v?.toDate ? v.toDate().getTime() : v instanceof Date ? v.getTime() : 0);
+    const stageAttempts = attempts.filter(
+      (a) => columnKeyOf(lead) !== 'calling' || !callingEnteredAt || toMs(a.at) > toMs(callingEnteredAt),
+    );
+    if (stageAttempts.length >= callMaxAttempts) {
+      showToast(`Уже ${stageAttempts.length} из ${callMaxAttempts} касаний — переведите лида дальше («→») или откажите через «⋮».`, { type: 'error' });
+      return;
+    }
     // expectedBy — дедлайн, действовавший НА МОМЕНТ этой попытки (тот, что
     // уже лежал на лиде до неё) — нужен для разбора отклонений при отказе
     // (см. src/lib/leadDeviationAnalysis.js): «просрочка при звонке N»
@@ -464,16 +475,15 @@ export function LeadsPage() {
       columnKeyOf(lead) === 'new'
         ? { funnelStage: 'calling', stageHistory: [...(lead.stageHistory ?? []), { stage: 'calling', enteredAt: at }] }
         : {};
-    // Превью без outcome/nextStep — только чтобы посчитать предлагаемый
-    // дедлайн ДО того, как задача введена (nextCallDueAt читает только
-    // length/result).
-    const preview = [...attempts, { result }];
+    // stagePreview (ниже) — превью без outcome/nextStep, только чтобы посчитать предлагаемый
+    // дедлайн ДО того, как задача введена (nextCallDueAt читает только length/result).
 
     // «Успешно»/«Не успешно» ведут через одну и ту же простую модалку
     // (Что произошло/Следующий шаг/Дедлайн) — трёхкнопочный выбор исхода
     // (Думает/Запись на пробный/Отказ, CallSuccessOutcomeModal) убран по
     // просьбе, запись на пробный/отказ теперь только через «⋮» на карточке.
-    const isCold = result === 'fail' && preview.length === callMaxAttempts && attempts.every((a) => a.result === 'fail');
+    const stagePreview = [...stageAttempts, { result }];
+    const isCold = result === 'fail' && stagePreview.length === callMaxAttempts && stageAttempts.every((a) => a.result === 'fail');
     if (isCold) {
       // терминальная стадия «Отказ» — дедлайну взяться неоткуда, но задача
       // (итог последней попытки) всё равно обязательна — noDate-модалка.
@@ -499,7 +509,7 @@ export function LeadsPage() {
     setDeadlineTarget({
       lead,
       title: 'Следующая задача:',
-      suggestedDate: nextCallDueAt(preview, callMaxAttempts),
+      suggestedDate: nextCallDueAt(stagePreview, callMaxAttempts),
       requireTask: true,
       onConfirm: (dueDate, outcome, nextStep) => {
         const at = new Date();
