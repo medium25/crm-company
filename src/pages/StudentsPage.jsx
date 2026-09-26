@@ -532,6 +532,11 @@ export function StudentsPage() {
     ...(section === 'left'
       ? [
           {
+            key: 'leftReason',
+            label: 'Причина ухода',
+            render: (st) => leftEnrollmentByStudent.get(st.id)?.leftReason || st.statusReason || '—',
+          },
+          {
             key: 'leftAt',
             label: 'Дата исключения',
             render: (st) => formatDate(leftEnrollmentByStudent.get(st.id)?.leftAt),

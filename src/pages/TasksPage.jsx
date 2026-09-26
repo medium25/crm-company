@@ -415,59 +415,29 @@ const timeOf = (e) => format(new Date(msOf(e.at)), 'HH:mm');
 
 /**
  * Выполненная задача — остаётся в колонке до конца дня (на следующий день
- * её уже нет: список строится только по отметкам за сегодня). Спереди —
- * имя, задача и «Выполнено»; по клику карточка переворачивается: на
- * обороте все записи зачёркнуты.
+ * её уже нет: список строится только по отметкам за сегодня). Клик по
+ * «Выполнено» сразу открывает лид на доске «Заявки» (рамка на его карточке) —
+ * так лид можно найти и после выполнения, как по «Выполнить» у открытой задачи.
  */
-function CompletedTaskCard({ lead, taskText, entries, focused }) {
-  const [flipped, setFlipped] = useState(false);
-  const face = 'col-start-1 row-start-1 [backface-visibility:hidden]';
-  const struck = 'text-muted line-through';
+function CompletedTaskCard({ lead, taskText, entries, focused, onOpenLead }) {
   const last = entries[entries.length - 1];
   return (
-    <div id={`task-done-${lead.id}`} className={focused ? 'rounded-field ring-4 ring-navy ring-offset-2' : ''} style={{ perspective: '900px' }}>
-      <div
-        className="grid transition-transform duration-500"
-        style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'none' }}
-      >
-        <div
-          className={`${face} flex h-[96px] items-center justify-between gap-3 rounded-field border border-border bg-card p-3`}
-          style={{ pointerEvents: flipped ? 'none' : 'auto' }}
-        >
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-bold leading-snug text-text">{lead.fullName}</p>
-            <p className="line-clamp-2 text-[12px] leading-snug text-text" title={taskText}>{taskText}</p>
-            <p className="mt-0.5 text-[11px] text-muted">сегодня в {timeOf(last)}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFlipped(true)}
-            className="flex shrink-0 items-center gap-1 rounded-field bg-success-bg px-3 py-1.5 text-[12px] font-bold text-success"
-          >
-            <Check className="h-3.5 w-3.5" />
-            Выполнено
-          </button>
+    <div id={`task-done-${lead.id}`} className={focused ? 'rounded-field ring-4 ring-navy ring-offset-2' : ''}>
+      <div className="flex h-[96px] items-center justify-between gap-3 rounded-field border border-border bg-card p-3">
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-bold leading-snug text-text">{lead.fullName}</p>
+          <p className="line-clamp-2 text-[12px] leading-snug text-text" title={taskText}>{taskText}</p>
+          <p className="mt-0.5 text-[11px] text-muted">сегодня в {timeOf(last)}</p>
         </div>
-        <div
-          className={`${face} h-[96px] overflow-y-auto rounded-field border border-border bg-surface-alt p-3`}
-          style={{ transform: 'rotateY(180deg)', pointerEvents: flipped ? 'auto' : 'none' }}
+        <button
+          type="button"
+          onClick={() => onOpenLead(lead)}
+          title="Открыть лид в «Заявках»"
+          className="flex shrink-0 items-center gap-1 rounded-field bg-success-bg px-3 py-1.5 text-[12px] font-bold text-success hover:opacity-80"
         >
-          <div className="flex items-start justify-between gap-3">
-            <p className={`truncate text-[13px] font-bold leading-snug ${struck}`}>{lead.fullName}</p>
-            <button type="button" onClick={() => setFlipped(false)} className="shrink-0 text-[11px] text-muted underline hover:text-text">
-              Назад
-            </button>
-          </div>
-          <p className={`text-[12px] leading-snug ${struck}`}>{taskText}</p>
-          {entries.map((e, i) => (
-            <div key={i} className="mt-1.5 border-t border-border pt-1.5">
-              <p className={`text-[11px] leading-snug ${struck}`}>
-                {timeOf(e)}
-                {[e.outcome, e.nextStep].some(Boolean) ? ` · ${[e.outcome, e.nextStep].filter(Boolean).join(' → ')}` : ''}
-              </p>
-            </div>
-          ))}
-        </div>
+          <Check className="h-3.5 w-3.5" />
+          Выполнено
+        </button>
       </div>
     </div>
   );
@@ -821,7 +791,7 @@ export function TasksPage() {
                 ) : (
                   columnItems[bucket.key].map((item) => {
                     if (item.done) {
-                      return <CompletedTaskCard key={`done-${item.lead.id}`} lead={item.lead} entries={item.entries} taskText={item.taskText} focused={focusKey === `done-${item.lead.id}`} />;
+                      return <CompletedTaskCard key={`done-${item.lead.id}`} lead={item.lead} entries={item.entries} taskText={item.taskText} focused={focusKey === `done-${item.lead.id}`} onOpenLead={(l) => navigate(`/leads?highlight=${l.id}&from=tasks`)} />;
                     }
                     const { lead, deadline, level, pinnedToday } = item;
                     const mark = PRIORITY_STYLES[level];
