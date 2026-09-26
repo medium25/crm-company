@@ -16,6 +16,7 @@ import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Select } from '../components/ui/Select.jsx';
 import { Input } from '../components/ui/Input.jsx';
+import { DatePicker } from '../components/ui/DatePicker.jsx';
 import { Table } from '../components/ui/Table.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
@@ -72,6 +73,8 @@ export function StudentsPage() {
   const onlyDebtors = searchParams.get('debtors') === '1';
   const page = Math.max(1, Number(searchParams.get('page') || 1));
   const leftView = searchParams.get('leftView') || null;
+  // Дата исключения (yyyy-MM-dd) — фильтр списка «Покинувшие»: кто ушёл из группы в этот день.
+  const leftDate = searchParams.get('leftDate') || '';
 
   // «Покинувшие»/«Замороженные»/«На пробном» — отдельные секции с
   // фиксированным фильтром статуса; общий фильтр «Статус» из «Все ученики»
@@ -198,14 +201,18 @@ export function StudentsPage() {
 
   const leftStudents = useMemo(() => {
     if (section !== 'left') return [];
-    if (leftView === 'all') return leftAllStudents;
     const monthStart = startOfMonth(new Date());
     return leftAllStudents.filter((s) => {
       const enr = leftEnrollmentByStudent.get(s.id);
-      if (leftView === 'month') return enr.leftAt.toDate() >= monthStart;
+      const leftAtDate = enr.leftAt.toDate();
+      // Конкретная дата исключения заменяет «в этом месяце»/«архив»: ищем по всему списку покинувших
+      // (с желанием вернуться — остаётся своим отбором).
+      if (leftDate) return (leftView !== 'return' || enr.returnIntent === 'return') && format(leftAtDate, 'yyyy-MM-dd') === leftDate;
+      if (leftView === 'all') return true;
+      if (leftView === 'month') return leftAtDate >= monthStart;
       return enr.returnIntent === leftView;
     });
-  }, [section, leftAllStudents, leftEnrollmentByStudent, leftView]);
+  }, [section, leftAllStudents, leftEnrollmentByStudent, leftView, leftDate]);
 
   // Пробные считаем и показываем только с учителем: студент с действующей
   // записью (enrollment) у учителя. Лиды, лишь записанные на пробную дату, — нет.
@@ -522,6 +529,15 @@ export function StudentsPage() {
           ? leftEnrollmentByStudent.get(st.id)?.teacherName || '—'
           : [...new Set((enrollmentsByStudent.get(st.id) ?? []).map((e) => e.teacherName))].join(', ') || '—',
     },
+    ...(section === 'left'
+      ? [
+          {
+            key: 'leftAt',
+            label: 'Дата исключения',
+            render: (st) => formatDate(leftEnrollmentByStudent.get(st.id)?.leftAt),
+          },
+        ]
+      : []),
     {
       key: 'createdAt',
       label: 'Дата добавления',
@@ -747,13 +763,21 @@ export function StudentsPage() {
           )}
 
           {section === 'left' && leftView && (
-            <button type="button" onClick={() => setFilter({ leftView: null })} className="mb-4 flex items-center gap-1 text-[15px] text-link">
+            <button type="button" onClick={() => setFilter({ leftView: null, leftDate: null })} className="mb-4 flex items-center gap-1 text-[15px] text-link">
               <ArrowLeft className="h-4 w-4" /> Назад к разделам
             </button>
           )}
 
           <FilterBar onReset={resetFilters}>
             <Input placeholder="Поиск по имени или телефону" value={search} onChange={(e) => setFilter({ q: e.target.value })} className="w-64" />
+            {section === 'left' && (
+              <>
+                <DatePicker aria-label="Дата исключения" value={leftDate} onChange={(e) => setFilter({ leftDate: e.target.value })} className="w-48" />
+                <Button variant="secondary" onClick={() => setFilter({ leftDate: format(new Date(), 'yyyy-MM-dd') })}>
+                  Сегодня
+                </Button>
+              </>
+            )}
             {section === 'all' && (
               <>
                 <Select options={STATUS_OPTIONS} value={status} onChange={(e) => setFilter({ status: e.target.value })} className="w-44" />
@@ -764,6 +788,15 @@ export function StudentsPage() {
               </>
             )}
           </FilterBar>
+
+          {section === 'left' && leftDate && !loading && (
+            <p className="mb-3 text-[15px] text-text">
+              Покинули группу {leftDate.split('-').reverse().join('.')}:{' '}
+              <span className="font-bold">
+                {filtered.length} {pluralize(filtered.length, ['ученик', 'ученика', 'учеников'])}
+              </span>
+            </p>
+          )}
 
           {section === 'all' && !loading && filtered.length > 0 && (
             <p className="mb-3 text-[13px] text-muted">
@@ -785,7 +818,7 @@ export function StudentsPage() {
             <EmptyState
               icon={section === 'paused' ? Snowflake : section === 'trial' ? GraduationCap : CircleUserRound}
               title={
-                section === 'left' ? 'Никто не уходил' :
+                section === 'left' ? (leftDate ? 'В этот день никто не уходил' : 'Никто не уходил') :
                 section === 'paused' ? 'Замороженных нет' :
                 section === 'trial' ? 'Никого нет на пробном' :
                 'Пока нет ни одного студента'
