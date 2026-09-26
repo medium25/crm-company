@@ -30,7 +30,7 @@ const msOf = (v) => (v?.toDate ? v.toDate().getTime() : v instanceof Date ? v.ge
  * стадии (overdueReasonLabel).
  */
 function pendingTaskText(lead) {
-  const entries = [...(lead.callAttempts ?? []), ...(lead.closingTouchLog ?? []), ...(lead.unreachableAttempts ?? [])];
+  const entries = [...(lead.callAttempts ?? []), ...(lead.closingTouchLog ?? []), ...(lead.unreachableAttempts ?? []), ...(lead.taskLog ?? [])];
   const last = entries.sort((a, b) => msOf(b.at) - msOf(a.at))[0];
   const text = last?.nextStep || last?.outcome;
   if (text) return text;
@@ -39,7 +39,7 @@ function pendingTaskText(lead) {
 }
 
 const allEntriesOf = (lead) =>
-  [...(lead.callAttempts ?? []), ...(lead.closingTouchLog ?? []), ...(lead.unreachableAttempts ?? [])]
+  [...(lead.callAttempts ?? []), ...(lead.closingTouchLog ?? []), ...(lead.unreachableAttempts ?? []), ...(lead.taskLog ?? [])]
     .filter((e) => msOf(e.at))
     .sort((a, b) => msOf(a.at) - msOf(b.at));
 
@@ -521,7 +521,7 @@ export function TasksPage() {
   const activityByUid = useMemo(() => {
     const byUid = new Map();
     for (const lead of allLeads) {
-      for (const list of [lead.callAttempts, lead.closingTouchLog, lead.unreachableAttempts]) {
+      for (const list of [lead.callAttempts, lead.closingTouchLog, lead.unreachableAttempts, lead.taskLog]) {
         for (const e of list ?? []) {
           const ms = msOf(e.at);
           const uid = e.by ?? lead.assignedOperator;

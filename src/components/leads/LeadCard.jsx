@@ -282,6 +282,7 @@ function buildFullHistory(lead) {
   (lead.callAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
   (lead.closingTouchLog ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
   (lead.unreachableAttempts ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
+  (lead.taskLog ?? []).forEach((e) => items.push({ type: 'entry', ...e }));
   (lead.operatorTransfers ?? []).forEach((e) => items.push({ type: 'operator', fromName: e.fromName, toName: e.toName, at: e.at }));
   items.sort((a, b) => {
     const diff = msOf(a.at) - msOf(b.at);

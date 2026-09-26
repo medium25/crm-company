@@ -7,6 +7,7 @@ import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { advanceStage, LOST_REASON_OPTIONS } from '../../lib/leadFunnel.js';
 import { analyzeLeadDeviations } from '../../lib/leadDeviationAnalysis.js';
+import { taskSnapshot, taskPlacement } from '../../lib/leadTasks.js';
 import { pluralize } from '../../lib/format.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -71,11 +72,29 @@ export function DeclineLeadModal({ lead, onClose, callMaxAttempts }) {
     if (askTrialGroup && !groupId) return;
     setSaving(true);
     try {
+      // Отказ закрывает открытую задачу по лиду — записываем её как выполненную (taskLog), иначе
+      // на странице «Задачи» она пропадала бы вместе с лидом (у «Отказа» дедлайна нет). Запись
+      // читают «Задачи» (карточка «Выполнено») и лента истории лида.
+      const openTask = taskPlacement(lead);
+      const taskLogEntry = openTask
+        ? [
+            {
+              result: 'lost',
+              at: new Date(),
+              by: user.uid,
+              expectedBy: openTask.deadline,
+              outcome: `Отказ: ${detailRequired ? `${selectedOption.label} — ${detail.trim()}` : (selectedOption?.label ?? reason)}`,
+              nextStep: null,
+              ...taskSnapshot(lead),
+            },
+          ]
+        : [];
       await advanceStage(
         db,
         lead,
         'lost',
         {
+          ...(taskLogEntry.length ? { taskLog: [...(lead.taskLog ?? []), ...taskLogEntry] } : {}),
           statusReason: detailRequired ? `${selectedOption.label} — ${detail.trim()}` : (selectedOption?.label ?? reason),
           lostReason: reason,
           lostReasonDetail: detailRequired ? detail.trim() : null,
