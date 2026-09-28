@@ -316,33 +316,49 @@ export async function countTrialMonthRetention(db, branchId, monthDate = new Dat
 }
 
 /**
- * Оплаты текущего месяца по источникам лида: сколько платежей (каждый платёж — одна оплата) и на
- * какую сумму пришло с каждого источника. Источник — поле `source` карточки студента (по одному
- * чтению на плательщика); оплаты студентов без источника — ключ 'none'. По убыванию числа оплат.
+ * Первые оплаты НОВЫХ учеников текущего месяца по источникам лида: новый ученик — тот, у кого
+ * `students.firstPaymentAt` попадает в текущий месяц; его «новая оплата» — самый ранний платёж
+ * месяца (повторные платежи новых и все платежи прежних учеников не считаются). Источник — поле
+ * `source` карточки студента (по одному чтению на плательщика); без источника — ключ 'none'.
+ * По убыванию числа оплат.
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} branchId
  * @param {Promise<Array<Object>>} [payments] платежи текущего/прошлого месяца (fetchDashboardPayments), если уже загружены
  * @returns {Promise<Array<{key: string, count: number, amount: number}>>}
  */
 export async function countPaymentSources(db, branchId, payments) {
-  const month = format(new Date(), 'yyyy-MM');
+  const now = new Date();
+  const month = format(now, 'yyyy-MM');
+  const monthStart = startOfMonth(now);
+  const nextMonthStart = addMonths(monthStart, 1);
   const list = payments ? await payments : await fetchPaymentDocs(db, branchId, [month]);
   const current = list.filter((t) => t.month === month);
   const ids = [...new Set(current.map((t) => t.studentId).filter(Boolean))];
-  const sourceOf = new Map();
+  const info = new Map(); // studentId → { source, isNew }
   for (let i = 0; i < ids.length; i += 30) {
     const snap = await getDocs(query(collection(db, 'students'), where(documentId(), 'in', ids.slice(i, i + 30))));
-    for (const d of snap.docs) sourceOf.set(d.id, d.data().source || 'none');
+    for (const d of snap.docs) {
+      const s = d.data();
+      const first = s.firstPaymentAt?.toDate?.();
+      info.set(d.id, { source: s.source || 'none', isNew: Boolean(first && first >= monthStart && first < nextMonthStart) });
+    }
+  }
+  // Самый ранний платёж месяца у каждого нового ученика.
+  const earliest = new Map();
+  for (const t of current) {
+    if (!info.get(t.studentId)?.isNew) continue;
+    const cur = earliest.get(t.studentId);
+    if (!cur || (t.date?.toMillis?.() ?? 0) < (cur.date?.toMillis?.() ?? 0)) earliest.set(t.studentId, t);
   }
   const map = new Map();
-  for (const t of current) {
-    const key = sourceOf.get(t.studentId) ?? 'none';
+  for (const [studentId, t] of earliest) {
+    const key = info.get(studentId).source;
     const cur = map.get(key) ?? { key, count: 0, amount: 0 };
     cur.count += 1;
     cur.amount += t.amount ?? 0;
     map.set(key, cur);
   }
-  return [...map.values()].sort((a, b) => b.count - a.count);
+  return [...map.values()].sort((a, b2) => b2.count - a.count);
 }
 
 /**
@@ -367,7 +383,7 @@ export async function loadDashboardStats(db, branchId, churnPeriod = 'year', pay
     newStudents,
     trialToday,
     trialMonth,
-    paymentSources,
+    newPaymentSources,
   ] = await Promise.all([
     countStudentBuckets(db, branchId),
     countPaidThisMonth(db, branchId, month, payments),
@@ -379,7 +395,7 @@ export async function loadDashboardStats(db, branchId, churnPeriod = 'year', pay
     countPaymentSources(db, branchId, payments),
   ]);
 
-  return { activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial, newStudents, trialToday, trialMonth, paymentSources };
+  return { activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial, newStudents, trialToday, trialMonth, newPaymentSources };
 }
 
 /**

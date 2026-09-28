@@ -290,9 +290,9 @@ export function DashboardPage() {
     if (stats.trialMonth === undefined) {
       countTrialMonthRetention(db, activeBranchId).then((v) => setLiveFallback((prev) => ({ ...prev, trialMonth: v })));
     }
-    if (stats.paymentSources === undefined && paymentSourcesRequested.current !== activeBranchId) {
+    if (stats.newPaymentSources === undefined && paymentSourcesRequested.current !== activeBranchId) {
       paymentSourcesRequested.current = activeBranchId; // один раз за сессию — это ~200 чтений
-      countPaymentSources(db, activeBranchId).then((v) => setLiveFallback((prev) => ({ ...prev, paymentSources: v })));
+      countPaymentSources(db, activeBranchId).then((v) => setLiveFallback((prev) => ({ ...prev, newPaymentSources: v })));
     }
     if (stats.newStudents === undefined) {
       const { start, end } = churnPeriodRange(churnPeriod);
@@ -302,7 +302,7 @@ export function DashboardPage() {
   const effectiveTrialToday = stats?.trialToday ?? liveFallback.trialToday;
   const effectiveTrialMonth = stats?.trialMonth ?? liveFallback.trialMonth;
   const effectiveNewStudents = stats?.newStudents ?? liveFallback.newStudents;
-  const effectivePaymentSources = stats?.paymentSources ?? liveFallback.paymentSources;
+  const effectiveNewPaymentSources = stats?.newPaymentSources ?? liveFallback.newPaymentSources;
 
   const [monthly, setMonthly] = useState(null);
   const [monthlyError, setMonthlyError] = useState(false);
@@ -513,7 +513,7 @@ export function DashboardPage() {
         </>
       )}
 
-      <PaymentSourceAnalysis className="mt-6" sources={effectivePaymentSources} periodLabel={`за ${currentMonthName}`} />
+      <PaymentSourceAnalysis className="mt-6" sources={effectiveNewPaymentSources} periodLabel={`новые оплаты за ${currentMonthName}`} />
 
       <Card className="mt-6">
         {stats?.comparison ? (

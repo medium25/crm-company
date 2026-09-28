@@ -5,8 +5,8 @@ import { formatMoney, formatSource, pluralize } from '../../lib/format.js';
 const BAR_COLORS = ['#378ADD', '#1D9E75', '#BA7517', '#7F77DD', '#888780', '#D4537E', '#0F6E56'];
 
 /**
- * «Анализ источников оплат» — сколько оплат пришло с каждого источника лида (Таргет, Инстаграм …):
- * название (число оплат), полоса, доля и сумма. Каждый платёж — одна оплата; оплаты студентов без
+ * «Анализ источников оплат» — сколько НОВЫХ оплат (первых оплат новых учеников) пришло с каждого
+ * источника лида (Таргет, Инстаграм …): название (число), полоса, доля и сумма. Студенты без
  * источника — «Не указан». Данные считает countPaymentSources (stats.js) / Apps Script.
  * @param {Object} props
  * @param {Array<{key: string, count: number, amount: number}>|null|undefined} props.sources undefined — ещё не посчитано
@@ -41,7 +41,7 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
       {sources === undefined ? (
         <p className="text-[13px] text-muted">Считаю…</p>
       ) : view.rows.length === 0 ? (
-        <p className="text-[13px] text-muted">За месяц оплат пока нет.</p>
+        <p className="text-[13px] text-muted">Новых оплат за месяц пока нет.</p>
       ) : (
         <div className="flex flex-col gap-2.5">
           {view.rows.map((r, i) => (

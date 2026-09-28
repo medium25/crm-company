@@ -256,11 +256,14 @@ function computePaymentsAndChart_(branchId, now) {
 }
 
 /**
- * Оплаты текущего месяца по источникам лида — копия countPaymentSources из stats.js: каждый
- * платёж — одна оплата, источник берётся из карточки студента (один batchGet на плательщиков),
- * без источника — 'none'. По убыванию числа оплат.
+ * Первые оплаты НОВЫХ учеников текущего месяца по источникам лида — копия countPaymentSources
+ * из stats.js: новый ученик — firstPaymentAt в текущем месяце, его «новая оплата» — самый ранний
+ * платёж месяца. Источник и firstPaymentAt берутся из карточки студента (batchGet), без
+ * источника — 'none'. По убыванию числа оплат.
  */
-function computePaymentSources_(branchId, payments) {
+function computePaymentSources_(branchId, payments, now) {
+  const monthStart = startOfMonth_(now);
+  const nextMonthStart = addMonths_(monthStart, 1);
   const ids = [];
   const seen = {};
   payments.forEach((t) => {
@@ -269,22 +272,34 @@ function computePaymentSources_(branchId, payments) {
       ids.push(t.studentId);
     }
   });
-  const sourceOf = {};
+  const info = {};
   const base = `projects/${projectId_()}/databases/(default)/documents/students/`;
   for (let i = 0; i < ids.length; i += 100) {
     const chunk = ids.slice(i, i + 100);
-    const resp = fsRequest_('POST', ':batchGet', { documents: chunk.map((id) => base + id), mask: { fieldPaths: ['source'] } });
+    const resp = fsRequest_('POST', ':batchGet', { documents: chunk.map((id) => base + id), mask: { fieldPaths: ['source', 'firstPaymentAt'] } });
     USAGE_RUN_.reads += chunk.length;
     (resp || []).forEach((r) => {
-      if (r.found) sourceOf[r.found.name.split('/').pop()] = (r.found.fields && r.found.fields.source && r.found.fields.source.stringValue) || 'none';
+      if (!r.found) return;
+      const f = r.found.fields || {};
+      const first = f.firstPaymentAt && f.firstPaymentAt.timestampValue ? new Date(f.firstPaymentAt.timestampValue) : null;
+      info[r.found.name.split('/').pop()] = {
+        source: (f.source && f.source.stringValue) || 'none',
+        isNew: Boolean(first && first >= monthStart && first < nextMonthStart),
+      };
     });
   }
-  const map = {};
+  const earliest = {};
   payments.forEach((t) => {
-    const key = sourceOf[t.studentId] || 'none';
+    if (!info[t.studentId] || !info[t.studentId].isNew) return;
+    const cur = earliest[t.studentId];
+    if (!cur || new Date(t.date).getTime() < new Date(cur.date).getTime()) earliest[t.studentId] = t;
+  });
+  const map = {};
+  Object.keys(earliest).forEach((studentId) => {
+    const key = info[studentId].source;
     if (!map[key]) map[key] = { key, count: 0, amount: 0 };
     map[key].count += 1;
-    map[key].amount += t.amount || 0;
+    map[key].amount += earliest[studentId].amount || 0;
   });
   return Object.keys(map)
     .map((k) => map[k])
@@ -305,7 +320,7 @@ function refreshDashboardStatsForBranch_(branchId) {
   const trialToday = computeTrialToday_(branchId, now);
   const trialMonth = computeTrialMonth_(branchId, now);
   const { paidThisMonth, comparison, currentPayments } = computePaymentsAndChart_(branchId, now);
-  const paymentSources = computePaymentSources_(branchId, currentPayments);
+  const newPaymentSources = computePaymentSources_(branchId, currentPayments, now);
 
   const fields = toFsFields_({
     activeStudents: buckets.activeStudents,
@@ -317,7 +332,7 @@ function refreshDashboardStatsForBranch_(branchId) {
     newStudents,
     trialToday,
     trialMonth,
-    paymentSources,
+    newPaymentSources,
     comparison,
   });
   fields.updatedAt = { timestampValue: new Date().toISOString() };
