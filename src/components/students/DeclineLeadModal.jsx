@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { collection, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -49,8 +49,15 @@ export function DeclineLeadModal({ lead, onClose, callMaxAttempts }) {
   // не остаётся вообще никакой привязки к учителю (enrollments для них не
   // заводится, см. 2026-09-24 «Без учителя» в разбивке дашборда).
   const askTrialGroup = lead?.funnelStage === 'trial_scheduled';
-  const groupsQuery =
-    db && activeBranchId && askTrialGroup ? query(collection(db, 'groups'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null;
+  // ВАЖНО: query обязан быть в useMemo — новый объект на каждый рендер пересоздаёт подписку useCollection,
+  // а её ответ вызывает новый рендер (бесконечный цикл, 26–28.09 сжёг ~1.9 млн чтений за день).
+  const groupsQuery = useMemo(
+    () =>
+      db && activeBranchId && askTrialGroup
+        ? query(collection(db, 'groups'), where('branchId', '==', activeBranchId), where('isArchived', '==', false))
+        : null,
+    [activeBranchId, askTrialGroup],
+  );
   const { data: groups } = useCollection(groupsQuery);
   const selectedGroup = groups.find((g) => g.id === groupId);
 
