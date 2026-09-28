@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -14,12 +14,14 @@ import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
 import { RoomScheduleGrid } from '../components/dashboard/RoomScheduleGrid.jsx';
 import { TrialsMonthChart } from '../components/charts/TrialsMonthChart.jsx';
+import { PaymentSourceAnalysis } from '../components/payments/PaymentSourceAnalysis.jsx';
 import {
   getMonthlyRevenue,
   churnPeriodRange,
   countTrialToday,
   countTrialMonthRetention,
   countNewStudents,
+  countPaymentSources,
   loadDashboardStats,
   fetchDashboardPayments,
   getDailyRevenueComparison,
@@ -279,6 +281,7 @@ export function DashboardPage() {
   // на этот случай досчитываются прямо в браузере той же формулой из stats.js —
   // один раз за сессию, только пока Apps Script не обновлён.
   const [liveFallback, setLiveFallback] = useState({});
+  const paymentSourcesRequested = useRef(null);
   useEffect(() => {
     if (!db || !activeBranchId || !stats) return;
     if (stats.trialToday === undefined) {
@@ -286,6 +289,10 @@ export function DashboardPage() {
     }
     if (stats.trialMonth === undefined) {
       countTrialMonthRetention(db, activeBranchId).then((v) => setLiveFallback((prev) => ({ ...prev, trialMonth: v })));
+    }
+    if (stats.paymentSources === undefined && paymentSourcesRequested.current !== activeBranchId) {
+      paymentSourcesRequested.current = activeBranchId; // один раз за сессию — это ~200 чтений
+      countPaymentSources(db, activeBranchId).then((v) => setLiveFallback((prev) => ({ ...prev, paymentSources: v })));
     }
     if (stats.newStudents === undefined) {
       const { start, end } = churnPeriodRange(churnPeriod);
@@ -295,6 +302,7 @@ export function DashboardPage() {
   const effectiveTrialToday = stats?.trialToday ?? liveFallback.trialToday;
   const effectiveTrialMonth = stats?.trialMonth ?? liveFallback.trialMonth;
   const effectiveNewStudents = stats?.newStudents ?? liveFallback.newStudents;
+  const effectivePaymentSources = stats?.paymentSources ?? liveFallback.paymentSources;
 
   const [monthly, setMonthly] = useState(null);
   const [monthlyError, setMonthlyError] = useState(false);
@@ -504,6 +512,8 @@ export function DashboardPage() {
           </div>
         </>
       )}
+
+      <PaymentSourceAnalysis className="mt-6" sources={effectivePaymentSources} periodLabel={`за ${currentMonthName}`} />
 
       <Card className="mt-6">
         {stats?.comparison ? (

@@ -252,7 +252,43 @@ function computePaymentsAndChart_(branchId, now) {
     data.push({ day, current, previous });
   }
 
-  return { paidThisMonth, comparison: { data, currentMonth, prevMonth } };
+  return { paidThisMonth, comparison: { data, currentMonth, prevMonth }, currentPayments: txs.filter((t) => t.month === currentMonth) };
+}
+
+/**
+ * Оплаты текущего месяца по источникам лида — копия countPaymentSources из stats.js: каждый
+ * платёж — одна оплата, источник берётся из карточки студента (один batchGet на плательщиков),
+ * без источника — 'none'. По убыванию числа оплат.
+ */
+function computePaymentSources_(branchId, payments) {
+  const ids = [];
+  const seen = {};
+  payments.forEach((t) => {
+    if (t.studentId && !seen[t.studentId]) {
+      seen[t.studentId] = true;
+      ids.push(t.studentId);
+    }
+  });
+  const sourceOf = {};
+  const base = `projects/${projectId_()}/databases/(default)/documents/students/`;
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const resp = fsRequest_('POST', ':batchGet', { documents: chunk.map((id) => base + id), mask: { fieldPaths: ['source'] } });
+    USAGE_RUN_.reads += chunk.length;
+    (resp || []).forEach((r) => {
+      if (r.found) sourceOf[r.found.name.split('/').pop()] = (r.found.fields && r.found.fields.source && r.found.fields.source.stringValue) || 'none';
+    });
+  }
+  const map = {};
+  payments.forEach((t) => {
+    const key = sourceOf[t.studentId] || 'none';
+    if (!map[key]) map[key] = { key, count: 0, amount: 0 };
+    map[key].count += 1;
+    map[key].amount += t.amount || 0;
+  });
+  return Object.keys(map)
+    .map((k) => map[k])
+    .sort((a, b) => b.count - a.count);
 }
 
 /** Считает все плитки дашборда одного филиала и пишет их в dashboardStats/{branchId} (полная замена документа). */
@@ -268,7 +304,8 @@ function refreshDashboardStatsForBranch_(branchId) {
   const newStudents = computeNewStudents_(branchId, start, end);
   const trialToday = computeTrialToday_(branchId, now);
   const trialMonth = computeTrialMonth_(branchId, now);
-  const { paidThisMonth, comparison } = computePaymentsAndChart_(branchId, now);
+  const { paidThisMonth, comparison, currentPayments } = computePaymentsAndChart_(branchId, now);
+  const paymentSources = computePaymentSources_(branchId, currentPayments);
 
   const fields = toFsFields_({
     activeStudents: buckets.activeStudents,
@@ -280,6 +317,7 @@ function refreshDashboardStatsForBranch_(branchId) {
     newStudents,
     trialToday,
     trialMonth,
+    paymentSources,
     comparison,
   });
   fields.updatedAt = { timestampValue: new Date().toISOString() };

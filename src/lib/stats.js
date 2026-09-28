@@ -1,4 +1,4 @@
-import { collection, getCountFromServer, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, documentId, getCountFromServer, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { addMonths, format, startOfMonth, startOfQuarter, startOfYear, subMonths, getDaysInMonth } from 'date-fns';
 
 /**
@@ -316,6 +316,36 @@ export async function countTrialMonthRetention(db, branchId, monthDate = new Dat
 }
 
 /**
+ * Оплаты текущего месяца по источникам лида: сколько платежей (каждый платёж — одна оплата) и на
+ * какую сумму пришло с каждого источника. Источник — поле `source` карточки студента (по одному
+ * чтению на плательщика); оплаты студентов без источника — ключ 'none'. По убыванию числа оплат.
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {string} branchId
+ * @param {Promise<Array<Object>>} [payments] платежи текущего/прошлого месяца (fetchDashboardPayments), если уже загружены
+ * @returns {Promise<Array<{key: string, count: number, amount: number}>>}
+ */
+export async function countPaymentSources(db, branchId, payments) {
+  const month = format(new Date(), 'yyyy-MM');
+  const list = payments ? await payments : await fetchPaymentDocs(db, branchId, [month]);
+  const current = list.filter((t) => t.month === month);
+  const ids = [...new Set(current.map((t) => t.studentId).filter(Boolean))];
+  const sourceOf = new Map();
+  for (let i = 0; i < ids.length; i += 30) {
+    const snap = await getDocs(query(collection(db, 'students'), where(documentId(), 'in', ids.slice(i, i + 30))));
+    for (const d of snap.docs) sourceOf.set(d.id, d.data().source || 'none');
+  }
+  const map = new Map();
+  for (const t of current) {
+    const key = sourceOf.get(t.studentId) ?? 'none';
+    const cur = map.get(key) ?? { key, count: 0, amount: 0 };
+    cur.count += 1;
+    cur.amount += t.amount ?? 0;
+    map.set(key, cur);
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
+/**
  * Все KPI дашборда одним вызовом — «03 · Бизнес-логика» §5.
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} branchId
@@ -337,6 +367,7 @@ export async function loadDashboardStats(db, branchId, churnPeriod = 'year', pay
     newStudents,
     trialToday,
     trialMonth,
+    paymentSources,
   ] = await Promise.all([
     countStudentBuckets(db, branchId),
     countPaidThisMonth(db, branchId, month, payments),
@@ -345,9 +376,10 @@ export async function loadDashboardStats(db, branchId, churnPeriod = 'year', pay
     countNewStudents(db, branchId, start, end),
     countTrialToday(db, branchId),
     countTrialMonthRetention(db, branchId),
+    countPaymentSources(db, branchId, payments),
   ]);
 
-  return { activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial, newStudents, trialToday, trialMonth };
+  return { activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial, newStudents, trialToday, trialMonth, paymentSources };
 }
 
 /**
