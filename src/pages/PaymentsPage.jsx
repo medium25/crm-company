@@ -17,6 +17,7 @@ import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
+import { PaymentSourceAnalysis } from '../components/payments/PaymentSourceAnalysis.jsx';
 import { EditPaymentMethodModal } from '../components/students/EditPaymentMethodModal.jsx';
 import { formatDate, formatDateTime, formatMoney, formatMethod, PAYMENT_METHOD_OPTIONS } from '../lib/format.js';
 import { getMonthlyRevenue, getDailyRevenueComparison } from '../lib/stats.js';
@@ -222,6 +223,8 @@ export function PaymentsPage() {
     downloadCsv(`платежи-${dateFrom}-${dateTo}.csv`, toCsv(columns, filtered));
   };
 
+  const paymentsOnly = useMemo(() => filtered.filter((t) => t.type === 'payment'), [filtered]);
+
   const byMethod = useMemo(() => {
     const map = new Map();
     for (const t of filtered.filter((t) => t.type === 'payment')) {
@@ -308,6 +311,7 @@ export function PaymentsPage() {
 
   return (
     <>
+      <PaymentSourceAnalysis payments={paymentsOnly} />
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
         <div className="flex flex-col gap-4">
           <Card>
