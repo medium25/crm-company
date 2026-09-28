@@ -4,6 +4,7 @@ import { formatMoney, formatSource, pluralize } from '../../lib/format.js';
 
 // «Таргет (р)» (ручной ввод) и «Таргет» (из таблицы) — один источник в анализе.
 const MERGE_SOURCE = { target_manual: 'meta_target' };
+const MERGED_LABEL = { meta_target: 'Таргет / Таргет (р)' };
 
 const BAR_COLORS = ['#378ADD', '#1D9E75', '#BA7517', '#7F77DD', '#888780', '#D4537E', '#0F6E56'];
 
@@ -33,7 +34,7 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
       total,
       rows: list.map((r) => ({
         ...r,
-        label: r.key === 'none' ? 'Не указан' : (formatSource(r.key) ?? r.key),
+        label: r.key === 'none' ? 'Не указан' : (MERGED_LABEL[r.key] ?? formatSource(r.key) ?? r.key),
         pct: total ? Math.round((r.count / total) * 100) : 0,
         width: Math.round((r.count / maxCount) * 100),
       })),
@@ -57,7 +58,7 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
         <div className="flex flex-col gap-2.5">
           {view.rows.map((r, i) => (
             <div key={r.key} className="flex items-center gap-3 text-[13px]">
-              <span className="w-36 shrink-0 text-text">
+              <span className="w-44 shrink-0 text-text">
                 {r.label} <span className="text-muted">({r.count})</span>
               </span>
               <span className="h-4 flex-1 overflow-hidden rounded bg-surface-alt">
