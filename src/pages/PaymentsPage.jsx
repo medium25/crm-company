@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
-import { ChevronRight, Coins, Wallet } from 'lucide-react';
+import { Banknote, ChevronRight, Coins, CreditCard, Smartphone, Wallet } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -31,10 +31,11 @@ const TYPE_TOGGLE = [
 
 // Порядок способов оплаты в блоке «По методам оплаты» и цвет плашки названия.
 const METHOD_ORDER = ['cash', 'click', 'uzcard'];
-const METHOD_BADGE = {
-  cash: 'bg-success/10 text-success',
-  click: 'bg-navy/10 text-navy',
+const METHOD_META = {
+  cash: { icon: Banknote, tone: 'bg-success/10 text-success' },
+  click: { icon: Smartphone, tone: 'bg-navy/10 text-navy' },
 };
+const METHOD_META_DEFAULT = { icon: CreditCard, tone: 'bg-surface-alt text-muted' };
 
 const PAGE_SIZE = 20;
 
@@ -326,13 +327,21 @@ export function PaymentsPage() {
               <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 text-[13px]">
                 <div>
                   <p className="mb-1 font-bold text-text">По методам оплаты</p>
-                  {byMethod.map(([m, sum]) => (
-                    <div key={m} className="flex items-center gap-2 py-1">
-                      <span className={`shrink-0 rounded-badge px-2.5 py-0.5 text-[12px] font-bold ${METHOD_BADGE[m] ?? 'bg-surface-alt text-muted'}`}>{formatMethod(m)}</span>
-                      <span className="h-px flex-1 border-b border-dotted border-border-strong" aria-hidden="true" />
-                      <span className="shrink-0 font-bold text-text">{formatMoney(sum)}</span>
-                    </div>
-                  ))}
+                  {byMethod.map(([m, sum]) => {
+                    const meta = METHOD_META[m] ?? METHOD_META_DEFAULT;
+                    const Icon = meta.icon;
+                    return (
+                      <div key={m} className="flex items-center justify-between gap-3 py-1.5">
+                        <span className="flex items-center gap-2.5">
+                          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${meta.tone}`}>
+                            <Icon className="h-4 w-4" aria-hidden="true" />
+                          </span>
+                          <span className="text-text">{formatMethod(m)}</span>
+                        </span>
+                        <span className="shrink-0 font-bold text-text">{formatMoney(sum)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div>
                   <p className="mb-1 font-bold text-text">По учителям</p>
