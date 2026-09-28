@@ -29,6 +29,13 @@ const TYPE_TOGGLE = [
   { value: 'all', label: 'Всё' },
 ];
 
+// Порядок способов оплаты в блоке «По методам оплаты» и цвет плашки названия.
+const METHOD_ORDER = ['cash', 'click', 'uzcard'];
+const METHOD_BADGE = {
+  cash: 'bg-success/10 text-success',
+  click: 'bg-navy/10 text-navy',
+};
+
 const PAGE_SIZE = 20;
 
 const SORT_VALUE = {
@@ -219,7 +226,12 @@ export function PaymentsPage() {
     for (const t of filtered.filter((t) => t.type === 'payment')) {
       map.set(t.method, (map.get(t.method) ?? 0) + t.amount);
     }
-    return [...map.entries()];
+    // Порядок фиксированный: наличные, потом Click, потом остальное (терминал и способы из старой системы).
+    const rank = (m) => {
+      const i = METHOD_ORDER.indexOf(m);
+      return i === -1 ? METHOD_ORDER.length : i;
+    };
+    return [...map.entries()].sort((a, b) => rank(a[0]) - rank(b[0]));
   }, [filtered]);
 
   const byTeacher = useMemo(() => {
@@ -315,9 +327,10 @@ export function PaymentsPage() {
                 <div>
                   <p className="mb-1 font-bold text-text">По методам оплаты</p>
                   {byMethod.map(([m, sum]) => (
-                    <div key={m} className="flex justify-between text-muted">
-                      <span>{formatMethod(m)}</span>
-                      <span>{formatMoney(sum)}</span>
+                    <div key={m} className="flex items-center gap-2 py-1">
+                      <span className={`shrink-0 rounded-badge px-2.5 py-0.5 text-[12px] font-bold ${METHOD_BADGE[m] ?? 'bg-surface-alt text-muted'}`}>{formatMethod(m)}</span>
+                      <span className="h-px flex-1 border-b border-dotted border-border-strong" aria-hidden="true" />
+                      <span className="shrink-0 font-bold text-text">{formatMoney(sum)}</span>
                     </div>
                   ))}
                 </div>
