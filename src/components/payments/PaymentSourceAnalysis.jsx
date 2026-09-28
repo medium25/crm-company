@@ -2,6 +2,9 @@ import { useMemo } from 'react';
 import { Card } from '../ui/Card.jsx';
 import { formatMoney, formatSource, pluralize } from '../../lib/format.js';
 
+// «Таргет (р)» (ручной ввод) и «Таргет» (из таблицы) — один источник в анализе.
+const MERGE_SOURCE = { target_manual: 'meta_target' };
+
 const BAR_COLORS = ['#378ADD', '#1D9E75', '#BA7517', '#7F77DD', '#888780', '#D4537E', '#0F6E56'];
 
 /**
@@ -15,7 +18,15 @@ const BAR_COLORS = ['#378ADD', '#1D9E75', '#BA7517', '#7F77DD', '#888780', '#D45
  */
 export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '' }) {
   const view = useMemo(() => {
-    const list = sources ?? [];
+    const merged = new Map();
+    for (const r of sources ?? []) {
+      const key = MERGE_SOURCE[r.key] ?? r.key;
+      const cur = merged.get(key) ?? { key, count: 0, amount: 0 };
+      cur.count += r.count;
+      cur.amount += r.amount;
+      merged.set(key, cur);
+    }
+    const list = [...merged.values()].sort((a, b) => b.count - a.count);
     const total = list.reduce((s, r) => s + r.count, 0);
     const maxCount = Math.max(1, ...list.map((r) => r.count));
     return {
