@@ -9,12 +9,15 @@ const MERGED_LABEL = { meta_target: 'Таргет / Таргет (р)' };
 const BAR_COLORS = ['#378ADD', '#1D9E75', '#BA7517', '#7F77DD', '#888780', '#D4537E', '#0F6E56'];
 
 /**
- * «Анализ источников оплат» — разбивка плитки «добавились» (новые оплаченные ученики периода) по
- * источнику лида (Таргет, Инстаграм …): название (число), полоса, доля и сумма. Сумма счётчиков
- * по строкам всегда равна числу на плитке «добавились» — тот же период, та же выборка студентов.
- * Студенты без источника — «Не указан». Данные считает countPaymentSources (stats.js) / Apps Script.
+ * «Анализ источников оплат» — по каждому источнику лида (Таргет, Инстаграм …) сразу две цифры:
+ * сколько оплат (разбивка плитки «добавились» — сумма по строкам равна числу на плитке) и сколько
+ * пробных этого источника было в этом календарном месяце (та же выборка, что «пробные за месяц»).
+ * Это две независимые выборки студентов (разные периоды), одно не обязано быть частью другого —
+ * поэтому оба числа подписаны словом, не «N из M» (раньше выглядело как подмножество и казалось
+ * ошибкой, когда оплат оказывалось больше, чем пробных). Студенты без источника — «Не указан».
+ * Данные считает countPaymentSources (stats.js) / Apps Script.
  * @param {Object} props
- * @param {Array<{key: string, count: number, amount: number}>|null|undefined} props.sources undefined — ещё не посчитано
+ * @param {Array<{key: string, count: number, amount: number, trialCount: number}>|null|undefined} props.sources undefined — ещё не посчитано
  * @param {string} [props.periodLabel] «за сентябрь»
  * @param {string} [props.className]
  */
@@ -23,9 +26,10 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
     const merged = new Map();
     for (const r of sources ?? []) {
       const key = MERGE_SOURCE[r.key] ?? r.key;
-      const cur = merged.get(key) ?? { key, count: 0, amount: 0 };
+      const cur = merged.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
       cur.count += r.count;
       cur.amount += r.amount;
+      cur.trialCount += r.trialCount ?? 0;
       merged.set(key, cur);
     }
     const list = [...merged.values()].sort((a, b) => b.count - a.count);
@@ -59,8 +63,12 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
         <div className="flex flex-col gap-2.5">
           {view.rows.map((r, i) => (
             <div key={r.key} className="flex items-center gap-3 text-[13px]">
-              <span className="w-44 shrink-0 text-text">
-                {r.label} <span className="text-muted">({r.count})</span>
+              <span className="w-52 shrink-0 text-text">
+                {r.label}{' '}
+                <span className="text-muted">
+                  ({r.count} {pluralize(r.count, ['оплата', 'оплаты', 'оплат'])} · {r.trialCount}{' '}
+                  {pluralize(r.trialCount, ['пробный', 'пробных', 'пробных'])})
+                </span>
               </span>
               <span className="h-4 flex-1 overflow-hidden rounded bg-surface-alt">
                 <span className="block h-full rounded" style={{ width: `${r.width}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />

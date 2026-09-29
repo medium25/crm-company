@@ -262,7 +262,7 @@ function computePaymentsAndChart_(branchId, now) {
  * источникам всегда равна числу на этой плитке. Сумма денег — по платежам этих же студентов
  * среди уже загруженных (`payments`, текущий+прошлый месяц).
  */
-function computePaymentSources_(branchId, start, end, payments) {
+function computePaymentSources_(branchId, start, end, payments, now) {
   const docs = runQuery_('students', [
     { field: 'branchId', op: 'EQUAL', value: branchId },
     { field: 'funnelStage', op: 'EQUAL', value: 'won' },
@@ -274,9 +274,23 @@ function computePaymentSources_(branchId, start, end, payments) {
   const sourceByStudent = {};
   docs.forEach((s) => {
     const key = s.source || 'none';
-    if (!map[key]) map[key] = { key, count: 0, amount: 0 };
+    if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
     map[key].count += 1;
     sourceByStudent[s.id] = key;
+  });
+
+  // Пробные этого календарного месяца по источнику — та же выборка, что computeTrialMonth_.
+  const monthStart = startOfMonth_(now);
+  const monthEnd = new Date(addMonths_(monthStart, 1).getTime() - 1);
+  const trialDocs = runQuery_('students', [
+    { field: 'branchId', op: 'EQUAL', value: branchId },
+    { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
+    { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
+  ]);
+  trialDocs.filter(hasTrialHappened_).forEach((s) => {
+    const key = s.source || 'none';
+    if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
+    map[key].trialCount += 1;
   });
   if (Object.keys(map).length === 0) return [];
 
@@ -304,7 +318,7 @@ function refreshDashboardStatsForBranch_(branchId) {
   const trialToday = computeTrialToday_(branchId, now);
   const trialMonth = computeTrialMonth_(branchId, now);
   const { paidThisMonth, comparison, allPayments } = computePaymentsAndChart_(branchId, now);
-  const newPaymentSources = computePaymentSources_(branchId, start, end, allPayments);
+  const newPaymentSources = computePaymentSources_(branchId, start, end, allPayments, now);
 
   const fields = toFsFields_({
     activeStudents: buckets.activeStudents,
