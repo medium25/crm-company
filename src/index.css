@@ -44,6 +44,18 @@
   --color-freeze-blue: 234 243 255;
   --color-freeze-yellow: 255 246 217;
   --color-freeze-red: 251 234 234;
+  --color-warning: 229 132 43;
+  --color-warning-bg: 253 240 227;
+  --color-info: 47 111 228;
+  --color-info-bg: 234 243 255;
+  --color-chip: 238 240 243;
+  --color-chart-1: 55 138 221;
+  --color-chart-2: 29 158 117;
+  --color-chart-3: 186 117 23;
+  --color-chart-4: 127 119 221;
+  --color-chart-5: 136 135 128;
+  --color-chart-6: 212 83 126;
+  --color-chart-7: 15 110 86;
 }
 
 .dark {
@@ -71,6 +83,18 @@
   --color-freeze-blue: 27 42 61;
   --color-freeze-yellow: 51 48 26;
   --color-freeze-red: 58 31 32;
+  --color-warning: 240 154 74;
+  --color-warning-bg: 58 42 24;
+  --color-info: 91 143 242;
+  --color-info-bg: 27 42 61;
+  --color-chip: 40 48 60;
+  --color-chart-1: 55 138 221;
+  --color-chart-2: 29 158 117;
+  --color-chart-3: 186 117 23;
+  --color-chart-4: 127 119 221;
+  --color-chart-5: 136 135 128;
+  --color-chart-6: 212 83 126;
+  --color-chart-7: 15 110 86;
 }
 
 body {
