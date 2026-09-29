@@ -63,12 +63,8 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
         <div className="flex flex-col gap-2.5">
           {view.rows.map((r, i) => (
             <div key={r.key} className="flex items-center gap-3 text-[13px]">
-              <span className="w-52 shrink-0 text-text">
-                {r.label}{' '}
-                <span className="text-muted">
-                  ({r.count} {pluralize(r.count, ['оплата', 'оплаты', 'оплат'])} · {r.trialCount}{' '}
-                  {pluralize(r.trialCount, ['пробный', 'пробных', 'пробных'])})
-                </span>
+              <span className="w-44 shrink-0 text-text">
+                {r.label} <span className="text-muted">({r.count} из {r.trialCount})</span>
               </span>
               <span className="h-4 flex-1 overflow-hidden rounded bg-surface-alt">
                 <span className="block h-full rounded" style={{ width: `${r.width}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
