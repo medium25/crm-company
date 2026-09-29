@@ -313,14 +313,14 @@ export function PaymentsPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <p className="text-small text-muted">Всего платежей</p>
-            <p className="text-kpi font-bold text-navy-num">{formatMoney(totalPayments)}</p>
+            <p className="text-page font-bold text-navy-num">{formatMoney(totalPayments)}</p>
             <p className="text-small text-muted">
               {formatDate(Timestamp.fromDate(new Date(dateFrom)))} — {formatDate(Timestamp.fromDate(new Date(dateTo)))}
             </p>
           </Card>
           <Card>
             <p className="text-small text-muted">Чистая прибыль</p>
-            <p className="text-kpi font-bold text-navy-num">{formatMoney(totalPayments)}</p>
+            <p className="text-page font-bold text-navy-num">{formatMoney(totalPayments)}</p>
             <button type="button" onClick={() => setDetailsOpen((v) => !v)} className="mt-1 flex items-center gap-1 text-small text-link">
               Details <ChevronRight className={`h-3.5 w-3.5 transition-transform ${detailsOpen ? 'rotate-90' : ''}`} />
             </button>

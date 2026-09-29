@@ -90,9 +90,9 @@ function MetricSegment({ value, label, percent, tone, onClick, detailsOpen, onTo
       onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
       className={`flex-1 rounded-row px-3 py-3 text-center ${TONE_BG[tone] ?? 'bg-navy/5'} ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
     >
-      <p className={`text-kpi font-bold leading-[34px] tracking-tight ${toneText}`}>{value}</p>
+      <p className={`text-kpi font-bold tracking-tight ${toneText}`}>{value}</p>
       <div className="mt-1 flex items-center justify-center gap-1">
-        <span className="text-caption leading-[16px] text-muted">
+        <span className="text-caption text-muted">
           {label}
           {percent != null && <span className={`ml-1 font-semibold ${toneText}`}>{percent}%</span>}
         </span>
