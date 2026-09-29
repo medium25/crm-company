@@ -331,6 +331,7 @@ export async function countPaymentSources(db, branchId, payments) {
   const month = format(now, 'yyyy-MM');
   const monthStart = startOfMonth(now);
   const nextMonthStart = addMonths(monthStart, 1);
+  const monthEnd = new Date(nextMonthStart.getTime() - 1);
   const list = payments ? await payments : await fetchPaymentDocs(db, branchId, [month]);
   const current = list.filter((t) => t.month === month);
   const ids = [...new Set(current.map((t) => t.studentId).filter(Boolean))];
@@ -353,11 +354,31 @@ export async function countPaymentSources(db, branchId, payments) {
   const map = new Map();
   for (const [studentId, t] of earliest) {
     const key = info.get(studentId).source;
-    const cur = map.get(key) ?? { key, count: 0, amount: 0 };
+    const cur = map.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
     cur.count += 1;
     cur.amount += t.amount ?? 0;
     map.set(key, cur);
   }
+
+  // Пробные этого месяца по источнику (та же выборка, что и трialMonthBreakdown/countTrialMonthRetention) —
+  // «10 из 20»: 10 оплат из 20 пробных этого источника состоялись в этом месяце.
+  const trialSnap = await getDocs(
+    query(
+      collection(db, 'students'),
+      where('branchId', '==', branchId),
+      where('trialDate', '>=', Timestamp.fromDate(monthStart)),
+      where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
+    ),
+  );
+  for (const d of trialSnap.docs) {
+    const s = d.data();
+    if (!hasTrialHappened(s)) continue;
+    const key = s.source || 'none';
+    const cur = map.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
+    cur.trialCount += 1;
+    map.set(key, cur);
+  }
+
   return [...map.values()].sort((a, b2) => b2.count - a.count);
 }
 

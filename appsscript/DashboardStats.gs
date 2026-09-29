@@ -297,10 +297,25 @@ function computePaymentSources_(branchId, payments, now) {
   const map = {};
   Object.keys(earliest).forEach((studentId) => {
     const key = info[studentId].source;
-    if (!map[key]) map[key] = { key, count: 0, amount: 0 };
+    if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
     map[key].count += 1;
     map[key].amount += earliest[studentId].amount || 0;
   });
+
+  // Пробные этого месяца по источнику — «10 из 20» (копия хвоста countPaymentSources из stats.js).
+  const monthEnd = new Date(nextMonthStart.getTime() - 1);
+  const trialDocs = runQuery_('students', [
+    { field: 'branchId', op: 'EQUAL', value: branchId },
+    { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
+    { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
+  ]);
+  trialDocs.forEach((s) => {
+    if (!hasTrialHappened_(s)) return;
+    const key = s.source || 'none';
+    if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
+    map[key].trialCount += 1;
+  });
+
   return Object.keys(map)
     .map((k) => map[k])
     .sort((a, b) => b.count - a.count);

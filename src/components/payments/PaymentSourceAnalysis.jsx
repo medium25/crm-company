@@ -10,10 +10,11 @@ const BAR_COLORS = ['#378ADD', '#1D9E75', '#BA7517', '#7F77DD', '#888780', '#D45
 
 /**
  * «Анализ источников оплат» — сколько НОВЫХ оплат (первых оплат новых учеников) пришло с каждого
- * источника лида (Таргет, Инстаграм …): название (число), полоса, доля и сумма. Студенты без
- * источника — «Не указан». Данные считает countPaymentSources (stats.js) / Apps Script.
+ * источника лида (Таргет, Инстаграм …): название «(N из M)» — N оплат из M пробных этого
+ * источника в этом месяце, полоса по N, доля и сумма. Студенты без источника — «Не указан».
+ * Данные считает countPaymentSources (stats.js) / Apps Script.
  * @param {Object} props
- * @param {Array<{key: string, count: number, amount: number}>|null|undefined} props.sources undefined — ещё не посчитано
+ * @param {Array<{key: string, count: number, amount: number, trialCount: number}>|null|undefined} props.sources undefined — ещё не посчитано
  * @param {string} [props.periodLabel] «за сентябрь»
  * @param {string} [props.className]
  */
@@ -22,9 +23,10 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
     const merged = new Map();
     for (const r of sources ?? []) {
       const key = MERGE_SOURCE[r.key] ?? r.key;
-      const cur = merged.get(key) ?? { key, count: 0, amount: 0 };
+      const cur = merged.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
       cur.count += r.count;
       cur.amount += r.amount;
+      cur.trialCount += r.trialCount ?? 0;
       merged.set(key, cur);
     }
     const list = [...merged.values()].sort((a, b) => b.count - a.count);
@@ -59,7 +61,7 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
           {view.rows.map((r, i) => (
             <div key={r.key} className="flex items-center gap-3 text-[13px]">
               <span className="w-44 shrink-0 text-text">
-                {r.label} <span className="text-muted">({r.count})</span>
+                {r.label} <span className="text-muted">({r.count} из {r.trialCount})</span>
               </span>
               <span className="h-4 flex-1 overflow-hidden rounded bg-surface-alt">
                 <span className="block h-full rounded" style={{ width: `${r.width}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
