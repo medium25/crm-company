@@ -10,33 +10,21 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SCAN = ['src/components', 'src/pages'];
 
 const LEGACY = [
-  'src/pages/CoursesPage.jsx',
-  'src/pages/GroupDetailPage.jsx',
-  'src/pages/GroupsPage.jsx',
   'src/pages/LeadsPage.jsx',
   'src/pages/LoginPage.jsx',
   'src/pages/ReportsLandingPage.jsx',
   'src/pages/ReportsPage.jsx',
-  'src/pages/RoomsPage.jsx',
   'src/pages/SalesStatsPage.jsx',
   'src/pages/SettingsPage.jsx',
-  'src/pages/StatsDepartmentsPage.jsx',
-  'src/pages/StudentDetailPage.jsx',
-  'src/pages/StudentsPage.jsx',
   'src/pages/TasksPage.jsx',
-  'src/pages/TeacherDetailPage.jsx',
-  'src/pages/TeachersAndGroupsPage.jsx',
-  'src/pages/TeachersPage.jsx',
   'src/pages/TrialsPage.jsx',
   'src/pages/UiKitShowcasePage.jsx',
   'src/components/dev/',
-  'src/components/groups/',
   'src/components/layout/',
   'src/components/leads/',
   'src/components/settings/',
-  'src/components/shared/',
-  'src/components/students/',
-  'src/components/teachers/',
+  'src/components/students/DeclineLeadModal.jsx',
+  'src/components/students/TaskListModal.jsx',
 ];
 
 function* walk(dir) {
