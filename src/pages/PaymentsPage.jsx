@@ -14,6 +14,7 @@ import { GroupOptions } from '../components/ui/GroupOptions.jsx';
 import { DatePicker } from '../components/ui/DatePicker.jsx';
 import { Table } from '../components/ui/Table.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
+import { FilterChip } from '../components/ui/FilterChip.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { SkeletonRow } from '../components/ui/Skeleton.jsx';
 import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
@@ -311,20 +312,20 @@ export function PaymentsPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
         <div className="flex flex-col gap-4">
           <Card>
-            <p className="text-[13px] text-muted">Всего платежей</p>
-            <p className="text-[28px] font-bold text-navy-num">{formatMoney(totalPayments)}</p>
-            <p className="text-[13px] text-muted">
+            <p className="text-small text-muted">Всего платежей</p>
+            <p className="text-kpi font-bold text-navy-num">{formatMoney(totalPayments)}</p>
+            <p className="text-small text-muted">
               {formatDate(Timestamp.fromDate(new Date(dateFrom)))} — {formatDate(Timestamp.fromDate(new Date(dateTo)))}
             </p>
           </Card>
           <Card>
-            <p className="text-[13px] text-muted">Чистая прибыль</p>
-            <p className="text-[28px] font-bold text-navy-num">{formatMoney(totalPayments)}</p>
-            <button type="button" onClick={() => setDetailsOpen((v) => !v)} className="mt-1 flex items-center gap-1 text-[13px] text-link">
+            <p className="text-small text-muted">Чистая прибыль</p>
+            <p className="text-kpi font-bold text-navy-num">{formatMoney(totalPayments)}</p>
+            <button type="button" onClick={() => setDetailsOpen((v) => !v)} className="mt-1 flex items-center gap-1 text-small text-link">
               Details <ChevronRight className={`h-3.5 w-3.5 transition-transform ${detailsOpen ? 'rotate-90' : ''}`} />
             </button>
             {detailsOpen && (
-              <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 text-[13px]">
+              <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 text-small">
                 <div>
                   <p className="mb-1 font-bold text-text">По методам оплаты</p>
                   {byMethod.map(([m, sum]) => {
@@ -426,17 +427,16 @@ export function PaymentsPage() {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex gap-2">
           {TYPE_TOGGLE.map((t) => (
-            <button
+            <FilterChip
               key={t.value}
-              type="button"
+              active={typeFilter === t.value}
               onClick={() => {
                 setFilter({ type: t.value });
                 setPage(1);
               }}
-              className={`rounded-full px-3 py-1.5 text-[13px] ${typeFilter === t.value ? 'bg-navy text-white' : 'bg-surface-alt text-muted'}`}
             >
               {t.label}
-            </button>
+            </FilterChip>
           ))}
         </div>
         <Button variant="secondary" onClick={exportFiltered} disabled={filtered.length === 0}>
@@ -451,7 +451,7 @@ export function PaymentsPage() {
         </div>
       )}
 
-      {error && <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>}
+      {error && <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>}
 
       {!loading && !error && filtered.length === 0 && <EmptyState icon={Coins} title="Платежей за период не найдено" />}
 
@@ -465,14 +465,14 @@ export function PaymentsPage() {
                   key={n}
                   type="button"
                   onClick={() => setPage(n)}
-                  className={`h-9 w-9 rounded-full text-[15px] ${n === pageClamped ? 'bg-navy text-white' : 'text-text hover:bg-surface-alt'}`}
+                  className={`h-9 w-9 rounded-full text-control ${n === pageClamped ? 'bg-navy text-white' : 'text-text hover:bg-surface-alt'}`}
                 >
                   {n}
                 </button>
               ))}
             </div>
           )}
-          <p className="mt-4 text-right text-[15px] font-bold text-text">
+          <p className="mt-4 text-right text-control font-bold text-text">
             Итог по фильтру: {formatMoney(filtered.reduce((sum, t) => sum + t.amount, 0))}
           </p>
         </>

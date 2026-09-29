@@ -4,6 +4,7 @@ import { collection, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { Card } from '../ui/Card.jsx';
+import { FilterChip } from '../ui/FilterChip.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { CalendarClock } from 'lucide-react';
 
@@ -48,20 +49,13 @@ export function RoomScheduleGrid({ branchId }) {
 
   return (
     <Card>
-      <h3 className="mb-4 text-[20px] font-bold text-text">Расписание кабинетов</h3>
+      <h3 className="mb-4 text-title font-bold text-text">Расписание кабинетов</h3>
 
       <div className="mb-4 flex gap-2">
         {DAY_TYPE_TABS.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setDayType(t.value)}
-            className={`rounded-full px-3 py-1.5 text-[13px] ${
-              dayType === t.value ? 'bg-navy text-white' : 'bg-surface-alt text-muted hover:text-text'
-            }`}
-          >
+          <FilterChip key={t.value} active={dayType === t.value} onClick={() => setDayType(t.value)}>
             {t.label}
-          </button>
+          </FilterChip>
         ))}
       </div>
 
@@ -71,14 +65,14 @@ export function RoomScheduleGrid({ branchId }) {
         <EmptyState icon={CalendarClock} title="Нет групп с таким типом расписания" />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
+          <table className="w-full border-collapse text-small">
             <thead>
               <tr>
                 <th className="w-16 border-b border-r border-border p-2" />
                 {rooms.map((room) => (
                   <th
                     key={room.id}
-                    className="min-w-[170px] border-b border-r border-border p-2 text-center text-[15px] font-bold text-text"
+                    className="min-w-[170px] border-b border-r border-border p-2 text-center text-control font-bold text-text"
                   >
                     {room.name}
                   </th>
@@ -88,7 +82,7 @@ export function RoomScheduleGrid({ branchId }) {
             <tbody>
               {timeSlots.map((slot) => (
                 <tr key={slot}>
-                  <td className="border-b border-r border-border p-2 text-right align-top text-[13px] font-bold text-text">
+                  <td className="border-b border-r border-border p-2 text-right align-top text-small font-bold text-text">
                     {slot}
                   </td>
                   {rooms.map((room) => {
@@ -104,10 +98,10 @@ export function RoomScheduleGrid({ branchId }) {
                               className="flex flex-col rounded-field border border-navy/20 bg-orange-soft px-2 py-1 text-left hover:opacity-80"
                               title={`${g.code} · ${g.courseName} · ${g.teacherName}`}
                             >
-                              <span className="truncate text-[12px] font-bold text-navy">
+                              <span className="truncate text-caption font-bold text-navy">
                                 {g.code} · {g.courseName}
                               </span>
-                              <span className="truncate text-[11px] text-muted">
+                              <span className="truncate text-caption text-muted">
                                 {g.studentsCount ?? 0} студ. · {g.teacherName}
                               </span>
                             </button>

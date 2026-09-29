@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { FilterChip } from '../ui/FilterChip.jsx';
+import { chartColors } from '../../lib/chartColors.js';
 import { formatMoney, formatMonth, formatMonthShort } from '../../lib/format.js';
 import { MonthComparisonChart } from './MonthComparisonChart.jsx';
 
@@ -13,7 +15,7 @@ function MonthlyTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
   return (
-    <div className="rounded-field border border-border bg-surface p-3 text-[13px] shadow-hover">
+    <div className="rounded-field border border-border bg-surface p-3 text-small shadow-hover">
       <p className="font-bold text-text">{formatMonth(point.month)}</p>
       <p className="text-text">{formatMoney(point.amount)}</p>
       <p className="text-muted">{point.paymentsCount ?? 0} платежей</p>
@@ -43,16 +45,9 @@ export function RevenueOverviewChart({ comparison, monthly }) {
     <div>
       <div className="mb-4 flex justify-end gap-2">
         {PERIOD_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => setPeriod(opt.value)}
-            className={`rounded-full px-3 py-1 text-[13px] ${
-              period === opt.value ? 'bg-navy text-white' : 'bg-surface-alt text-muted hover:text-text'
-            }`}
-          >
+          <FilterChip key={opt.value} active={period === opt.value} onClick={() => setPeriod(opt.value)}>
             {opt.label}
-          </button>
+          </FilterChip>
         ))}
       </div>
 
@@ -62,7 +57,7 @@ export function RevenueOverviewChart({ comparison, monthly }) {
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={filteredMonthly} margin={{ top: 10, right: 20, bottom: 40, left: 10 }}>
-              <CartesianGrid stroke="#E9EBEF" />
+              <CartesianGrid stroke={chartColors.grid} />
               <XAxis
                 dataKey="month"
                 tickFormatter={(m) => formatMonthShort(m)}
@@ -70,18 +65,18 @@ export function RevenueOverviewChart({ comparison, monthly }) {
                 textAnchor="end"
                 interval={1}
                 height={60}
-                tick={{ fontSize: 12, fill: '#8B94A3' }}
-                stroke="#E9EBEF"
+                tick={{ fontSize: 12, fill: chartColors.axis }}
+                stroke={chartColors.grid}
               />
-              <YAxis tickFormatter={(v) => formatMoney(v)} tick={{ fontSize: 12, fill: '#8B94A3' }} stroke="#E9EBEF" width={110} />
+              <YAxis tickFormatter={(v) => formatMoney(v)} tick={{ fontSize: 12, fill: chartColors.axis }} stroke={chartColors.grid} width={110} />
               <Tooltip content={<MonthlyTooltip />} />
               <Line
                 type="monotone"
                 dataKey="amount"
-                stroke="#3C4656"
+                stroke={chartColors.line}
                 strokeWidth={2}
-                dot={{ stroke: '#3C4656', strokeWidth: 2, fill: '#FFFFFF', r: 5 }}
-                activeDot={{ stroke: '#3C4656', strokeWidth: 2, fill: '#FFFFFF', r: 6 }}
+                dot={{ stroke: chartColors.line, strokeWidth: 2, fill: chartColors.white, r: 5 }}
+                activeDot={{ stroke: chartColors.line, strokeWidth: 2, fill: chartColors.white, r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>

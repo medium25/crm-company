@@ -88,11 +88,11 @@ function MetricSegment({ value, label, percent, tone, onClick, detailsOpen, onTo
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
-      className={`flex-1 rounded-xl px-3 py-3 text-center ${TONE_BG[tone] ?? 'bg-navy/5'} ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
+      className={`flex-1 rounded-row px-3 py-3 text-center ${TONE_BG[tone] ?? 'bg-navy/5'} ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
     >
-      <p className={`text-[28px] font-bold leading-[34px] tracking-tight ${toneText}`}>{value}</p>
+      <p className={`text-kpi font-bold leading-[34px] tracking-tight ${toneText}`}>{value}</p>
       <div className="mt-1 flex items-center justify-center gap-1">
-        <span className="text-[12.5px] leading-[16px] text-muted">
+        <span className="text-caption leading-[16px] text-muted">
           {label}
           {percent != null && <span className={`ml-1 font-semibold ${toneText}`}>{percent}%</span>}
         </span>
@@ -140,14 +140,14 @@ function DetailPanel({ state }) {
   if (!state?.open) return null;
   const tone = state.tone ?? 'navy';
   if (state.loading) {
-    return <div className="rounded-card border border-border-strong bg-card p-3 text-[12px] text-muted">Загрузка…</div>;
+    return <div className="rounded-card border border-border-strong bg-card p-3 text-caption text-muted">Загрузка…</div>;
   }
   if (state.error) {
-    return <div className="rounded-card border border-border-strong bg-card p-3 text-[12px] text-danger">Не удалось загрузить.</div>;
+    return <div className="rounded-card border border-border-strong bg-card p-3 text-caption text-danger">Не удалось загрузить.</div>;
   }
   const sections = state.sections ?? [];
   if (!sections.some((s) => s.chart || s.rows.length > 0)) {
-    return <div className="rounded-card border border-border-strong bg-card p-3 text-[12px] text-muted">Нет данных за период.</div>;
+    return <div className="rounded-card border border-border-strong bg-card p-3 text-caption text-muted">Нет данных за период.</div>;
   }
   return (
     <div className="grid grid-cols-1 gap-4 rounded-card border border-border-strong bg-card p-3 sm:grid-cols-2">
@@ -156,7 +156,7 @@ function DetailPanel({ state }) {
         if (s.chart) {
           return (
             <div key={s.title} className="sm:col-span-2">
-              <p className={`mb-2 text-[11px] font-semibold ${TONE_TEXT[tone] ?? 'text-navy'}`}>{s.title}</p>
+              <p className={`mb-2 text-caption font-semibold ${TONE_TEXT[tone] ?? 'text-navy'}`}>{s.title}</p>
               {s.chart}
             </div>
           );
@@ -164,11 +164,11 @@ function DetailPanel({ state }) {
         const max = Math.max(1, ...s.rows.map((r) => r.barValue ?? 0));
         return (
           <div key={s.title}>
-            <p className={`mb-2 text-[11px] font-semibold ${TONE_TEXT[tone] ?? 'text-navy'}`}>{s.title}</p>
+            <p className={`mb-2 text-caption font-semibold ${TONE_TEXT[tone] ?? 'text-navy'}`}>{s.title}</p>
             <div className="flex flex-col gap-2.5">
               {s.rows.map((r) => (
                 <div key={r.label}>
-                  <div className="flex items-center justify-between gap-3 text-[13px]">
+                  <div className="flex items-center justify-between gap-3 text-small">
                     <span className="text-navy-num">{r.label}</span>
                     <span className="shrink-0 font-semibold">{r.display}</span>
                   </div>
@@ -392,7 +392,7 @@ export function DashboardPage() {
   return (
     <>
       {!stats && !statsLoading ? (
-        <div className="flex items-center justify-between gap-3 rounded-card border border-border-strong bg-card p-4 text-[14px] text-muted">
+        <div className="flex items-center justify-between gap-3 rounded-card border border-border-strong bg-card p-4 text-body text-muted">
           <span>Цифры дашборда ещё не посчитаны — Apps Script считает их раз в час.</span>
         </div>
       ) : !stats ? (
@@ -497,7 +497,7 @@ export function DashboardPage() {
           </div>
           <div className="mt-2 flex items-center gap-2">
             {updatedAgo && (
-              <p className="text-[12px] text-muted">
+              <p className="text-caption text-muted">
                 {isStale ? `Цифры последнего обновления (${updatedAgo}) — сейчас, возможно, устарели` : `Обновлено ${updatedAgo}`}
               </p>
             )}
@@ -505,7 +505,7 @@ export function DashboardPage() {
               type="button"
               onClick={manualRefresh}
               disabled={refreshing}
-              className="flex items-center gap-1 text-[12px] text-navy hover:underline disabled:opacity-50"
+              className="flex items-center gap-1 text-caption text-navy hover:underline disabled:opacity-50"
             >
               <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
               {refreshing ? 'Обновляю…' : 'Обновить сейчас'}
@@ -520,7 +520,7 @@ export function DashboardPage() {
         {stats?.comparison ? (
           <RevenueOverviewChart comparison={stats.comparison} monthly={monthly ?? []} />
         ) : monthlyError ? (
-          <div className="flex items-center justify-between gap-3 rounded-card border border-border-strong bg-card p-4 text-[14px] text-muted">
+          <div className="flex items-center justify-between gap-3 rounded-card border border-border-strong bg-card p-4 text-body text-muted">
             <span>Не удалось загрузить график.</span>
           </div>
         ) : (

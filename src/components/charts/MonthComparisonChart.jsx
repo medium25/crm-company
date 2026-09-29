@@ -1,10 +1,11 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { chartColors } from '../../lib/chartColors.js';
 import { formatMoney, formatMonth } from '../../lib/format.js';
 
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-field border border-border bg-surface p-3 text-[13px] shadow-hover">
+    <div className="rounded-field border border-border bg-surface p-3 text-small shadow-hover">
       <p className="mb-1 font-bold text-text">{label} число</p>
       {payload.map((p) => (
         <p key={p.dataKey} style={{ color: p.color }}>
@@ -29,29 +30,29 @@ export function MonthComparisonChart({ data, currentMonth, prevMonth }) {
     <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
-          <CartesianGrid stroke="#E9EBEF" />
-          <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#8B94A3' }} stroke="#E9EBEF" />
-          <YAxis tickFormatter={(v) => formatMoney(v)} tick={{ fontSize: 12, fill: '#8B94A3' }} stroke="#E9EBEF" width={110} />
+          <CartesianGrid stroke={chartColors.grid} />
+          <XAxis dataKey="day" tick={{ fontSize: 12, fill: chartColors.axis }} stroke={chartColors.grid} />
+          <YAxis tickFormatter={(v) => formatMoney(v)} tick={{ fontSize: 12, fill: chartColors.axis }} stroke={chartColors.grid} width={110} />
           <Tooltip content={<ChartTooltip />} />
           <Legend wrapperStyle={{ fontSize: 13 }} />
           <Line
             type="monotone"
             dataKey="current"
             name={formatMonth(currentMonth)}
-            stroke="#E8695A"
+            stroke={chartColors.lineAlt}
             strokeWidth={2}
             dot={false}
-            activeDot={{ stroke: '#E8695A', strokeWidth: 2, fill: '#FFFFFF', r: 5 }}
+            activeDot={{ stroke: chartColors.lineAlt, strokeWidth: 2, fill: chartColors.white, r: 5 }}
             connectNulls={false}
           />
           <Line
             type="monotone"
             dataKey="previous"
             name={formatMonth(prevMonth)}
-            stroke="#8B94A3"
+            stroke={chartColors.lineMuted}
             strokeWidth={2}
             dot={false}
-            activeDot={{ stroke: '#8B94A3', strokeWidth: 2, fill: '#FFFFFF', r: 5 }}
+            activeDot={{ stroke: chartColors.lineMuted, strokeWidth: 2, fill: chartColors.white, r: 5 }}
             connectNulls={false}
           />
         </LineChart>

@@ -58,10 +58,10 @@ export function BillingBanner() {
 
   return (
     <>
-      <div className="flex items-center gap-2 rounded-full bg-orange-soft px-4 py-1.5 text-[13px] text-navy">
+      <div className="flex items-center gap-2 rounded-full bg-orange-soft px-4 py-1.5 text-small text-navy">
         <CircleDollarSign className="h-4 w-4 text-orange" />
         <span>Начислить за {formatMonth(month)}</span>
-        <Button size="md" className="h-7 px-3 text-[13px]" onClick={() => setConfirming(true)}>
+        <Button size="md" className="h-7 px-3 text-small" onClick={() => setConfirming(true)}>
           Начислить
         </Button>
       </div>

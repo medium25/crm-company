@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Info } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
+import { SectionTitle } from '../ui/SectionTitle.jsx';
+import { Tile } from '../ui/Tile.jsx';
 import { formatMoney, formatSource, pluralize } from '../../lib/format.js';
 
 // «Таргет (р)» (ручной ввод) и «Таргет» (из таблицы) — один источник в анализе.
 const MERGE_SOURCE = { target_manual: 'meta_target' };
 const MERGED_LABEL = { meta_target: 'Таргет / Таргет (р)', prev_month: 'Прошлый месяц' };
-
-const BAR_COLORS = ['#378ADD', '#1D9E75', '#BA7517', '#7F77DD', '#888780', '#D4537E', '#0F6E56'];
 
 /**
  * «Анализ источников оплат» — по каждому источнику лида (Таргет, Инстаграм …) две независимые
@@ -54,22 +54,19 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
 
   return (
     <Card className={className}>
-      <p className="mb-3 text-[15px] font-bold text-text">
-        Анализ источников оплат{' '}
-        <span className="text-[12px] font-normal text-muted">
-          {periodLabel ? `· ${periodLabel} ` : '· '}
-          {view.total} {pluralize(view.total, ['оплата', 'оплаты', 'оплат'])}
-        </span>
-      </p>
+      <SectionTitle
+        title="Анализ источников оплат"
+        hint={`${periodLabel ? `· ${periodLabel} ` : '· '}${view.total} ${pluralize(view.total, ['оплата', 'оплаты', 'оплат'])}`}
+      />
       {sources === undefined ? (
-        <p className="text-[13px] text-muted">Считаю…</p>
+        <p className="text-small text-muted">Считаю…</p>
       ) : view.rows.length === 0 ? (
-        <p className="text-[13px] text-muted">Новых оплат за период пока нет.</p>
+        <p className="text-small text-muted">Новых оплат за период пока нет.</p>
       ) : (
         <div className="flex flex-col gap-2.5">
           {view.rows.map((r, i) => (
             <div key={r.key}>
-              <div className="flex items-center gap-3 text-[13px]">
+              <div className="flex items-center gap-3 text-small">
                 <span className="flex w-44 shrink-0 items-center gap-1 text-text">
                   {r.label}{' '}
                   <span className="text-muted">
@@ -87,20 +84,20 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
                     </button>
                   )}
                 </span>
-                <span className="h-4 flex-1 overflow-hidden rounded bg-surface-alt">
-                  <span className="block h-full rounded" style={{ width: `${r.width}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
+                <span className="h-4 flex-1 overflow-hidden rounded-badge bg-surface-alt">
+                  <span className="block h-full rounded-badge" style={{ width: `${r.width}%`, backgroundColor: `rgb(var(--color-chart-${(i % 7) + 1}))` }} />
                 </span>
                 <span className="w-10 shrink-0 text-right text-muted">{r.pct}%</span>
                 <span className="w-28 shrink-0 text-right font-bold text-text">{formatMoney(r.amount)}</span>
               </div>
               {r.key === 'prev_month' && breakdownOpen && r.breakdown?.length > 0 && (
-                <div className="ml-1 mt-1.5 flex flex-wrap gap-x-4 gap-y-1 rounded-field border border-border bg-surface-alt px-3 py-2 text-[12px] text-muted">
+                <Tile className="ml-1 mt-1.5 flex flex-wrap gap-x-4 gap-y-1 px-3 py-2 text-caption text-muted">
                   {r.breakdown.map((b) => (
                     <span key={b.key}>
                       {b.key === 'none' ? 'Не указан' : (formatSource(b.key) ?? b.key)}: <span className="font-bold text-text">{b.count}</span>
                     </span>
                   ))}
-                </div>
+                </Tile>
               )}
             </div>
           ))}
