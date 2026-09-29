@@ -1,35 +1,41 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Info } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { formatMoney, formatSource, pluralize } from '../../lib/format.js';
 
 // «Таргет (р)» (ручной ввод) и «Таргет» (из таблицы) — один источник в анализе.
 const MERGE_SOURCE = { target_manual: 'meta_target' };
-const MERGED_LABEL = { meta_target: 'Таргет / Таргет (р)' };
+const MERGED_LABEL = { meta_target: 'Таргет / Таргет (р)', prev_month: 'Прошлый месяц' };
 
 const BAR_COLORS = ['#378ADD', '#1D9E75', '#BA7517', '#7F77DD', '#888780', '#D4537E', '#0F6E56'];
 
 /**
- * «Анализ источников оплат» — по каждому источнику лида (Таргет, Инстаграм …) сразу две цифры:
- * сколько оплат (разбивка плитки «добавились» — сумма по строкам равна числу на плитке) и сколько
- * пробных этого источника было в этом календарном месяце (та же выборка, что «пробные за месяц»).
- * Это две независимые выборки студентов (разные периоды), одно не обязано быть частью другого —
- * поэтому оба числа подписаны словом, не «N из M» (раньше выглядело как подмножество и казалось
- * ошибкой, когда оплат оказывалось больше, чем пробных). Студенты без источника — «Не указан».
- * Данные считает countPaymentSources (stats.js) / Apps Script.
+ * «Анализ источников оплат» — по каждому источнику лида (Таргет, Инстаграм …) две независимые
+ * цифры «(N из M)»: N — оплат (разбивка плитки «добавились», сумма строк равна числу на плитке),
+ * M — пробных этого источника в этом календарном месяце («пробные за месяц»); одно не обязано
+ * быть частью другого, оба считаются по-разному.
+ *
+ * Отдельная строка «Прошлый месяц» — те из «добавились», чей пробный был НЕ в этом месяце (пришли
+ * раньше, заплатили только сейчас): их настоящий источник тут не показан впрямую (чтобы не путать
+ * с конверсией месяца), только по кнопке «i» — какие источники у них были на самом деле.
+ * Студенты без источника — «Не указан». Данные считает countPaymentSources (stats.js) / Apps Script.
  * @param {Object} props
- * @param {Array<{key: string, count: number, amount: number, trialCount: number}>|null|undefined} props.sources undefined — ещё не посчитано
+ * @param {Array<{key: string, count: number, amount: number, trialCount: number, breakdown?: Array<{key: string, count: number}>}>|null|undefined} props.sources undefined — ещё не посчитано
  * @param {string} [props.periodLabel] «за сентябрь»
  * @param {string} [props.className]
  */
 export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '' }) {
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+
   const view = useMemo(() => {
     const merged = new Map();
     for (const r of sources ?? []) {
       const key = MERGE_SOURCE[r.key] ?? r.key;
-      const cur = merged.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
+      const cur = merged.get(key) ?? { key, count: 0, amount: 0, trialCount: 0, breakdown: null };
       cur.count += r.count;
       cur.amount += r.amount;
       cur.trialCount += r.trialCount ?? 0;
+      if (r.breakdown) cur.breakdown = r.breakdown;
       merged.set(key, cur);
     }
     const list = [...merged.values()].sort((a, b) => b.count - a.count);
@@ -62,15 +68,40 @@ export function PaymentSourceAnalysis({ sources, periodLabel = '', className = '
       ) : (
         <div className="flex flex-col gap-2.5">
           {view.rows.map((r, i) => (
-            <div key={r.key} className="flex items-center gap-3 text-[13px]">
-              <span className="w-44 shrink-0 text-text">
-                {r.label} <span className="text-muted">({r.count} из {r.trialCount})</span>
-              </span>
-              <span className="h-4 flex-1 overflow-hidden rounded bg-surface-alt">
-                <span className="block h-full rounded" style={{ width: `${r.width}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
-              </span>
-              <span className="w-10 shrink-0 text-right text-muted">{r.pct}%</span>
-              <span className="w-28 shrink-0 text-right font-bold text-text">{formatMoney(r.amount)}</span>
+            <div key={r.key}>
+              <div className="flex items-center gap-3 text-[13px]">
+                <span className="flex w-44 shrink-0 items-center gap-1 text-text">
+                  {r.label}{' '}
+                  <span className="text-muted">
+                    {r.key === 'prev_month' ? `(${r.count})` : `(${r.count} из ${r.trialCount})`}
+                  </span>
+                  {r.key === 'prev_month' && r.breakdown?.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setBreakdownOpen((v) => !v)}
+                      aria-label="Из каких источников они были"
+                      title="Из каких источников они были"
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full hover:bg-surface-alt ${breakdownOpen ? 'text-navy' : 'text-muted'}`}
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </span>
+                <span className="h-4 flex-1 overflow-hidden rounded bg-surface-alt">
+                  <span className="block h-full rounded" style={{ width: `${r.width}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
+                </span>
+                <span className="w-10 shrink-0 text-right text-muted">{r.pct}%</span>
+                <span className="w-28 shrink-0 text-right font-bold text-text">{formatMoney(r.amount)}</span>
+              </div>
+              {r.key === 'prev_month' && breakdownOpen && r.breakdown?.length > 0 && (
+                <div className="ml-1 mt-1.5 flex flex-wrap gap-x-4 gap-y-1 rounded-field border border-border bg-surface-alt px-3 py-2 text-[12px] text-muted">
+                  {r.breakdown.map((b) => (
+                    <span key={b.key}>
+                      {b.key === 'none' ? 'Не указан' : (formatSource(b.key) ?? b.key)}: <span className="font-bold text-text">{b.count}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

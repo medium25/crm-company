@@ -263,6 +263,10 @@ function computePaymentsAndChart_(branchId, now) {
  * среди уже загруженных (`payments`, текущий+прошлый месяц).
  */
 function computePaymentSources_(branchId, start, end, payments, now) {
+  const monthStart = startOfMonth_(now);
+  const nextMonthStart = addMonths_(monthStart, 1);
+  const monthEnd = new Date(nextMonthStart.getTime() - 1);
+
   const docs = runQuery_('students', [
     { field: 'branchId', op: 'EQUAL', value: branchId },
     { field: 'funnelStage', op: 'EQUAL', value: 'won' },
@@ -272,16 +276,19 @@ function computePaymentSources_(branchId, start, end, payments, now) {
 
   const map = {};
   const sourceByStudent = {};
+  const prevBreakdown = {};
   docs.forEach((s) => {
-    const key = s.source || 'none';
+    const realSource = s.source || 'none';
+    const trialDate = s.trialDate ? new Date(s.trialDate) : null;
+    const cameThisMonth = Boolean(trialDate && trialDate >= monthStart && trialDate < nextMonthStart);
+    const key = cameThisMonth ? realSource : 'prev_month';
     if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
     map[key].count += 1;
     sourceByStudent[s.id] = key;
+    if (!cameThisMonth) prevBreakdown[realSource] = (prevBreakdown[realSource] || 0) + 1;
   });
 
   // Пробные этого календарного месяца по источнику — та же выборка, что computeTrialMonth_.
-  const monthStart = startOfMonth_(now);
-  const monthEnd = new Date(addMonths_(monthStart, 1).getTime() - 1);
   const trialDocs = runQuery_('students', [
     { field: 'branchId', op: 'EQUAL', value: branchId },
     { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
@@ -293,6 +300,12 @@ function computePaymentSources_(branchId, start, end, payments, now) {
     map[key].trialCount += 1;
   });
   if (Object.keys(map).length === 0) return [];
+
+  if (map.prev_month) {
+    map.prev_month.breakdown = Object.keys(prevBreakdown)
+      .map((key) => ({ key, count: prevBreakdown[key] }))
+      .sort((a, b) => b.count - a.count);
+  }
 
   payments.forEach((t) => {
     const key = sourceByStudent[t.studentId];
