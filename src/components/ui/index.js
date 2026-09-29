@@ -15,3 +15,6 @@ export { StatCard } from './StatCard.jsx';
 export { DropdownMenu } from './DropdownMenu.jsx';
 export { ColumnsPopover } from './ColumnsPopover.jsx';
 export { AttendanceCell } from './AttendanceCell.jsx';
+export { Tile } from './Tile.jsx';
+export { SectionTitle } from './SectionTitle.jsx';
+export { FilterChip } from './FilterChip.jsx';
