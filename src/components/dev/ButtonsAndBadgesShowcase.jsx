@@ -15,8 +15,8 @@ export function ButtonsAndBadgesShowcase() {
           <Button variant="secondary">Отмена</Button>
           <Button variant="ghost">Ghost</Button>
           <Button variant="danger">Удалить</Button>
-          <Button variant="primary" size="lg">
-            Большая (lg)
+          <Button variant="primary" size="sm">
+            Маленькая (sm)
           </Button>
           <Button variant="primary" disabled>
             Disabled

@@ -87,7 +87,7 @@ export function LoginPage() {
               />
             </label>
             {formError && <p className="text-[13px] text-danger">{formError}</p>}
-            <Button type="submit" size="lg" loading={submitting} className="w-full">
+            <Button type="submit" loading={submitting} className="w-full">
               Войти
             </Button>
             <p className="text-center text-[13px] text-muted">Забыли пароль — обратитесь к администратору.</p>

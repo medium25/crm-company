@@ -6,20 +6,25 @@ const VARIANT_CLASSES = {
 };
 
 const SIZE_CLASSES = {
-  md: 'h-11 px-5 text-[15px]',
-  lg: 'h-[52px] px-6 text-[15px]',
+  md: 'h-12 px-6 text-control',
+  sm: 'h-9 px-4 text-small',
+};
+
+const ICON_SIZE_CLASSES = {
+  md: 'h-12 w-12',
+  sm: 'h-9 w-9',
 };
 
 const ICON_TONE_CLASSES = {
   navy: 'border-navy text-navy',
   danger: 'border-danger text-danger',
-  warning: 'border-[#E9B949] text-[#E9B949]',
+  warning: 'border-warning text-warning',
 };
 
 /**
  * @param {Object} props
  * @param {'primary'|'secondary'|'ghost'|'danger'|'icon-round'} [props.variant]
- * @param {'md'|'lg'} [props.size]
+ * @param {'md'|'sm'} [props.size] md — 48px (формы), sm — 36px (фильтры, таблицы, канбан)
  * @param {'navy'|'danger'|'warning'} [props.tone] цвет обводки, только для variant="icon-round"
  * @param {boolean} [props.loading]
  */
@@ -38,7 +43,7 @@ export function Button({
       <button
         type="button"
         disabled={disabled || loading}
-        className={`inline-flex h-11 w-11 items-center justify-center rounded-full border bg-white transition-shadow hover:shadow-hover disabled:cursor-not-allowed disabled:opacity-50 ${ICON_TONE_CLASSES[tone]} ${className}`}
+        className={`inline-flex ${ICON_SIZE_CLASSES[size]} items-center justify-center rounded-full border bg-white transition-shadow hover:shadow-hover disabled:cursor-not-allowed disabled:opacity-50 ${ICON_TONE_CLASSES[tone]} ${className}`}
         {...rest}
       >
         {children}
@@ -50,7 +55,7 @@ export function Button({
     <button
       type="button"
       disabled={disabled || loading}
-      className={`inline-flex items-center justify-center gap-2 rounded-full font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-field font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
       {...rest}
     >
       {loading && (
