@@ -17,7 +17,7 @@ export function Tabs({ tabs, activeKey, onChange }) {
             role="tab"
             aria-selected={active}
             onClick={() => onChange(tab.key)}
-            className={`relative -mb-px shrink-0 border-b-[3px] px-1 pb-3 text-[15px] transition-colors ${
+            className={`relative -mb-px shrink-0 border-b-[3px] px-1 pb-3 text-control transition-colors ${
               active ? 'border-navy font-bold text-text' : 'border-transparent font-normal text-muted hover:text-text'
             }`}
           >

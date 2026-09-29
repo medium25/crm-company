@@ -39,7 +39,7 @@ export function Table({ columns, rows, sortKey, sortDir = 'asc', onSort, onRowCl
               type="button"
               disabled={!col.sortable}
               onClick={() => col.sortable && onSort?.(col.key)}
-              className={`flex min-w-0 items-center gap-1 px-5 py-2 text-left text-[15px] font-bold ${
+              className={`flex min-w-0 items-center gap-1 px-4 py-2 text-left text-small font-bold ${
                 col.sortable ? 'cursor-pointer' : 'cursor-default'
               } ${active ? 'text-navy' : 'text-text'}`}
             >
@@ -54,12 +54,12 @@ export function Table({ columns, rows, sortKey, sortDir = 'asc', onSort, onRowCl
             key={row.id}
             role="row"
             onClick={() => onRowClick?.(row)}
-            className={`col-span-full grid grid-cols-subgrid items-center rounded-row px-5 py-4 shadow-card transition-shadow hover:shadow-hover ${
+            className={`col-span-full grid grid-cols-subgrid items-center rounded-row px-4 py-3 shadow-card transition-shadow hover:shadow-hover ${
               rowClassName ? rowClassName(row) : 'bg-surface hover:bg-surface-alt'
             } ${onRowClick ? 'cursor-pointer' : ''}`}
           >
             {columns.map((col) => (
-              <div key={col.key} className="min-w-0 px-0 text-[15px] text-text">
+              <div key={col.key} className="min-w-0 px-0 text-small text-text">
                 {col.render ? col.render(row, index) : row[col.key]}
               </div>
             ))}

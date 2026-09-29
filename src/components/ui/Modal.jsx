@@ -28,15 +28,15 @@ export function Modal({ open, onClose, title, width = 'form', footer, children }
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(16,24,40,.45)] p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-text/45 p-4">
       <div
-        className={`w-full ${WIDTH_CLASSES[width]} rounded-2xl bg-surface shadow-modal`}
+        className={`w-full ${WIDTH_CLASSES[width]} rounded-card bg-surface shadow-modal`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
         <div className="flex items-center justify-between border-b border-border p-6">
-          <h2 className="text-xl font-bold text-text">{title}</h2>
+          <h2 className="text-title font-bold text-text">{title}</h2>
           <button
             type="button"
             onClick={onClose}
