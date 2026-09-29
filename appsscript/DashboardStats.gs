@@ -252,68 +252,41 @@ function computePaymentsAndChart_(branchId, now) {
     data.push({ day, current, previous });
   }
 
-  return { paidThisMonth, comparison: { data, currentMonth, prevMonth }, currentPayments: txs.filter((t) => t.month === currentMonth) };
+  return { paidThisMonth, comparison: { data, currentMonth, prevMonth }, allPayments: txs };
 }
 
 /**
- * Первые оплаты НОВЫХ учеников текущего месяца по источникам лида — копия countPaymentSources
- * из stats.js: новый ученик — firstPaymentAt в текущем месяце, его «новая оплата» — самый ранний
- * платёж месяца. Источник и firstPaymentAt берутся из карточки студента (batchGet), без
- * источника — 'none'. По убыванию числа оплат.
+ * Конверсия пробных этого месяца в оплату, по источнику лида — копия countPaymentSources из
+ * stats.js: M — пробные источника, состоявшиеся в этом месяце; N — сколько из НИХ ЖЕ уже оплатили
+ * (`students.firstPaymentAt` заполнен). N — подмножество M, поэтому N ⩽ M всегда. Сумма — по
+ * платежам этих же оплативших среди уже загруженных (`payments`, текущий+прошлый месяц).
  */
 function computePaymentSources_(branchId, payments, now) {
   const monthStart = startOfMonth_(now);
-  const nextMonthStart = addMonths_(monthStart, 1);
-  const ids = [];
-  const seen = {};
-  payments.forEach((t) => {
-    if (t.studentId && !seen[t.studentId]) {
-      seen[t.studentId] = true;
-      ids.push(t.studentId);
-    }
-  });
-  const info = {};
-  const base = `projects/${projectId_()}/databases/(default)/documents/students/`;
-  for (let i = 0; i < ids.length; i += 100) {
-    const chunk = ids.slice(i, i + 100);
-    const resp = fsRequest_('POST', ':batchGet', { documents: chunk.map((id) => base + id), mask: { fieldPaths: ['source', 'firstPaymentAt'] } });
-    USAGE_RUN_.reads += chunk.length;
-    (resp || []).forEach((r) => {
-      if (!r.found) return;
-      const f = r.found.fields || {};
-      const first = f.firstPaymentAt && f.firstPaymentAt.timestampValue ? new Date(f.firstPaymentAt.timestampValue) : null;
-      info[r.found.name.split('/').pop()] = {
-        source: (f.source && f.source.stringValue) || 'none',
-        isNew: Boolean(first && first >= monthStart && first < nextMonthStart),
-      };
-    });
-  }
-  const earliest = {};
-  payments.forEach((t) => {
-    if (!info[t.studentId] || !info[t.studentId].isNew) return;
-    const cur = earliest[t.studentId];
-    if (!cur || new Date(t.date).getTime() < new Date(cur.date).getTime()) earliest[t.studentId] = t;
-  });
-  const map = {};
-  Object.keys(earliest).forEach((studentId) => {
-    const key = info[studentId].source;
-    if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
-    map[key].count += 1;
-    map[key].amount += earliest[studentId].amount || 0;
-  });
+  const monthEnd = new Date(addMonths_(monthStart, 1).getTime() - 1);
 
-  // Пробные этого месяца по источнику — «10 из 20» (копия хвоста countPaymentSources из stats.js).
-  const monthEnd = new Date(nextMonthStart.getTime() - 1);
   const trialDocs = runQuery_('students', [
     { field: 'branchId', op: 'EQUAL', value: branchId },
     { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
     { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
   ]);
-  trialDocs.forEach((s) => {
-    if (!hasTrialHappened_(s)) return;
+  const happened = trialDocs.filter(hasTrialHappened_);
+
+  const map = {};
+  const sourceByStudent = {};
+  happened.forEach((s) => {
     const key = s.source || 'none';
     if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
     map[key].trialCount += 1;
+    if (s.firstPaymentAt) {
+      map[key].count += 1;
+      sourceByStudent[s.id] = key;
+    }
+  });
+
+  payments.forEach((t) => {
+    const key = sourceByStudent[t.studentId];
+    if (key && map[key]) map[key].amount += t.amount || 0;
   });
 
   return Object.keys(map)
@@ -334,8 +307,8 @@ function refreshDashboardStatsForBranch_(branchId) {
   const newStudents = computeNewStudents_(branchId, start, end);
   const trialToday = computeTrialToday_(branchId, now);
   const trialMonth = computeTrialMonth_(branchId, now);
-  const { paidThisMonth, comparison, currentPayments } = computePaymentsAndChart_(branchId, now);
-  const newPaymentSources = computePaymentSources_(branchId, currentPayments, now);
+  const { paidThisMonth, comparison, allPayments } = computePaymentsAndChart_(branchId, now);
+  const newPaymentSources = computePaymentSources_(branchId, allPayments, now);
 
   const fields = toFsFields_({
     activeStudents: buckets.activeStudents,

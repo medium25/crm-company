@@ -1,4 +1,4 @@
-import { collection, documentId, getCountFromServer, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, getCountFromServer, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { addMonths, format, startOfMonth, startOfQuarter, startOfYear, subMonths, getDaysInMonth } from 'date-fns';
 
 /**
@@ -316,52 +316,25 @@ export async function countTrialMonthRetention(db, branchId, monthDate = new Dat
 }
 
 /**
- * Первые оплаты НОВЫХ учеников текущего месяца по источникам лида: новый ученик — тот, у кого
- * `students.firstPaymentAt` попадает в текущий месяц; его «новая оплата» — самый ранний платёж
- * месяца (повторные платежи новых и все платежи прежних учеников не считаются). Источник — поле
- * `source` карточки студента (по одному чтению на плательщика); без источника — ключ 'none'.
- * По убыванию числа оплат.
+ * Конверсия пробных этого месяца в оплату, по источнику лида: «N из M» — M это пробные этого
+ * источника, что состоялись в этом месяце (та же выборка, что countTrialMonthRetention/
+ * trialMonthBreakdown), N — сколько из НИХ ЖЕ (не любых плативших в этом месяце) уже оплатили
+ * (`students.firstPaymentAt` заполнен — оплата могла случиться и позже, решение просто ещё не
+ * принято, как и у «остались»%). N — подмножество M, поэтому N ⩽ M всегда, в отличие от прежней
+ * версии, где N считался как «новые плательщики месяца» независимо от месяца их пробного (тогда
+ * могло получиться N > M, если пробный был раньше, а заплатили в этом месяце). Источник — поле
+ * `source` карточки студента; без источника — ключ 'none'. По убыванию N.
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} branchId
- * @param {Promise<Array<Object>>} [payments] платежи текущего/прошлого месяца (fetchDashboardPayments), если уже загружены
- * @returns {Promise<Array<{key: string, count: number, amount: number}>>}
+ * @param {Promise<Array<Object>>} [payments] платежи текущего/прошлого месяца (fetchDashboardPayments) — только
+ *   для суммы оплаченного (сама конверсия платежи не читает, они не обязаны попадать в эти 2 месяца)
+ * @returns {Promise<Array<{key: string, count: number, amount: number, trialCount: number}>>}
  */
 export async function countPaymentSources(db, branchId, payments) {
   const now = new Date();
-  const month = format(now, 'yyyy-MM');
   const monthStart = startOfMonth(now);
-  const nextMonthStart = addMonths(monthStart, 1);
-  const monthEnd = new Date(nextMonthStart.getTime() - 1);
-  const list = payments ? await payments : await fetchPaymentDocs(db, branchId, [month]);
-  const current = list.filter((t) => t.month === month);
-  const ids = [...new Set(current.map((t) => t.studentId).filter(Boolean))];
-  const info = new Map(); // studentId → { source, isNew }
-  for (let i = 0; i < ids.length; i += 30) {
-    const snap = await getDocs(query(collection(db, 'students'), where(documentId(), 'in', ids.slice(i, i + 30))));
-    for (const d of snap.docs) {
-      const s = d.data();
-      const first = s.firstPaymentAt?.toDate?.();
-      info.set(d.id, { source: s.source || 'none', isNew: Boolean(first && first >= monthStart && first < nextMonthStart) });
-    }
-  }
-  // Самый ранний платёж месяца у каждого нового ученика.
-  const earliest = new Map();
-  for (const t of current) {
-    if (!info.get(t.studentId)?.isNew) continue;
-    const cur = earliest.get(t.studentId);
-    if (!cur || (t.date?.toMillis?.() ?? 0) < (cur.date?.toMillis?.() ?? 0)) earliest.set(t.studentId, t);
-  }
-  const map = new Map();
-  for (const [studentId, t] of earliest) {
-    const key = info.get(studentId).source;
-    const cur = map.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
-    cur.count += 1;
-    cur.amount += t.amount ?? 0;
-    map.set(key, cur);
-  }
+  const monthEnd = new Date(addMonths(monthStart, 1).getTime() - 1);
 
-  // Пробные этого месяца по источнику (та же выборка, что и трialMonthBreakdown/countTrialMonthRetention) —
-  // «10 из 20»: 10 оплат из 20 пробных этого источника состоялись в этом месяце.
   const trialSnap = await getDocs(
     query(
       collection(db, 'students'),
@@ -370,16 +343,36 @@ export async function countPaymentSources(db, branchId, payments) {
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  for (const d of trialSnap.docs) {
+  const happened = trialSnap.docs.filter((d) => hasTrialHappened(d.data()));
+
+  const map = new Map();
+  const paidIds = new Set();
+  for (const d of happened) {
     const s = d.data();
-    if (!hasTrialHappened(s)) continue;
     const key = s.source || 'none';
     const cur = map.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
     cur.trialCount += 1;
+    if (s.firstPaymentAt) {
+      cur.count += 1;
+      paidIds.add(d.id);
+    }
     map.set(key, cur);
   }
+  if (paidIds.size === 0) return [...map.values()].sort((a, b) => b.count - a.count);
 
-  return [...map.values()].sort((a, b2) => b2.count - a.count);
+  // Сумма — по транзакциям этих же оплативших, что реально нашлись в уже загруженных платежах
+  // (текущий/прошлый месяц); оплата вне этого окна в сумму не попадёт, но N/M это не меняет.
+  const month = format(now, 'yyyy-MM');
+  const prevMonth = format(subMonths(now, 1), 'yyyy-MM');
+  const list = payments ? await payments : await fetchPaymentDocs(db, branchId, [month, prevMonth]);
+  const sourceByStudent = new Map(happened.filter((d) => paidIds.has(d.id)).map((d) => [d.id, d.data().source || 'none']));
+  for (const t of list) {
+    if (!paidIds.has(t.studentId)) continue;
+    const cur = map.get(sourceByStudent.get(t.studentId));
+    if (cur) cur.amount += t.amount ?? 0;
+  }
+
+  return [...map.values()].sort((a, b) => b.count - a.count);
 }
 
 /**
