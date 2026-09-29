@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "deploy": "npm run build && gh-pages -d dist",
+    "check:design": "node scripts/check-design.mjs",
+    "test:design": "node --test scripts/check-design.test.mjs scripts/migrate-design.test.mjs",
+    "deploy": "npm run check:design && npm run build && gh-pages -d dist",
     "seed": "node --env-file=.env scripts/seed.js"
   },
   "dependencies": {
