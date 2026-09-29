@@ -81,12 +81,12 @@ export function FreezeEnrollmentModal({ enrollment, studentBalance, studentFreez
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {!canFreeze && freezeLimitReached && (
-          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+          <p className="rounded-field bg-danger/5 p-3 text-small text-danger">
             Лимит заморозок за весь срок обучения исчерпан ({MAX_FREEZES_PER_STUDENT} из {MAX_FREEZES_PER_STUDENT}).
           </p>
         )}
         {!canFreeze && !freezeLimitReached && (
-          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+          <p className="rounded-field bg-danger/5 p-3 text-small text-danger">
             Заморозка доступна только при балансе от {formatMoney(MIN_FREEZE_BALANCE)}. Текущий баланс: {formatMoney(studentBalance)}.
           </p>
         )}

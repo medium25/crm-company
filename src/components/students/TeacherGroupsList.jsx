@@ -73,7 +73,7 @@ export function TeacherGroupsList({ teacherId, branchId, todayOnly = false }) {
     <div className="flex flex-col gap-8">
       {sections.map((s) => (
         <div key={s.type}>
-          <h3 className="mb-3 text-[15px] font-bold text-text">{s.label}</h3>
+          <h3 className="mb-3 text-title font-bold text-text">{s.label}</h3>
           <div className="flex flex-col gap-3">
             {s.groups.map((g) => (
               <Card
@@ -84,10 +84,10 @@ export function TeacherGroupsList({ teacherId, branchId, todayOnly = false }) {
               >
                 <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
                   <span className="font-bold text-text">{g.code}</span>
-                  <span className="text-[15px] text-muted">{g.courseName}</span>
-                  <span className="text-[13px] text-muted">{scheduleSubtitle(g.schedule)}</span>
+                  <span className="text-control text-muted">{g.courseName}</span>
+                  <span className="text-small text-muted">{scheduleSubtitle(g.schedule)}</span>
                 </span>
-                <span className="flex shrink-0 items-center gap-2 text-[15px] text-muted">
+                <span className="flex shrink-0 items-center gap-2 text-control text-muted">
                   {g.studentsCount} {pluralize(g.studentsCount, ['ученик', 'ученика', 'учеников'])}
                   <ChevronRight className="h-4 w-4 text-muted" />
                 </span>

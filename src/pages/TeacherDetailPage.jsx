@@ -29,7 +29,7 @@ export function TeacherDetailPage() {
   }
 
   if (error) {
-    return <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>;
+    return <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>;
   }
 
   if (!teacher) {
@@ -41,7 +41,7 @@ export function TeacherDetailPage() {
       <button
         type="button"
         onClick={() => navigate('/teachers')}
-        className="mb-4 flex items-center gap-1 text-[15px] text-muted hover:text-text"
+        className="mb-4 flex items-center gap-1 text-control text-muted hover:text-text"
       >
         <ArrowLeft className="h-4 w-4" /> Все учителя
       </button>
@@ -58,29 +58,29 @@ export function TeacherDetailPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
         <Card className="flex flex-col gap-3">
           <div>
-            <span className="block text-[13px] text-muted">Полное имя</span>
-            <span className="text-[15px] text-text">{teacher.fullName || '—'}</span>
+            <span className="block text-small text-muted">Полное имя</span>
+            <span className="text-control text-text">{teacher.fullName || '—'}</span>
           </div>
           <div>
-            <span className="block text-[13px] text-muted">Телефон</span>
-            <a href={`tel:+${teacher.phone}`} className="text-[15px] text-link">
+            <span className="block text-small text-muted">Телефон</span>
+            <a href={`tel:+${teacher.phone}`} className="text-control text-link">
               {formatPhone(teacher.phone)}
             </a>
           </div>
           <div>
-            <span className="block text-[13px] text-muted">Филиалы</span>
-            <span className="text-[15px] text-text">{teacher.branchIds?.join(', ') || '—'}</span>
+            <span className="block text-small text-muted">Филиалы</span>
+            <span className="text-control text-text">{teacher.branchIds?.join(', ') || '—'}</span>
           </div>
           <div>
-            <span className="block text-[13px] text-muted">Групп</span>
-            <span className="text-[15px] text-text">
+            <span className="block text-small text-muted">Групп</span>
+            <span className="text-control text-text">
               {teacher.groupsCount} {pluralize(teacher.groupsCount, ['группа', 'группы', 'групп'])}
             </span>
           </div>
         </Card>
 
         <Card>
-          <h2 className="mb-4 text-[20px] font-bold text-text">Группы</h2>
+          <h2 className="mb-4 text-page font-bold text-text">Группы</h2>
           <EmptyState icon={Layers} title="Группы появятся в Фазе 2" />
         </Card>
       </div>

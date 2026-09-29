@@ -56,7 +56,7 @@ export function CommentsTab({ entityType, entityId }) {
     <div className="flex flex-col gap-4">
       <form onSubmit={handleSubmit} className="flex gap-2">
         <textarea
-          className="min-h-16 flex-1 rounded-field border border-border-strong p-2 text-[15px] focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
+          className="min-h-16 flex-1 rounded-field border border-border-strong p-2 text-control focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
           placeholder="Написать комментарий…"
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -74,11 +74,11 @@ export function CommentsTab({ entityType, entityId }) {
         <div className="flex flex-col gap-3">
           {comments.map((c) => (
             <div key={c.id} className="rounded-row bg-surface-alt p-3">
-              <div className="mb-1 flex items-center justify-between text-[13px] text-muted">
+              <div className="mb-1 flex items-center justify-between text-small text-muted">
                 <span className="font-bold text-text">{c.authorName}</span>
                 <span>{formatDateTime(c.createdAt)}</span>
               </div>
-              <p className="whitespace-pre-wrap text-[15px] text-text">{c.text}</p>
+              <p className="whitespace-pre-wrap text-control text-text">{c.text}</p>
             </div>
           ))}
         </div>

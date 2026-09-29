@@ -135,8 +135,8 @@ export function DebtorsByTeacher() {
               <CalendarDays className="h-6 w-6" strokeWidth={1.75} />
             </span>
             <span className="flex-1">
-              <span className="block text-[17px] font-bold text-text">{PARITY_LABEL[p]}</span>
-              <span className="block text-[13px] text-muted">{parityDebtorCount(p)} должников</span>
+              <span className="block text-title font-bold text-text">{PARITY_LABEL[p]}</span>
+              <span className="block text-small text-muted">{parityDebtorCount(p)} должников</span>
             </span>
           </Card>
         ))}
@@ -150,7 +150,7 @@ export function DebtorsByTeacher() {
   if (!teacherId) {
     return (
       <div>
-        <button type="button" onClick={() => setParity(null)} className="mb-4 flex items-center gap-1 text-[15px] text-link">
+        <button type="button" onClick={() => setParity(null)} className="mb-4 flex items-center gap-1 text-control text-link">
           <ArrowLeft className="h-4 w-4" /> {PARITY_LABEL[parity]} — назад
         </button>
 
@@ -161,7 +161,7 @@ export function DebtorsByTeacher() {
             {teachersInParity.map(([tId, t]) => (
               <Card key={tId} hoverable className="flex cursor-pointer items-center justify-between p-4" onClick={() => setTeacherId(tId)}>
                 <span className="font-bold text-text">{t.teacherName}</span>
-                <span className="text-[15px] text-muted">
+                <span className="text-control text-muted">
                   {new Set(t.entries.map((e) => e.studentId)).size} {pluralize(new Set(t.entries.map((e) => e.studentId)).size, ['должник', 'должника', 'должников'])}
                 </span>
               </Card>
@@ -237,7 +237,7 @@ export function DebtorsByTeacher() {
             className="flex max-w-[220px] items-center gap-1.5 text-left text-muted hover:text-navy"
           >
             <MessageSquare className="h-4 w-4 shrink-0" />
-            <span className="truncate text-[14px]">{text || '—'}</span>
+            <span className="truncate text-body">{text || '—'}</span>
           </button>
         );
       },
@@ -264,7 +264,7 @@ export function DebtorsByTeacher() {
 
   return (
     <div>
-      <button type="button" onClick={() => setTeacherId(null)} className="mb-4 flex items-center gap-1 text-[15px] text-link">
+      <button type="button" onClick={() => setTeacherId(null)} className="mb-4 flex items-center gap-1 text-control text-link">
         <ArrowLeft className="h-4 w-4" /> {structure[parity].get(teacherId)?.teacherName} — назад
       </button>
 

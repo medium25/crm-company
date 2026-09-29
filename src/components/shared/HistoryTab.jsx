@@ -49,7 +49,7 @@ export function HistoryTab({ entityType, entityId }) {
   return (
     <div className="flex flex-col gap-2">
       {entries.map((e) => (
-        <div key={e.id} className="flex items-center justify-between rounded-row bg-surface-alt px-4 py-3 text-[15px]">
+        <div key={e.id} className="flex items-center justify-between rounded-row bg-surface-alt px-4 py-3 text-control">
           <span className="text-text">
             <span className="font-bold">{e.userName}</span> {ACTION_LABELS[e.action] ?? e.action}
             {e.field && (
@@ -59,7 +59,7 @@ export function HistoryTab({ entityType, entityId }) {
               </>
             )}
           </span>
-          <span className="text-[13px] text-muted">{formatDateTime(e.createdAt)}</span>
+          <span className="text-small text-muted">{formatDateTime(e.createdAt)}</span>
         </div>
       ))}
     </div>

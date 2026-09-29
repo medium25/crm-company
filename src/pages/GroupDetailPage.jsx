@@ -60,15 +60,15 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
       : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`;
 
   return (
-    <li className="flex items-center gap-2 text-[15px] text-text">
+    <li className="flex items-center gap-2 text-control text-text">
       <span className="w-5 shrink-0 text-right text-muted">{index}.</span>
       {isTrial || isPaused ? (
         <span className="flex-1 truncate">
           <button
             type="button"
             onClick={() => navigate(`/students/${enrollment.studentId}`)}
-            className={`rounded-badge px-2 py-0.5 text-[13px] font-bold hover:opacity-80 ${
-              isPaused ? 'bg-present/15 text-present' : 'bg-[#EEF0F3] text-text'
+            className={`rounded-badge px-2 py-0.5 text-small font-bold hover:opacity-80 ${
+              isPaused ? 'bg-present/15 text-present' : 'bg-chip text-text'
             }`}
             title={isPaused ? 'Заморожен' : 'Пробный урок'}
           >
@@ -202,7 +202,7 @@ export function GroupDetailPage() {
     );
   }
 
-  if (error) return <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>;
+  if (error) return <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>;
   if (!group) return <EmptyState icon={Users} title="Группа не найдена" />;
 
   const exportRoster = () => {
@@ -246,12 +246,12 @@ export function GroupDetailPage() {
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="mb-4 flex items-center gap-1 text-[15px] text-muted hover:text-text"
+        className="mb-4 flex items-center gap-1 text-control text-muted hover:text-text"
       >
         <ArrowLeft className="h-4 w-4" /> Назад
       </button>
 
-      <h1 className="mb-6 text-[32px] leading-[40px] text-text">
+      <h1 className="mb-6 text-kpi text-text">
         {group.code} <span className="text-muted">·</span> {group.courseName} <span className="text-muted">·</span>{' '}
         {group.teacherName}
       </h1>
@@ -265,11 +265,11 @@ export function GroupDetailPage() {
           <Field label="Кабинеты" value={group.roomName || '—'} />
           <Field label="Вместимость комнаты" value={room ? `${room.capacity}` : '—'} />
           <Field label="Даты обучения" value={`${formatDate(group.startDate)} — ${formatDate(group.endDate)}`} />
-          <p className="text-[13px] text-muted">(id: {group.publicId})</p>
+          <p className="text-small text-muted">(id: {group.publicId})</p>
           <Field label="Филиалы" value={group.branchId} />
 
           <div className="mt-2 flex items-center justify-between border-t border-border pt-4">
-            <Select options={SORT_OPTIONS} value={sort} onChange={(e) => setSort(e.target.value)} className="w-48" />
+            <Select size="sm" options={SORT_OPTIONS} value={sort} onChange={(e) => setSort(e.target.value)} className="w-48" />
           </div>
 
           {sortedEnrollments.length === 0 ? (
@@ -293,7 +293,7 @@ export function GroupDetailPage() {
           )}
 
           <div className="mt-2 flex items-center justify-between">
-            <button type="button" onClick={() => setShowArchivedStudents((v) => !v)} className="text-[13px] text-link">
+            <button type="button" onClick={() => setShowArchivedStudents((v) => !v)} className="text-small text-link">
               {showArchivedStudents ? 'Скрыть архивных студентов' : 'Показать архивных студентов'}
             </button>
             <Button variant="icon-round" tone="navy" onClick={exportRoster} aria-label="Экспорт в CSV" disabled={enrollments.length === 0}>
@@ -388,7 +388,7 @@ export function GroupDetailPage() {
 
 function Field({ label, value }) {
   return (
-    <p className="text-[15px] text-text">
+    <p className="text-control text-text">
       <span className="font-bold">{label}: </span>
       {value}
     </p>

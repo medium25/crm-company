@@ -117,7 +117,7 @@ export function TeachersPage() {
         <div className="mb-6 flex items-start gap-3 rounded-card bg-success-bg p-4">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
           <div className="flex-1">
-            <p className="text-[15px] text-success">
+            <p className="text-control text-success">
               CEO профилями можно связать учителя с другим филиалом.
             </p>
           </div>
@@ -135,7 +135,7 @@ export function TeachersPage() {
         </div>
       )}
 
-      {error && <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>}
+      {error && <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>}
 
       {!loading && !error && teachers.length === 0 && (
         <EmptyState icon={GraduationCap} title="Пока нет ни одного учителя" actionLabel="Добавить учителя" onAction={() => setModalTeacher({})} />
@@ -154,11 +154,11 @@ export function TeachersPage() {
               <a
                 href={`tel:+${t.phone}`}
                 onClick={(e) => e.stopPropagation()}
-                className="text-[15px] text-link"
+                className="text-control text-link"
               >
                 {formatPhone(t.phone)}
               </a>
-              <span className="text-[15px] text-muted">
+              <span className="text-control text-muted">
                 {studentsCountByTeacher.get(t.id) ?? 0} {pluralize(studentsCountByTeacher.get(t.id) ?? 0, ['студент', 'студента', 'студентов'])}
               </span>
               <DropdownMenu

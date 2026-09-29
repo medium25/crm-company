@@ -61,10 +61,10 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
         >
           <Badge variant="group-code">{enrollment.groupCode}</Badge>
           <p className="mt-2 font-bold text-link">{enrollment.courseName}</p>
-          <p className="text-[15px] text-muted">{enrollment.teacherName}</p>
+          <p className="text-control text-muted">{enrollment.teacherName}</p>
         </button>
         {group && (
-          <div className="text-right text-[13px] text-muted">
+          <div className="text-right text-small text-muted">
             <p>
               {formatDate(group.startDate)} — {formatDate(group.endDate)}
             </p>
@@ -77,7 +77,7 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
 
       <div className="border-t border-border pt-3">
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[15px] text-text">Статус: {enrollment.statusLabel}</span>
+          <span className="text-control text-text">Статус: {enrollment.statusLabel}</span>
           <div className="flex items-center gap-1">
             {enrollment.status === 'trial' && (
               <Button variant="icon-round" tone="navy" onClick={() => onActivate(enrollment)} aria-label="Активировать">
@@ -114,16 +114,16 @@ export function EnrollmentCard({ enrollment, studentBalance, studentFreezeCount,
           </div>
         </div>
         <div className="mb-1">
-          <span className="text-[15px] text-muted">Дата добавления: {formatDate(enrollment.addedAt)}</span>
+          <span className="text-control text-muted">Дата добавления: {formatDate(enrollment.addedAt)}</span>
         </div>
         {enrollment.activatedAt && (
-          <p className="text-[15px] text-muted">Дата активации: {formatDate(enrollment.activatedAt)}</p>
+          <p className="text-control text-muted">Дата активации: {formatDate(enrollment.activatedAt)}</p>
         )}
-        <p className="text-[15px] text-muted">Стоимость для студента: {formatMoney(enrollment.price)}</p>
+        <p className="text-control text-muted">Стоимость для студента: {formatMoney(enrollment.price)}</p>
         {transferNote && (
           <div className="mt-2 flex items-center gap-2 rounded-field border border-navy/20 bg-navy/5 px-3 py-2">
             <ArrowRightLeft className="h-4 w-4 shrink-0 text-navy" />
-            <p className="min-w-0 flex-1 truncate text-[13px] font-bold text-navy">{transferNote}</p>
+            <p className="min-w-0 flex-1 truncate text-small font-bold text-navy">{transferNote}</p>
             <button
               type="button"
               onClick={dismissTransferNote}

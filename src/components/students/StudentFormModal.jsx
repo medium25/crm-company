@@ -354,10 +354,10 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           onChange={(e) => setForm((f) => ({ ...f, phone2: e.target.value }))}
         />
         {missingSecondPhone && (
-          <p className="-mt-2 text-[13px] text-danger">Без второго номера телефона добавить ученика нельзя.</p>
+          <p className="-mt-2 text-small text-danger">Без второго номера телефона добавить ученика нельзя.</p>
         )}
         {duplicateName && (
-          <p className="-mt-2 text-[13px] text-danger">Студент с этим номером уже есть в базе: {duplicateName}.</p>
+          <p className="-mt-2 text-small text-danger">Студент с этим номером уже есть в базе: {duplicateName}.</p>
         )}
         <Select
           label="Источник"
@@ -374,7 +374,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
               onChange={(e) => setForm((f) => ({ ...f, assignedOperator: e.target.value }))}
               error={missingOperator}
             />
-            {missingOperator && <p className="-mt-2 text-[13px] text-danger">Выбери ответственного оператора.</p>}
+            {missingOperator && <p className="-mt-2 text-small text-danger">Выбери ответственного оператора.</p>}
           </>
         )}
         {isTrialStatus && (

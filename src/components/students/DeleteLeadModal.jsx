@@ -65,7 +65,7 @@ export function DeleteLeadModal({ lead, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <p className="text-[15px] text-text">
+        <p className="text-control text-text">
           Это <b>полностью и без возврата</b> удалит карточку лида «{lead?.fullName}» — не архивация, восстановить
           будет нельзя.
         </p>

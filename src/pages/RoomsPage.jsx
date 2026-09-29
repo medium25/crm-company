@@ -155,7 +155,7 @@ export function RoomsPage() {
         </div>
       )}
 
-      {error && <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>}
+      {error && <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>}
 
       {!loading && !error && rooms.length === 0 && (
         <EmptyState

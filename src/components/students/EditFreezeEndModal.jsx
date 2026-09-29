@@ -97,7 +97,7 @@ export function EditFreezeEndModal({ enrollment, onClose }) {
     >
       {step === 'password' ? (
         <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
-          <p className="text-[13px] text-muted">Изменение даты окончания заморозки требует пароль.</p>
+          <p className="text-small text-muted">Изменение даты окончания заморозки требует пароль.</p>
           <Input
             label="Пароль"
             type="password"

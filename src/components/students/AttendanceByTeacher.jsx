@@ -112,11 +112,11 @@ export function AttendanceByTeacher() {
                 onClick={() => setTeacherId(t.id)}
               >
                 <span className="font-bold text-text">{t.displayName}</span>
-                <span className="text-[15px] text-link">{formatPhone(t.phone)}</span>
-                <span className="text-[13px] text-muted">
+                <span className="text-control text-link">{formatPhone(t.phone)}</span>
+                <span className="text-small text-muted">
                   Средний срок: <span className="font-bold text-text">{avgMonthsByTeacher.get(t.id) ?? '—'}</span>
                 </span>
-                <span className="text-[15px] text-muted">
+                <span className="text-control text-muted">
                   {t.groupsCount} {pluralize(t.groupsCount, ['группа', 'группы', 'групп'])}
                 </span>
               </Card>
@@ -132,12 +132,12 @@ export function AttendanceByTeacher() {
       <button
         type="button"
         onClick={() => setTeacherId(null)}
-        className="mb-4 flex items-center gap-1 text-[15px] text-link"
+        className="mb-4 flex items-center gap-1 text-control text-link"
       >
         <ArrowLeft className="h-4 w-4" /> Все учителя
       </button>
 
-      <h2 className="mb-4 text-[20px] font-bold text-text">{teacher?.displayName}</h2>
+      <h2 className="mb-4 text-page font-bold text-text">{teacher?.displayName}</h2>
 
       {groupsLoading && <Skeleton className="h-64 w-full" />}
 
@@ -149,7 +149,7 @@ export function AttendanceByTeacher() {
         <div className="flex flex-col gap-8">
           {teacherGroups.map((group) => (
             <Card key={group.id}>
-              <h3 className="mb-4 text-[15px] font-bold text-text">
+              <h3 className="mb-4 text-title font-bold text-text">
                 {group.code} · {group.courseName}
               </h3>
               <AttendanceTab group={group} />

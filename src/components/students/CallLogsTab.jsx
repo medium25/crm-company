@@ -43,13 +43,13 @@ export function CallLogsTab({ studentId }) {
       {!loading && calls.length > 0 && (
         <div className="flex flex-col gap-2">
           {calls.map((c) => (
-            <div key={c.id} className="flex items-center justify-between rounded-row bg-surface-alt px-4 py-3 text-[15px]">
+            <div key={c.id} className="flex items-center justify-between rounded-row bg-surface-alt px-4 py-3 text-control">
               <div>
                 <span className="font-bold text-text">{c.direction === 'out' ? 'Исходящий' : 'Входящий'}</span>{' '}
                 <span className="text-muted">— {RESULT_LABELS[c.result] ?? c.result}</span>
-                {c.comment && <p className="text-[13px] text-muted">{c.comment}</p>}
+                {c.comment && <p className="text-small text-muted">{c.comment}</p>}
               </div>
-              <div className="text-right text-[13px] text-muted">
+              <div className="text-right text-small text-muted">
                 <p>{c.userName}</p>
                 <p>{formatDateTime(c.createdAt)}</p>
               </div>

@@ -84,7 +84,7 @@ export function MaterialPaymentModal({ open, student, onClose }) {
         <Select label="Метод оплаты" options={PAYMENT_METHOD_OPTIONS} value={method} onChange={(e) => setMethod(e.target.value)} />
         <DatePicker label="Дата" required value={date} onChange={(e) => setDate(e.target.value)} />
         <Input label="Комментарий" placeholder="Например: учебник" value={comment} onChange={(e) => setComment(e.target.value)} />
-        <p className="text-[13px] text-muted">Не влияет на баланс студента — только на общую выручку в «Финансы».</p>
+        <p className="text-small text-muted">Не влияет на баланс студента — только на общую выручку в «Финансы».</p>
       </form>
     </Modal>
   );

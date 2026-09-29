@@ -235,31 +235,35 @@ export function GroupsPage() {
 
       <FilterBar onReset={resetFilters}>
         <Select
+          size="sm"
           options={STATUS_OPTIONS}
           value={status}
           onChange={(e) => setFilter({ status: e.target.value })}
           className="w-48"
         />
         <Select
+          size="sm"
           options={[{ value: '', label: 'Учителя: все' }, ...teachers.map((t) => ({ value: t.id, label: t.displayName }))]}
           value={teacherId}
           onChange={(e) => setFilter({ teacher: e.target.value })}
           className="w-44"
         />
         <Select
+          size="sm"
           options={[{ value: '', label: 'По курсам: все' }, ...courses.map((c) => ({ value: c.id, label: c.name }))]}
           value={courseId}
           onChange={(e) => setFilter({ course: e.target.value })}
           className="w-44"
         />
-        <Select options={DAYS_OPTIONS} value={days} onChange={(e) => setFilter({ days: e.target.value })} className="w-40" />
-        <Input placeholder="Тэги" value={tags} onChange={(e) => setFilter({ tags: e.target.value })} className="w-32" />
+        <Select size="sm" options={DAYS_OPTIONS} value={days} onChange={(e) => setFilter({ days: e.target.value })} className="w-40" />
+        <Input size="sm" placeholder="Тэги" value={tags} onChange={(e) => setFilter({ tags: e.target.value })} className="w-32" />
         <DatePicker
+          size="sm"
           value={startFrom}
           onChange={(e) => setFilter({ startFrom: e.target.value })}
           aria-label="Дата начала"
         />
-        <DatePicker value={endTo} onChange={(e) => setFilter({ endTo: e.target.value })} aria-label="Дата окончания" />
+        <DatePicker size="sm" value={endTo} onChange={(e) => setFilter({ endTo: e.target.value })} aria-label="Дата окончания" />
       </FilterBar>
 
       <div className="mb-4 flex justify-end">
@@ -274,7 +278,7 @@ export function GroupsPage() {
         </div>
       )}
 
-      {error && <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>}
+      {error && <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>}
 
       {!loading && !error && filtered.length === 0 && (
         <EmptyState icon={Layers} title="Пока нет ни одной группы" actionLabel="Добавить группу" onAction={() => setModalGroup({})} />
@@ -297,7 +301,7 @@ export function GroupsPage() {
                   key={n}
                   type="button"
                   onClick={() => setPage(n)}
-                  className={`h-9 w-9 rounded-full text-[15px] ${
+                  className={`h-9 w-9 rounded-full text-control ${
                     n === pageClamped ? 'bg-navy text-white' : 'text-text hover:bg-surface-alt'
                   }`}
                 >

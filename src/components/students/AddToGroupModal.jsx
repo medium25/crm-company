@@ -178,7 +178,7 @@ export function AddToGroupModal({ open, student, onClose }) {
         </Select>
         <Select label="Статус" options={STATUS_OPTIONS} value={status} onChange={(e) => setStatus(e.target.value)} />
         {missingLastName && (
-          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+          <p className="rounded-field bg-danger/5 p-3 text-small text-danger">
             У студента не указана фамилия — активный статус без неё создать нельзя. Допишите фамилию в карточке
             студента.
           </p>

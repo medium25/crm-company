@@ -486,7 +486,7 @@ export function StudentsPage() {
       width: 'minmax(220px, 1.5fr)',
       render: (st) => (
         <span className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-alt text-[13px] font-bold text-muted">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-alt text-small font-bold text-muted">
             {st.fullName[0]}
           </span>
           {st.fullName}
@@ -655,7 +655,7 @@ export function StudentsPage() {
         <span onClick={(e) => e.stopPropagation()}>
           <Button
             variant="secondary"
-            className="h-8 px-3 text-[13px]"
+            size="sm"
             onClick={() => setUnfreezeTarget(pausedEnrollmentByStudent.get(st.id))}
           >
             Активировать
@@ -692,8 +692,8 @@ export function StudentsPage() {
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
                   <Icon className="h-6 w-6" strokeWidth={1.75} />
                 </span>
-                <span className="flex-1 text-[17px] font-bold text-text">{t.label}</span>
-                {sectionMetric[t.key] && <span className="text-[15px] text-muted">{sectionMetric[t.key]}</span>}
+                <span className="flex-1 text-title font-bold text-text">{t.label}</span>
+                {sectionMetric[t.key] && <span className="text-control text-muted">{sectionMetric[t.key]}</span>}
                 <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
               </Card>
             );
@@ -731,7 +731,7 @@ export function StudentsPage() {
         }
       />
 
-      <button type="button" onClick={goToLanding} className="mb-6 flex items-center gap-1 text-[15px] text-link">
+      <button type="button" onClick={goToLanding} className="mb-6 flex items-center gap-1 text-control text-link">
         <ArrowLeft className="h-4 w-4" /> Все разделы
       </button>
 
@@ -754,8 +754,8 @@ export function StudentsPage() {
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
                   <Icon className="h-6 w-6" strokeWidth={1.75} />
                 </span>
-                <span className="flex-1 text-[17px] font-bold text-text">{t.label}</span>
-                <span className="text-[15px] text-muted">{t.count} {pluralize(t.count, ['студент', 'студента', 'студентов'])}</span>
+                <span className="flex-1 text-title font-bold text-text">{t.label}</span>
+                <span className="text-control text-muted">{t.count} {pluralize(t.count, ['студент', 'студента', 'студентов'])}</span>
                 <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
               </Card>
             );
@@ -768,25 +768,25 @@ export function StudentsPage() {
           )}
 
           {section === 'left' && leftView && (
-            <button type="button" onClick={() => setFilter({ leftView: null, leftDate: null })} className="mb-4 flex items-center gap-1 text-[15px] text-link">
+            <button type="button" onClick={() => setFilter({ leftView: null, leftDate: null })} className="mb-4 flex items-center gap-1 text-control text-link">
               <ArrowLeft className="h-4 w-4" /> Назад к разделам
             </button>
           )}
 
           <FilterBar onReset={resetFilters}>
-            <Input placeholder="Поиск по имени или телефону" value={search} onChange={(e) => setFilter({ q: e.target.value })} className="w-64" />
+            <Input size="sm" placeholder="Поиск по имени или телефону" value={search} onChange={(e) => setFilter({ q: e.target.value })} className="w-64" />
             {section === 'left' && (
               <>
-                <DatePicker aria-label="Дата исключения" value={leftDate} onChange={(e) => setFilter({ leftDate: e.target.value })} className="w-48" />
-                <Button variant="secondary" onClick={() => setFilter({ leftDate: format(new Date(), 'yyyy-MM-dd') })}>
+                <DatePicker size="sm" aria-label="Дата исключения" value={leftDate} onChange={(e) => setFilter({ leftDate: e.target.value })} className="w-48" />
+                <Button variant="secondary" size="sm" onClick={() => setFilter({ leftDate: format(new Date(), 'yyyy-MM-dd') })}>
                   Сегодня
                 </Button>
               </>
             )}
             {section === 'all' && (
               <>
-                <Select options={STATUS_OPTIONS} value={status} onChange={(e) => setFilter({ status: e.target.value })} className="w-44" />
-                <label className="flex h-11 items-center gap-2 rounded-field border border-border-strong px-3 text-[15px] text-text">
+                <Select size="sm" options={STATUS_OPTIONS} value={status} onChange={(e) => setFilter({ status: e.target.value })} className="w-44" />
+                <label className="flex h-9 items-center gap-2 rounded-field border border-border-strong px-3 text-small text-text">
                   <input type="checkbox" checked={onlyDebtors} onChange={(e) => setFilter({ debtors: e.target.checked ? '1' : '' })} />
                   Только должники
                 </label>
@@ -795,7 +795,7 @@ export function StudentsPage() {
           </FilterBar>
 
           {section === 'left' && leftDate && !loading && (
-            <p className="mb-3 text-[15px] text-text">
+            <p className="mb-3 text-control text-text">
               Покинули группу {leftDate.split('-').reverse().join('.')}:{' '}
               <span className="font-bold">
                 {filtered.length} {pluralize(filtered.length, ['ученик', 'ученика', 'учеников'])}
@@ -804,7 +804,7 @@ export function StudentsPage() {
           )}
 
           {section === 'all' && !loading && filtered.length > 0 && (
-            <p className="mb-3 text-[13px] text-muted">
+            <p className="mb-3 text-small text-muted">
               Средний срок обучения: <span className="font-bold text-text">{formatAvgMonths(filtered)}</span>
             </p>
           )}
@@ -817,7 +817,7 @@ export function StudentsPage() {
             </div>
           )}
 
-          {error && <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>}
+          {error && <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>}
 
           {!loading && !error && filtered.length === 0 && (
             <EmptyState
@@ -835,7 +835,7 @@ export function StudentsPage() {
             <div className="flex flex-col gap-6">
               {trialByTeacher.map(([teacherName, students]) => (
                 <Card key={teacherName}>
-                  <h3 className="mb-4 text-[15px] font-bold text-text">{teacherName}</h3>
+                  <h3 className="mb-4 text-title font-bold text-text">{teacherName}</h3>
                   <Table columns={trialColumns} rows={students} onRowClick={(st) => navigate(`/students/${st.id}`)} />
                 </Card>
               ))}
@@ -857,7 +857,7 @@ export function StudentsPage() {
                       key={n}
                       type="button"
                       onClick={() => setPage(n)}
-                      className={`h-9 w-9 rounded-full text-[15px] ${n === pageClamped ? 'bg-navy text-white' : 'text-text hover:bg-surface-alt'}`}
+                      className={`h-9 w-9 rounded-full text-control ${n === pageClamped ? 'bg-navy text-white' : 'text-text hover:bg-surface-alt'}`}
                     >
                       {n}
                     </button>

@@ -80,12 +80,12 @@ export function GradesTab({ group, enrollments }) {
       {!loading && grades.length > 0 && (
         <div className="flex flex-col gap-2">
           {grades.map((g) => (
-            <div key={g.id} className="flex items-center justify-between rounded-row bg-surface-alt px-4 py-3 text-[15px]">
+            <div key={g.id} className="flex items-center justify-between rounded-row bg-surface-alt px-4 py-3 text-control">
               <span className="text-text">{g.studentName}</span>
               <span className="font-bold text-navy-num">
                 {g.value} / {g.maxValue}
               </span>
-              <span className="text-[13px] text-muted">{g.comment}</span>
+              <span className="text-small text-muted">{g.comment}</span>
             </div>
           ))}
         </div>

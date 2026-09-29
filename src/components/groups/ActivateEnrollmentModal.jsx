@@ -88,11 +88,11 @@ export function ActivateEnrollmentModal({ enrollment, student, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <p className="text-[15px] text-text">
+        <p className="text-control text-text">
           Студент <b>{enrollment?.studentName}</b> перейдёт в статус «Активен» — стартует списание за обучение.
         </p>
         {missingLastName && (
-          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+          <p className="rounded-field bg-danger/5 p-3 text-small text-danger">
             У студента не указана фамилия — без неё активировать нельзя. Допишите фамилию в карточке студента
             («Редактировать») и вернитесь сюда.
           </p>

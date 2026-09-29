@@ -3,12 +3,13 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { Users } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { pluralize } from '../../lib/format.js';
+import { chartColors } from '../../lib/chartColors.js';
 
 // Категориальная палитра — фиксированный порядок слотов, проверен на
 // соседнюю CVD-безопасность (worst adjacent ΔE 9.1, dataviz-skill palette.md).
 // Слот закрепляется за учителем (см. colorByTeacher ниже), не за рангом —
 // иначе перестановка мест при смене чисел перекрашивала бы survivors.
-const CATEGORICAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+const CATEGORICAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948']; // design-ok: категориальная палитра диаграммы
 
 const RADIAN = Math.PI / 180;
 
@@ -31,10 +32,10 @@ function renderCalloutLabel(colorByTeacher) {
       <g>
         <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={color} fill="none" />
         <circle cx={ex} cy={ey} r={2} fill={color} stroke="none" />
-        <text x={ex + (cos >= 0 ? 6 : -6)} y={ey - 2} textAnchor={textAnchor} className="fill-text text-[13px] font-bold">
+        <text x={ex + (cos >= 0 ? 6 : -6)} y={ey - 2} textAnchor={textAnchor} className="fill-text text-small font-bold">
           {payload.teacherName}
         </text>
-        <text x={ex + (cos >= 0 ? 6 : -6)} y={ey + 15} textAnchor={textAnchor} className="fill-muted text-[15px] font-bold">
+        <text x={ex + (cos >= 0 ? 6 : -6)} y={ey + 15} textAnchor={textAnchor} className="fill-muted text-control font-bold">
           {payload.count} · {Math.round(percent * 100)}%
         </text>
       </g>
@@ -47,7 +48,7 @@ function ChartTooltip({ active, payload, total }) {
   const point = payload[0].payload;
   const percent = total > 0 ? Math.round((point.count / total) * 100) : 0;
   return (
-    <div className="rounded-field border border-border bg-surface p-3 text-[13px] shadow-hover">
+    <div className="rounded-field border border-border bg-surface p-3 text-small shadow-hover">
       <p className="font-bold text-text">{point.teacherName}</p>
       <p className="text-text">
         {point.count} {pluralize(point.count, ['ученик', 'ученика', 'учеников'])} ({percent}%)
@@ -80,13 +81,13 @@ export function AllStudentsSummary({ total, breakdown }) {
           <Users className="h-5 w-5" strokeWidth={1.75} />
         </span>
         <div>
-          <p className="text-[15px] font-bold text-text">Всего учеников</p>
-          <p className="text-[13px] text-muted">без учёта замороженных</p>
+          <p className="text-title font-bold text-text">Всего учеников</p>
+          <p className="text-small text-muted">без учёта замороженных</p>
         </div>
       </div>
 
       {breakdown.length === 0 ? (
-        <p className="text-[15px] text-muted">
+        <p className="text-control text-muted">
           {total > 0 ? `${total} ${pluralize(total, ['ученик', 'ученика', 'учеников'])}, пока без группы.` : 'Учеников пока нет.'}
         </p>
       ) : (
@@ -100,7 +101,7 @@ export function AllStudentsSummary({ total, breakdown }) {
                 innerRadius="42%"
                 outerRadius="62%"
                 paddingAngle={2}
-                stroke="#FFFFFF"
+                stroke={chartColors.white}
                 strokeWidth={2}
                 label={renderCalloutLabel(colorByTeacher)}
                 labelLine={false}
@@ -113,8 +114,8 @@ export function AllStudentsSummary({ total, breakdown }) {
             </PieChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[32px] font-bold leading-none text-navy-num">{total}</span>
-            <span className="text-[13px] text-muted">{pluralize(total, ['ученик', 'ученика', 'учеников'])}</span>
+            <span className="text-kpi font-bold text-navy-num">{total}</span>
+            <span className="text-small text-muted">{pluralize(total, ['ученик', 'ученика', 'учеников'])}</span>
           </div>
         </div>
       )}

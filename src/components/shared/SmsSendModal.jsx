@@ -83,7 +83,7 @@ export function SmsSendModal({ open, onClose, recipients, groupId = null, branch
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-[15px] text-muted">
+        <p className="text-control text-muted">
           Получатели: {recipients.length === 0 ? 'нет' : recipients.map((r) => r.studentName).join(', ')}
         </p>
         {templates.length > 0 && (
@@ -95,12 +95,12 @@ export function SmsSendModal({ open, onClose, recipients, groupId = null, branch
           />
         )}
         <div>
-          <label className="mb-1 block text-[13px] text-muted">Текст SMS</label>
+          <label className="mb-1 block text-small text-muted">Текст SMS</label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={4}
-            className="w-full rounded-field border border-border-strong px-3 py-2 text-[15px] text-text focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
+            className="w-full rounded-field border border-border-strong px-3 py-2 text-control text-text focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
           />
         </div>
       </div>

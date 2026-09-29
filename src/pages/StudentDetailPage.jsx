@@ -49,7 +49,7 @@ const TABS = [
 
 function BalanceBadge({ balance }) {
   const tone = balance < 0 ? 'bg-danger-bg text-white' : balance > 0 ? 'bg-success-bg text-success' : 'bg-surface-alt text-muted';
-  return <span className={`inline-block rounded-full px-4 py-1 text-[15px] font-bold ${tone}`}>{formatMoney(balance)}</span>;
+  return <span className={`inline-block rounded-full px-4 py-1 text-control font-bold ${tone}`}>{formatMoney(balance)}</span>;
 }
 
 export function StudentDetailPage() {
@@ -111,7 +111,7 @@ export function StudentDetailPage() {
       </div>
     );
   }
-  if (error) return <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>;
+  if (error) return <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>;
   if (!student) return <EmptyState icon={CircleUserRound} title="Студент не найден" />;
 
   const branchName = branches.find((b) => b.id === student.branchId)?.name ?? student.branchId;
@@ -195,7 +195,7 @@ export function StudentDetailPage() {
 
   return (
     <>
-      <button type="button" onClick={() => navigate(-1)} className="mb-4 flex items-center gap-1 text-[15px] text-muted hover:text-text">
+      <button type="button" onClick={() => navigate(-1)} className="mb-4 flex items-center gap-1 text-control text-muted hover:text-text">
         <ArrowLeft className="h-4 w-4" /> Назад
       </button>
 
@@ -207,8 +207,8 @@ export function StudentDetailPage() {
                 <ImageIcon className="h-8 w-8" strokeWidth={1.5} />
               </span>
               <div>
-                <p className="text-[20px] font-bold text-text">{student.fullName}</p>
-                <p className="text-[13px] text-muted">(id: {student.publicId})</p>
+                <p className="text-page font-bold text-text">{student.fullName}</p>
+                <p className="text-small text-muted">(id: {student.publicId})</p>
               </div>
             </div>
             <div className="flex flex-col justify-between">
@@ -229,24 +229,24 @@ export function StudentDetailPage() {
 
           <div className="flex items-center gap-2">
             <BalanceBadge balance={student.balance} />
-            <span className="text-[15px] text-muted">баланс</span>
+            <span className="text-control text-muted">баланс</span>
             <Button variant="icon-round" tone="navy" onClick={handleRecalcBalance} loading={recalculating} aria-label="Пересчитать баланс">
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
 
           <div>
-            <span className="text-[13px] text-muted">Телефон: </span>
-            <a href={`tel:+${student.phone}`} className="text-[15px] text-link">
+            <span className="text-small text-muted">Телефон: </span>
+            <a href={`tel:+${student.phone}`} className="text-control text-link">
               {formatPhone(student.phone)}
             </a>
           </div>
           <div>
-            <span className="text-[13px] text-muted">Дата добавления: </span>
-            <span className="text-[15px] text-text">{formatDateLong(student.createdAt)}</span>
+            <span className="text-small text-muted">Дата добавления: </span>
+            <span className="text-control text-text">{formatDateLong(student.createdAt)}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[13px] text-muted">Филиалы: </span>
+            <span className="text-small text-muted">Филиалы: </span>
             <Badge variant="group-code">{branchName}</Badge>
           </div>
 
@@ -259,7 +259,7 @@ export function StudentDetailPage() {
             <button
               type="button"
               onClick={() => setAddToGroupOpen(true)}
-              className="flex items-center gap-2 rounded-l-full px-4 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+              className="flex items-center gap-2 rounded-l-full px-4 text-control font-bold text-navy hover:bg-orange-soft/40"
             >
               <FolderPlus className="h-4 w-4" /> Добавить в группу
             </button>
@@ -275,7 +275,7 @@ export function StudentDetailPage() {
             <button
               type="button"
               onClick={() => setPaymentOpen(true)}
-              className="flex items-center gap-2 rounded-l-full px-4 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+              className="flex items-center gap-2 rounded-l-full px-4 text-control font-bold text-navy hover:bg-orange-soft/40"
             >
               <Wallet className="h-4 w-4" /> Добавить оплату
             </button>
@@ -288,7 +288,7 @@ export function StudentDetailPage() {
             <button
               type="button"
               onClick={() => setManualChargeOpen(true)}
-              className="flex w-fit items-center gap-2 rounded-full border border-navy px-4 py-2 text-[15px] font-bold text-navy hover:bg-orange-soft/40"
+              className="flex w-fit items-center gap-2 rounded-full border border-navy px-4 py-2 text-control font-bold text-navy hover:bg-orange-soft/40"
             >
               <Wallet className="h-4 w-4" /> Ручное списание
             </button>
@@ -296,7 +296,7 @@ export function StudentDetailPage() {
 
           <div className="rounded-r-field border-l-4 border-l-navy bg-surface-alt/40 py-2 pl-3 pr-2">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-[13px] text-muted">Заметки</span>
+              <span className="text-small text-muted">Заметки</span>
               <button type="button" onClick={toggleFlag} aria-label="На контроле">
                 <Flag className={`h-4 w-4 ${student.isFlagged ? 'fill-orange text-orange' : 'text-muted'}`} />
               </button>
@@ -305,24 +305,24 @@ export function StudentDetailPage() {
             {(noteEntries.length > 0 || legacyNote) && (
               <div className="mb-2 flex flex-col gap-2">
                 {[...noteEntries].reverse().map((entry, i) => (
-                  <div key={i} className="text-[14px]">
+                  <div key={i} className="text-body">
                     <p className="whitespace-pre-wrap text-text">{entry.text}</p>
-                    <p className="text-[12px] text-muted">
+                    <p className="text-caption text-muted">
                       {entry.authorName || 'Неизвестный'} · {formatDateTimeShort(entry.createdAt)}
                     </p>
                   </div>
                 ))}
                 {legacyNote && (
-                  <div className="text-[14px]">
+                  <div className="text-body">
                     <p className="whitespace-pre-wrap text-text">{legacyNote}</p>
-                    <p className="text-[12px] text-muted">Старая заметка, автор неизвестен</p>
+                    <p className="text-caption text-muted">Старая заметка, автор неизвестен</p>
                   </div>
                 )}
               </div>
             )}
 
             <textarea
-              className="min-h-16 w-full resize-none rounded-field border border-border bg-surface p-2 text-[14px] text-text focus:border-navy focus:outline-none"
+              className="min-h-16 w-full resize-none rounded-field border border-border bg-surface p-2 text-body text-text focus:border-navy focus:outline-none"
               placeholder="Добавить заметку…"
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
@@ -368,7 +368,7 @@ export function StudentDetailPage() {
                         <button
                           type="button"
                           onClick={() => setShowLeftGroups((v) => !v)}
-                          className="self-start text-[13px] text-link hover:underline"
+                          className="self-start text-small text-link hover:underline"
                         >
                           {showLeftGroups ? 'Скрыть покинутые группы' : 'Показать покинутые группы'}
                         </button>
@@ -377,7 +377,7 @@ export function StudentDetailPage() {
                   )}
 
                   <div>
-                    <h3 className="mb-3 text-[15px] font-bold text-text">Статус баланса за месяц</h3>
+                    <h3 className="mb-3 text-title font-bold text-text">Статус баланса за месяц</h3>
                     {monthlyBalances.length === 0 ? (
                       <EmptyState icon={Wallet} title="Пока нет начислений" />
                     ) : (
@@ -389,8 +389,8 @@ export function StudentDetailPage() {
                               mb.balance > 0 ? 'border-success' : 'border-danger'
                             }`}
                           >
-                            <p className="text-[13px] text-muted">{formatMonth(mb.month)}</p>
-                            <p className={`text-[15px] font-bold ${mb.balance > 0 ? 'text-success' : 'text-danger'}`}>
+                            <p className="text-small text-muted">{formatMonth(mb.month)}</p>
+                            <p className={`text-control font-bold ${mb.balance > 0 ? 'text-success' : 'text-danger'}`}>
                               {formatMoney(mb.balance)}
                             </p>
                           </div>
@@ -399,7 +399,7 @@ export function StudentDetailPage() {
                     )}
                   </div>
                   <div>
-                    <h3 className="mb-3 text-[15px] font-bold text-text">Платежи</h3>
+                    <h3 className="mb-3 text-title font-bold text-text">Платежи</h3>
                     {transactions.length === 0 ? (
                       <EmptyState icon={Wallet} title="Пока нет платежей" />
                     ) : (

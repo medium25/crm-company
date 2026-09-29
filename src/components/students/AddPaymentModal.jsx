@@ -132,7 +132,7 @@ export function AddPaymentModal({ open, student, enrollments, onClose }) {
           <DatePicker label="Дата" required value={date} onChange={(e) => setDate(e.target.value)} />
           <Input label="Комментарий" value={comment} onChange={(e) => setComment(e.target.value)} />
 
-          <p className="text-[15px] text-muted">
+          <p className="text-control text-muted">
             Баланс после оплаты:{' '}
             <span className={balanceAfter < 0 ? 'font-bold text-danger' : 'font-bold text-success'}>{formatMoney(balanceAfter)}</span>
           </p>

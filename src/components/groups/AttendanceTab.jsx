@@ -393,7 +393,7 @@ export function AttendanceTab({ group }) {
   return (
     <div>
       <div className="mb-4 flex items-center gap-1 sm:gap-2">
-        <button type="button" onClick={() => setMonthDate(startOfMonth(new Date()))} className="shrink-0 rounded-full px-2 py-1.5 text-[13px] text-link sm:px-3">
+        <button type="button" onClick={() => setMonthDate(startOfMonth(new Date()))} className="shrink-0 rounded-full px-2 py-1.5 text-small text-link sm:px-3">
           Текущий
         </button>
         <button type="button" onClick={() => setMonthDate((d) => subMonths(d, 12))} aria-label="-12 мес" className="hidden shrink-0 text-muted hover:text-text sm:block">
@@ -402,7 +402,7 @@ export function AttendanceTab({ group }) {
         <button type="button" onClick={() => setMonthDate((d) => subMonths(d, 1))} aria-label="-1 мес" className="shrink-0 text-muted hover:text-text">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="min-w-24 shrink-0 text-center text-[15px] font-bold text-text sm:min-w-32">
+        <span className="min-w-24 shrink-0 text-center text-control font-bold text-text sm:min-w-32">
           {format(monthDate, 'LLLL yyyy', { locale: ru })}
         </span>
         <button type="button" onClick={() => setMonthDate((d) => addMonths(d, 1))} aria-label="+1 мес" className="shrink-0 text-muted hover:text-text">
@@ -430,10 +430,10 @@ export function AttendanceTab({ group }) {
           */}
           <div className="flex">
             <div className="w-[160px] shrink-0 border-r border-border sm:w-[200px]">
-              <div className="flex h-11 items-center bg-surface px-3 text-[15px] font-bold text-text">Имя</div>
+              <div className="flex h-11 items-center bg-surface px-3 text-control font-bold text-text">Имя</div>
               {visibleEnrollments.map((enrollment) => (
-                <div key={enrollment.id} className="flex h-11 items-center gap-2 bg-surface px-3 text-[15px] text-text">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-alt text-[12px] font-bold text-muted">
+                <div key={enrollment.id} className="flex h-11 items-center gap-2 bg-surface px-3 text-control text-text">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-alt text-caption font-bold text-muted">
                     {enrollment.studentName[0]}
                   </span>
                   <span className="truncate">{enrollment.studentName}</span>
@@ -450,7 +450,7 @@ export function AttendanceTab({ group }) {
                     type="button"
                     onClick={(e) => day.currentLesson && handleHeaderClick(day.currentLesson, e)}
                     title={day.currentLesson ? 'Ctrl/Cmd+клик — отметить всех присутствующими' : 'Уроки прежней группы'}
-                    className={`flex h-11 items-center justify-center px-1 text-[13px] font-bold hover:bg-surface-alt ${
+                    className={`flex h-11 items-center justify-center px-1 text-small font-bold hover:bg-surface-alt ${
                       day.dateKey === todayKey ? 'bg-orange-soft/40 text-navy' : day.currentLesson ? 'text-text' : 'text-muted'
                     }`}
                   >
@@ -490,7 +490,7 @@ export function AttendanceTab({ group }) {
               const total = lessons.length;
               const pct = total > 0 ? Math.round((presentCount / total) * 100) : 0;
               return (
-                <div key={enrollment.id} className="flex items-center justify-between text-[13px] text-muted">
+                <div key={enrollment.id} className="flex items-center justify-between text-small text-muted">
                   <span>{enrollment.studentName}</span>
                   <span>
                     {presentCount}/{total} ({pct}%)

@@ -78,21 +78,21 @@ export function ExamsTab({ group, enrollments }) {
           <div key={exam.id} className="rounded-card border border-border-strong p-4">
             <div className="mb-3 flex items-center justify-between">
               <p className="font-bold text-text">{exam.name}</p>
-              <p className="text-[13px] text-muted">
+              <p className="text-small text-muted">
                 {formatDate(exam.date)} · из {exam.maxScore}
               </p>
             </div>
             <div className="flex flex-col gap-2">
               {exam.results.map((r) => (
                 <div key={r.studentId} className="flex items-center justify-between gap-3">
-                  <span className="text-[15px] text-text">{r.studentName}</span>
+                  <span className="text-control text-text">{r.studentName}</span>
                   <input
                     type="number"
                     min="0"
                     max={exam.maxScore}
                     defaultValue={r.score ?? ''}
                     onBlur={(e) => setScore(exam, r.studentId, e.target.value)}
-                    className="h-9 w-20 rounded-field border border-border-strong px-2 text-center text-[15px] focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
+                    className="h-9 w-20 rounded-field border border-border-strong px-2 text-center text-small focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
                   />
                 </div>
               ))}

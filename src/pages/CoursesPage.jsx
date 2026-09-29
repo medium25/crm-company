@@ -168,7 +168,7 @@ export function CoursesPage() {
         </div>
       )}
 
-      {error && <p className="text-[15px] text-danger">Не удалось загрузить. Проверьте соединение.</p>}
+      {error && <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>}
 
       {!loading && !error && courses.length === 0 && (
         <EmptyState
@@ -220,7 +220,7 @@ export function CoursesPage() {
             onChange={(e) => setForm((f) => ({ ...f, defaultDurationMonths: e.target.value }))}
           />
           <div>
-            <span className="mb-1 block text-[13px] text-muted">Цвет</span>
+            <span className="mb-1 block text-small text-muted">Цвет</span>
             <div className="flex gap-2">
               {PALETTE.map((c) => (
                 <button

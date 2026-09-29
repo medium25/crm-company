@@ -280,7 +280,7 @@ export function GroupFormModal({ group, onClose }) {
                 codeTouched.current = false;
                 setForm((f) => ({ ...f, code: suggestedCode }));
               }}
-              className="mt-1 text-[12px] font-bold text-navy hover:text-navy-hover"
+              className="mt-1 text-caption font-bold text-navy hover:text-navy-hover"
             >
               Применить по правилу: {suggestedCode}
             </button>
@@ -324,14 +324,14 @@ export function GroupFormModal({ group, onClose }) {
 
         {form.scheduleType === 'weekdays' && (
           <div className="md:col-span-2">
-            <span className="mb-1 block text-[13px] text-muted">Дни недели</span>
+            <span className="mb-1 block text-small text-muted">Дни недели</span>
             <div className="flex gap-2">
               {WEEKDAY_LABELS.map((d) => (
                 <button
                   key={d.value}
                   type="button"
                   onClick={() => toggleWeekday(d.value)}
-                  className={`h-9 w-9 rounded-full border text-[13px] font-bold ${
+                  className={`h-9 w-9 rounded-full border text-small font-bold ${
                     form.weekdays.includes(d.value) ? 'border-navy bg-navy text-white' : 'border-border-strong text-text'
                   }`}
                 >
@@ -350,19 +350,19 @@ export function GroupFormModal({ group, onClose }) {
         />
 
         <div>
-          <span className="mb-1 block text-[13px] text-muted">Окончание</span>
+          <span className="mb-1 block text-small text-muted">Окончание</span>
           <div className="mb-2 flex gap-2">
             <button
               type="button"
               onClick={() => setForm((f) => ({ ...f, endMode: 'date' }))}
-              className={`rounded-full px-3 py-1 text-[13px] ${form.endMode === 'date' ? 'bg-navy text-white' : 'bg-surface-alt text-muted'}`}
+              className={`rounded-full px-3 py-1 text-small ${form.endMode === 'date' ? 'bg-navy text-white' : 'bg-surface-alt text-muted'}`}
             >
               Дата
             </button>
             <button
               type="button"
               onClick={() => setForm((f) => ({ ...f, endMode: 'duration' }))}
-              className={`rounded-full px-3 py-1 text-[13px] ${form.endMode === 'duration' ? 'bg-navy text-white' : 'bg-surface-alt text-muted'}`}
+              className={`rounded-full px-3 py-1 text-small ${form.endMode === 'duration' ? 'bg-navy text-white' : 'bg-surface-alt text-muted'}`}
             >
               Длительность
             </button>

@@ -134,7 +134,7 @@ export function NoChargeHistoryList() {
       width: '160px',
       render: (st) => (
         <span onClick={(e) => e.stopPropagation()}>
-          <Button variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setConfirmTarget(st)}>
+          <Button variant="secondary" size="sm" onClick={() => setConfirmTarget(st)}>
             Проверено
           </Button>
         </span>
@@ -144,7 +144,7 @@ export function NoChargeHistoryList() {
 
   return (
     <div>
-      <p className="mb-4 text-[13px] text-muted">
+      <p className="mb-4 text-small text-muted">
         Сверка со старой системой — {rows.length} активных студентов. Открой карточку, сравни баланс и историю
         списаний с modme, затем нажми «Проверено». Список опустеет — сверка завершена.
       </p>

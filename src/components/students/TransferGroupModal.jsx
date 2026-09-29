@@ -274,7 +274,7 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <p className="text-[15px] text-text">
+        <p className="text-control text-text">
           Студент <b>{enrollment?.studentName}</b> покинет группу <b>{enrollment?.groupCode}</b> и будет добавлен в
           выбранную группу с тем же статусом (<b>{enrollment?.statusLabel}</b>).
         </p>
@@ -301,7 +301,7 @@ export function TransferGroupModal({ enrollment, student, onClose }) {
               value={alreadyHad}
               onChange={(e) => setAlreadyHad(e.target.value)}
             />
-            <p className="text-[13px] text-muted">
+            <p className="text-small text-muted">
               Спишется {alreadyHadNum} ур. со старой группы, {remaining} ур. с новой (из {totalOld}).
             </p>
           </>

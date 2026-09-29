@@ -79,13 +79,13 @@ export function UnfreezeEnrollmentModal({ enrollment, onClose }) {
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-[15px] text-text">
+        <p className="text-control text-text">
           Снять заморозку записи «{enrollment?.groupCode}»? Укажите дату, с которой студент фактически вернулся на занятия —
           студент вернётся в статус «Активен».
         </p>
         <DatePicker label="Дата возобновления" required value={resumedFrom} onChange={(e) => setResumedFrom(e.target.value)} />
         {dateBeforeFreezeStart && (
-          <p className="rounded-field bg-danger/5 p-3 text-[13px] text-danger">
+          <p className="rounded-field bg-danger/5 p-3 text-small text-danger">
             Дата возобновления не может быть раньше начала заморозки ({format(pausedFromDate, 'dd.MM.yyyy')}).
           </p>
         )}

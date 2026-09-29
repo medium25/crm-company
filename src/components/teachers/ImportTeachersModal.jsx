@@ -146,10 +146,10 @@ export function ImportTeachersModal({ open, onClose, teachers, branchId, userId 
       <div className="flex flex-col gap-4">
         {!report && rows.length === 0 && (
           <>
-            <p className="text-[15px] text-muted">
+            <p className="text-control text-muted">
               CSV с колонками: <b>Отображаемое имя</b>, <b>Полное имя</b>, <b>Телефон</b>. Первая строка — заголовки.
             </p>
-            <label className="flex h-11 w-fit cursor-pointer items-center gap-2 rounded-full border border-navy px-5 text-[15px] font-bold text-navy hover:bg-orange-soft/40">
+            <label className="flex h-12 w-fit cursor-pointer items-center gap-2 rounded-full border border-navy px-5 text-control font-bold text-navy hover:bg-orange-soft/40">
               <UploadCloud className="h-4 w-4" /> Выбрать файл
               <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
             </label>
@@ -158,7 +158,7 @@ export function ImportTeachersModal({ open, onClose, teachers, branchId, userId 
 
         {rows.length > 0 && !report && (
           <>
-            <p className="text-[13px] text-muted">
+            <p className="text-small text-muted">
               {fileName} · строк: {rows.length}, готово к импорту: {validRows.length}
             </p>
             <Table columns={columns} rows={rows.map((r, i) => ({ id: i, ...r }))} />
@@ -166,11 +166,11 @@ export function ImportTeachersModal({ open, onClose, teachers, branchId, userId 
         )}
 
         {report && !report.failed && (
-          <p className="text-[15px] text-text">
+          <p className="text-control text-text">
             Создано: {report.created} · Обновлено: {report.updated} · Пропущено с ошибками: {report.skipped}
           </p>
         )}
-        {report?.failed && <p className="text-[15px] text-danger">Импорт не удался, ничего не сохранено. Попробуйте ещё раз.</p>}
+        {report?.failed && <p className="text-control text-danger">Импорт не удался, ничего не сохранено. Попробуйте ещё раз.</p>}
       </div>
     </Modal>
   );
