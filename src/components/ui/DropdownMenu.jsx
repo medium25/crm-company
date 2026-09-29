@@ -120,7 +120,7 @@ export function DropdownMenu({ items, variant = 'icon', icon: Icon, ariaLabel, t
                   setOpen(false);
                   item.onClick();
                 }}
-                className={`block w-full px-3 py-2 text-left text-[15px] hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
+                className={`block w-full px-3 py-2 text-left text-control hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
                   item.danger ? 'text-danger' : 'text-text'
                 }`}
               >

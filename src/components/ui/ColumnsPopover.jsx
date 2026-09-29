@@ -30,7 +30,7 @@ export function ColumnsPopover({ columns, visible, onChange }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 items-center gap-2 rounded-field border border-border-strong px-3 text-[15px] text-text hover:bg-surface-alt"
+        className="flex h-9 items-center gap-2 rounded-field border border-border-strong px-3 text-small text-text hover:bg-surface-alt"
       >
         <Settings2 className="h-4 w-4" /> Колонки
       </button>
@@ -39,7 +39,7 @@ export function ColumnsPopover({ columns, visible, onChange }) {
           {columns.map((col) => (
             <label
               key={col.key}
-              className="flex items-center gap-2 rounded px-2 py-1.5 text-[15px] text-text hover:bg-surface-alt"
+              className="flex items-center gap-2 rounded-field px-2 py-1.5 text-control text-text hover:bg-surface-alt"
             >
               <input type="checkbox" checked={visible.includes(col.key)} onChange={() => toggle(col.key)} />
               {col.label}

@@ -38,7 +38,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-[15px] text-text">{message}</p>
+      <p className="text-control text-text">{message}</p>
     </Modal>
   );
 }

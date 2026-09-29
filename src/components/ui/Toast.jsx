@@ -43,11 +43,11 @@ export function ToastProvider({ children }) {
                 className="flex items-center gap-3 rounded-card border border-border bg-surface p-4 shadow-hover"
               >
                 <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
-                <span className="flex-1 text-[15px] text-text">{t.message}</span>
+                <span className="flex-1 text-control text-text">{t.message}</span>
                 {t.actionLabel && (
                   <button
                     type="button"
-                    className="text-[13px] font-bold text-link"
+                    className="text-small font-bold text-link"
                     onClick={() => {
                       t.onAction?.();
                       dismiss(t.id);
