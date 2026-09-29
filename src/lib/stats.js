@@ -316,58 +316,47 @@ export async function countTrialMonthRetention(db, branchId, monthDate = new Dat
 }
 
 /**
- * Конверсия пробных этого месяца в оплату, по источнику лида: «N из M» — M это пробные этого
- * источника, что состоялись в этом месяце (та же выборка, что countTrialMonthRetention/
- * trialMonthBreakdown), N — сколько из НИХ ЖЕ (не любых плативших в этом месяце) уже оплатили
- * (`students.firstPaymentAt` заполнен — оплата могла случиться и позже, решение просто ещё не
- * принято, как и у «остались»%). N — подмножество M, поэтому N ⩽ M всегда, в отличие от прежней
- * версии, где N считался как «новые плательщики месяца» независимо от месяца их пробного (тогда
- * могло получиться N > M, если пробный был раньше, а заплатили в этом месяце). Источник — поле
- * `source` карточки студента; без источника — ключ 'none'. По убыванию N.
+ * Разбивка «+N добавились» (countNewStudents — funnelStage 'won', paidAt в периоде) по источнику
+ * лида: те же студенты, тот же период (`periodStart`/`periodEnd` — тот же churnPeriodRange, что
+ * даёт число на плитке «добавились»), поэтому сумма счётчиков по источникам всегда равна числу
+ * на этой плитке (раньше окно источников считало отдельную выборку — «пробные этого месяца,
+ * кто уже оплатил» — и не совпадало с «добавились», путало). Источник — поле `source` карточки
+ * студента; без источника — ключ 'none'. По убыванию числа.
  * @param {import('firebase/firestore').Firestore} db
  * @param {string} branchId
- * @param {Promise<Array<Object>>} [payments] платежи текущего/прошлого месяца (fetchDashboardPayments) — только
- *   для суммы оплаченного (сама конверсия платежи не читает, они не обязаны попадать в эти 2 месяца)
- * @returns {Promise<Array<{key: string, count: number, amount: number, trialCount: number}>>}
+ * @param {Date} periodStart
+ * @param {Date} periodEnd
+ * @param {Promise<Array<Object>>} [payments] платежи текущего/прошлого месяца (fetchDashboardPayments), если уже
+ *   загружены — только для суммы (сама разбивка их не требует; сумма за период длиннее 2 месяцев
+ *   досчитается неполной, число студентов это не касается)
+ * @returns {Promise<Array<{key: string, count: number, amount: number}>>}
  */
-export async function countPaymentSources(db, branchId, payments) {
-  const now = new Date();
-  const monthStart = startOfMonth(now);
-  const monthEnd = new Date(addMonths(monthStart, 1).getTime() - 1);
-
-  const trialSnap = await getDocs(
+export async function countPaymentSources(db, branchId, periodStart, periodEnd, payments) {
+  const snap = await getDocs(
     query(
       collection(db, 'students'),
       where('branchId', '==', branchId),
-      where('trialDate', '>=', Timestamp.fromDate(monthStart)),
-      where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
+      where('funnelStage', '==', 'won'),
+      where('paidAt', '>=', Timestamp.fromDate(periodStart)),
+      where('paidAt', '<=', Timestamp.fromDate(periodEnd)),
     ),
   );
-  const happened = trialSnap.docs.filter((d) => hasTrialHappened(d.data()));
-
   const map = new Map();
-  const paidIds = new Set();
-  for (const d of happened) {
-    const s = d.data();
-    const key = s.source || 'none';
-    const cur = map.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
-    cur.trialCount += 1;
-    if (s.firstPaymentAt) {
-      cur.count += 1;
-      paidIds.add(d.id);
-    }
+  const sourceByStudent = new Map();
+  for (const d of snap.docs) {
+    const key = d.data().source || 'none';
+    const cur = map.get(key) ?? { key, count: 0, amount: 0 };
+    cur.count += 1;
     map.set(key, cur);
+    sourceByStudent.set(d.id, key);
   }
-  if (paidIds.size === 0) return [...map.values()].sort((a, b) => b.count - a.count);
+  if (map.size === 0) return [];
 
-  // Сумма — по транзакциям этих же оплативших, что реально нашлись в уже загруженных платежах
-  // (текущий/прошлый месяц); оплата вне этого окна в сумму не попадёт, но N/M это не меняет.
+  const now = new Date();
   const month = format(now, 'yyyy-MM');
   const prevMonth = format(subMonths(now, 1), 'yyyy-MM');
   const list = payments ? await payments : await fetchPaymentDocs(db, branchId, [month, prevMonth]);
-  const sourceByStudent = new Map(happened.filter((d) => paidIds.has(d.id)).map((d) => [d.id, d.data().source || 'none']));
   for (const t of list) {
-    if (!paidIds.has(t.studentId)) continue;
     const cur = map.get(sourceByStudent.get(t.studentId));
     if (cur) cur.amount += t.amount ?? 0;
   }
@@ -406,7 +395,7 @@ export async function loadDashboardStats(db, branchId, churnPeriod = 'year', pay
     countNewStudents(db, branchId, start, end),
     countTrialToday(db, branchId),
     countTrialMonthRetention(db, branchId),
-    countPaymentSources(db, branchId, payments),
+    countPaymentSources(db, branchId, start, end, payments),
   ]);
 
   return { activeStudents, trial, debtors, paidThisMonth, leftActiveGroup, leftAfterTrial, newStudents, trialToday, trialMonth, newPaymentSources };

@@ -292,7 +292,8 @@ export function DashboardPage() {
     }
     if (stats.newPaymentSources === undefined && paymentSourcesRequested.current !== activeBranchId) {
       paymentSourcesRequested.current = activeBranchId; // один раз за сессию — это ~200 чтений
-      countPaymentSources(db, activeBranchId).then((v) => setLiveFallback((prev) => ({ ...prev, newPaymentSources: v })));
+      const { start, end } = churnPeriodRange(churnPeriod);
+      countPaymentSources(db, activeBranchId, start, end).then((v) => setLiveFallback((prev) => ({ ...prev, newPaymentSources: v })));
     }
     if (stats.newStudents === undefined) {
       const { start, end } = churnPeriodRange(churnPeriod);
@@ -513,7 +514,7 @@ export function DashboardPage() {
         </>
       )}
 
-      <PaymentSourceAnalysis className="mt-6" sources={effectiveNewPaymentSources} periodLabel={`новые оплаты за ${currentMonthName}`} />
+      <PaymentSourceAnalysis className="mt-6" sources={effectiveNewPaymentSources} periodLabel="добавились" />
 
       <Card className="mt-6">
         {stats?.comparison ? (
