@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Переделать блок «Расписание кабинетов» на дашборде: 3 кабинета в ряд (лишние блоком ниже), время занятия крупным синим блоком внутри карточки, под названием места занятые и свободные, вместимость группы настраивается, кабинеты переименовываются, добавляются и убираются, у учителей видно число учеников и их занятия (время и кабинет).
+**Goal:** Добавить на дашборд под существующим блоком «Расписание кабинетов» новый блок: 3 кабинета в ряд (лишние блоком ниже), время занятия крупным синим блоком внутри карточки, под названием места занятые и свободные, вместимость группы настраивается, кабинеты переименовываются, добавляются и убираются, у учителей видно число учеников и их занятия (время и кабинет).
 
-**Architecture:** Чистая логика в `src/lib/roomSchedule.js` (тесты `node:test`). Презентационный `RoomScheduleView` получает данные и колбэки через пропсы и не знает про Firestore, что даёт возможность смотреть его на витрине `#/settings/ui` без входа. Контейнер `RoomScheduleGrid` (уже существует) подписывается на `groups` и `rooms` и пишет в Firestore: `groups.{id}.capacity`, `rooms.{id}.name`, создание и архивация кабинетов.
+**Architecture:** Чистая логика в `src/lib/roomSchedule.js` (тесты `node:test`). Презентационный `RoomScheduleView` получает данные и колбэки через пропсы и не знает про Firestore, что даёт возможность смотреть его на витрине `#/settings/ui` без входа. Новый контейнер `RoomScheduleBoard` (старый `RoomScheduleGrid` остаётся без изменений, новый блок идёт под ним) подписывается на `groups` и `rooms` и пишет в Firestore: `groups.{id}.capacity`, `rooms.{id}.name`, создание и архивация кабинетов.
 
 **Tech Stack:** React 19, Vite, Tailwind с токенами (см. `DESIGN.md`), Firestore, `node:test`.
 
@@ -277,36 +277,41 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: Контейнер RoomScheduleGrid с записью в Firestore
+### Task 3: Контейнер RoomScheduleBoard с записью в Firestore и подключение под старым блоком
+
+**Решение владельца:** старый блок «Расписание кабинетов» (`RoomScheduleGrid`) остаётся как есть и НЕ меняется. Новый блок добавляется на дашборд отдельной карточкой ПОД ним.
 
 **Files:**
-- Modify: `src/components/dashboard/RoomScheduleGrid.jsx` (полная замена содержимого)
+- Create: `src/components/dashboard/RoomScheduleBoard.jsx`
+- Modify: `src/pages/DashboardPage.jsx` (около строки 532: сразу после `<RoomScheduleGrid branchId={activeBranchId} />` добавить `<RoomScheduleBoard branchId={activeBranchId} />` и импорт; отступ между карточками как у соседних блоков страницы)
+- Не трогать: `src/components/dashboard/RoomScheduleGrid.jsx`
 
 **Interfaces:**
-- Consumes: `RoomScheduleView` (Task 2), `DEFAULT_GROUP_CAPACITY`, `clampCapacity`, `nextRoomName` (Task 1), `useAuth` (user.uid, как в `RoomsPage.jsx`), `useToast`, существующие запросы `groups` (active, не архивные, по branchId) и `rooms` (по branchId, не архивные, `orderBy('name')`).
-- Produces: `RoomScheduleGrid({ branchId })` — тот же публичный интерфейс, используется в `DashboardPage.jsx` без изменений.
+- Consumes: `RoomScheduleView` (Task 2), `DEFAULT_GROUP_CAPACITY`, `clampCapacity`, `nextRoomName` (Task 1), `useAuth` (user.uid, как в `RoomsPage.jsx`), `useToast`. Подписки: те же два запроса, что в `RoomScheduleGrid.jsx` (`groups`: active, не архивные, по branchId; `rooms`: по branchId, не архивные, `orderBy('name')`), оба в `useMemo`.
+- Produces: `RoomScheduleBoard({ branchId })`. Карточка с заголовком «Расписание кабинетов» и подписью `hint` «новый вид» (`SectionTitle`), внутри `RoomScheduleView`.
 
 **Запись в Firestore (по образцу `RoomsPage.jsx`):**
 - Вместимость: `updateDoc(doc(db, 'groups', id), { capacity, updatedAt: serverTimestamp(), updatedBy: user.uid })`.
 - Переименование: `updateDoc(doc(db, 'rooms', id), { name, updatedAt: serverTimestamp(), updatedBy: user.uid })`.
 - Добавить кабинет: `addDoc(collection(db, 'rooms'), { name: nextRoomName(rooms), capacity: DEFAULT_GROUP_CAPACITY, branchId, isArchived: false, createdAt, createdBy, updatedAt, updatedBy })`.
-- Убрать последний кабинет (архивация, не удаление): как `requestArchive` + `confirmArchive`: если у кабинета есть не архивные группы (запрос `groups` по `roomId`, `isArchived == false`) — `notice` «В кабинете «N» есть группы: КОДЫ. Сначала переведите их в другой кабинет.» и ничего не писать; иначе `updateDoc(..., { isArchived: true, archivedAt, updatedAt, updatedBy })`. Подтверждение через `ConfirmDialog`, как в `RoomsPage.jsx` (Читать ConfirmDialog там же).
-- Ошибки записи: toast `type: 'error'`. Успех: короткий toast («Вместимость сохранена» не показывать на каждый клик «+»/«−»; только на ошибки).
-- Фильтр по `dayType` (`g.schedule.type === dayType`) остаётся здесь, в `RoomScheduleView` приходят уже отфильтрованные группы. `studentsCount` берётся как есть.
-- `canEdit` берётся из роли (см. `src/lib/roles.js`; если нет подходящей функции — `true`, дашборд админский).
-- Новых чтений не добавлять, кроме разового `getDocs` перед архивацией.
+- Убрать последний кабинет (архивация, не удаление): как `requestArchive` + `confirmArchive` в `RoomsPage.jsx`: если у кабинета есть не архивные группы (разовый `getDocs` по `roomId`, `isArchived == false`) — `notice` «В кабинете «N» есть группы: КОДЫ. Сначала переведите их в другой кабинет.» и ничего не писать; иначе `ConfirmDialog` (как в `RoomsPage.jsx`) и `updateDoc(..., { isArchived: true, archivedAt, updatedAt, updatedBy })`.
+- Ошибки записи: toast `type: 'error'`. На успешные «+»/«−» вместимости toast не показывать.
+- Фильтр по `dayType` (`g.schedule.type === dayType`) делается здесь, в `RoomScheduleView` приходят уже отфильтрованные группы. `onOpenGroup` ведёт на `/groups/:id` (как в старом `RoomScheduleGrid`).
+- `canEdit`: `true` (дашборд админский), если в `src/lib/roles.js` нет подходящей проверки.
+- Новых чтений не добавлять, кроме разового `getDocs` перед архивацией. Оба `useCollection`-запроса обязаны быть в `useMemo`: иначе бесконечная подписка (однажды сожгла квоту чтений).
 
-- [ ] **Step 1:** Заменить `RoomScheduleGrid.jsx`: хуки и мемо-запросы оставить как есть (запросы обязаны быть в `useMemo`, иначе бесконечная подписка), добавить обработчики записи, вернуть `<RoomScheduleView …/>` внутри `Card` с заголовком «Расписание кабинетов» (`SectionTitle`).
-- [ ] **Step 2: Проверка**
+- [ ] **Step 1:** Создать `RoomScheduleBoard.jsx` (хуки/запросы по образцу `RoomScheduleGrid.jsx`, обработчики записи, `RoomScheduleView` внутри `Card`).
+- [ ] **Step 2:** Подключить в `DashboardPage.jsx` под `RoomScheduleGrid`.
+- [ ] **Step 3: Проверка**
 
 Run: `npm run check:design | tail -2 && npm run test:lib 2>&1 | tail -4 && npm run lint 2>&1 | tail -3 && npm run build 2>&1 | tail -3`
-Expected: `ок`, 8 pass, без новых замечаний, `✓ built`.
+Expected: `ок`, 8 pass, без новых замечаний, `✓ built`. И `git diff --stat main..HEAD -- src/components/dashboard/RoomScheduleGrid.jsx` пусто.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/components/dashboard/RoomScheduleGrid.jsx
-git commit -m "feat(rooms): RoomScheduleGrid пишет вместимость группы, переименование, добавление и архивацию кабинетов
+git add src/components/dashboard/RoomScheduleBoard.jsx src/pages/DashboardPage.jsx
+git commit -m "feat(rooms): RoomScheduleBoard — новый блок расписания кабинетов под старым, запись вместимости, переименование, добавление и архивация кабинетов
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
