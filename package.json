@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "check:design": "node scripts/check-design.mjs",
     "test:design": "node --test scripts/check-design.test.mjs scripts/migrate-design.test.mjs",
+    "test:lib": "node --test scripts/room-schedule.test.mjs",
     "deploy": "npm run check:design && npm run build && gh-pages -d dist",
     "seed": "node --env-file=.env scripts/seed.js"
   },
