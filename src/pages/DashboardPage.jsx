@@ -13,6 +13,7 @@ import { Card } from '../components/ui/Card.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
 import { RoomScheduleGrid } from '../components/dashboard/RoomScheduleGrid.jsx';
+import { RoomScheduleBoard } from '../components/dashboard/RoomScheduleBoard.jsx';
 import { TrialsMonthChart } from '../components/charts/TrialsMonthChart.jsx';
 import { PaymentSourceAnalysis } from '../components/payments/PaymentSourceAnalysis.jsx';
 import {
@@ -530,6 +531,10 @@ export function DashboardPage() {
 
       <div className="mt-6">
         <RoomScheduleGrid branchId={activeBranchId} />
+      </div>
+
+      <div className="mt-6">
+        <RoomScheduleBoard branchId={activeBranchId} />
       </div>
     </>
   );
