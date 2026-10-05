@@ -2,19 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Переделать блок «Расписание кабинетов» на дашборде: 2 кабинета в ряд (лишние блоком ниже), время занятия крупным синим блоком внутри карточки, под названием места занятые и свободные, вместимость группы настраивается, кабинеты переименовываются, добавляются и убираются, у учителей видно число учеников и их занятия (время и кабинет).
+**Goal:** Переделать блок «Расписание кабинетов» на дашборде: 3 кабинета в ряд (лишние блоком ниже), время занятия крупным синим блоком внутри карточки, под названием места занятые и свободные, вместимость группы настраивается, кабинеты переименовываются, добавляются и убираются, у учителей видно число учеников и их занятия (время и кабинет).
 
 **Architecture:** Чистая логика в `src/lib/roomSchedule.js` (тесты `node:test`). Презентационный `RoomScheduleView` получает данные и колбэки через пропсы и не знает про Firestore, что даёт возможность смотреть его на витрине `#/settings/ui` без входа. Контейнер `RoomScheduleGrid` (уже существует) подписывается на `groups` и `rooms` и пишет в Firestore: `groups.{id}.capacity`, `rooms.{id}.name`, создание и архивация кабинетов.
 
 **Tech Stack:** React 19, Vite, Tailwind с токенами (см. `DESIGN.md`), Firestore, `node:test`.
 
-**Визуальный эталон:** `/private/tmp/claude-501/-Users-donyor-Desktop--------------RM--laude/a3248690-aedb-4d45-959d-5d2b1fec6c95/scratchpad/rooms-v4.html`, вариант «2» (кнопка 2 вверху страницы): блок времени внутри карточки. Полоса учителей над таблицей, легенда, «6/8» с карандашом, редактор вместимости, переименование кабинета с карандашом в заголовке. Файл открывается на `http://localhost:5190/rooms-v4.html`, сервер уже запущен (`python3 -m http.server 5190` в каталоге scratchpad). Перенос в проект: размеры и цвета заменяются токенами из `DESIGN.md` (мокап использует свои px).
+**Визуальный эталон (в мокапе 2 столбца, в проекте 3):** `/private/tmp/claude-501/-Users-donyor-Desktop--------------RM--laude/a3248690-aedb-4d45-959d-5d2b1fec6c95/scratchpad/rooms-v4.html`, вариант «2» (кнопка 2 вверху страницы): блок времени внутри карточки. Полоса учителей над таблицей, легенда, «6/8» с карандашом, редактор вместимости, переименование кабинета с карандашом в заголовке. Файл открывается на `http://localhost:5190/rooms-v4.html`, сервер уже запущен (`python3 -m http.server 5190` в каталоге scratchpad). Перенос в проект: размеры и цвета заменяются токенами из `DESIGN.md` (мокап использует свои px).
 
 ## Global Constraints
 
 - Токены дизайна, а не px/hex: текст `text-caption|small|body|control|title|page|kpi`, радиусы `rounded-card|row|field|badge`, цвета палитры (`bg-navy`, `text-muted`, `bg-surface`, `border-border`, `chart-1..7`, `warning`, `danger`, `success`). Скрипт `npm run check:design` должен давать `ок` (папка `src/components/dashboard/` не в списке LEGACY).
 - Квадрат-место: форма 4px через inline `style={{ borderRadius: 4 }}`, не `rounded-[4px]`.
-- Кабинеты в 2 столбца. Третий и четвёртый и далее идут отдельными блоками таблицы ниже, у каждого блока свои строки времени.
+- Кабинеты в 3 столбца (решение владельца, мокап рисует 2: считать константой `ROOMS_PER_ROW = 3`). Четвёртый и далее идут отдельными блоками таблицы ниже, у каждого блока свои строки времени.
 - Вместимость группы по умолчанию 12 мест (решение владельца), хранится в `groups.{id}.capacity`, диапазон 1…30.
 - Колонки: время внутри карточки (синий блок слева: `bg-navy`, белый текст `text-title`, подпись «начало» `text-caption`), отдельной колонки времени нет.
 - Занято/свободно: закрашенный квадрат это ученик (`studentsCount`), пустой это свободное место, красный (`bg-danger`) это учеников больше, чем мест. Число «6/8» цветом: зелёный `text-success` до 74%, оранжевый `text-warning` от 75%, красный `text-danger` когда мест нет.
@@ -36,7 +36,8 @@
   - `DEFAULT_GROUP_CAPACITY = 12`, `MIN_CAPACITY = 1`, `MAX_CAPACITY = 30`
   - `groupCapacity(group) → number` (поле `capacity`, иначе 12; значения вне 1…30 приводятся к границам)
   - `clampCapacity(n) → number`
-  - `chunkRooms(rooms, size = 2) → Array<Array<room>>`
+  - `ROOMS_PER_ROW = 3`
+  - `chunkRooms(rooms, size = ROOMS_PER_ROW) → Array<Array<room>>`
   - `seatStates(students, capacity) → Array<'full'|'free'|'over'>`
   - `fillTone(students, capacity) → 'ok'|'mid'|'full'`
   - `blockTimes(groups, roomIds) → string[]` (уникальные `schedule.time` групп этих кабинетов, по возрастанию)
@@ -49,7 +50,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_GROUP_CAPACITY, groupCapacity, clampCapacity, chunkRooms, seatStates, fillTone,
+  DEFAULT_GROUP_CAPACITY, ROOMS_PER_ROW, groupCapacity, clampCapacity, chunkRooms, seatStates, fillTone,
   blockTimes, teacherStats, nextRoomName,
 } from '../src/lib/roomSchedule.js';
 
@@ -69,9 +70,11 @@ test('вместимость группы из поля и границы 1…30
   assert.equal(clampCapacity(7.6), 8);
 });
 
-test('кабинеты по 2 в блоке', () => {
-  const r = [1, 2, 3, 4, 5].map((id) => ({ id }));
-  assert.deepEqual(chunkRooms(r).map((b) => b.map((x) => x.id)), [[1, 2], [3, 4], [5]]);
+test('кабинеты по 3 в блоке', () => {
+  assert.equal(ROOMS_PER_ROW, 3);
+  const r = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ id }));
+  assert.deepEqual(chunkRooms(r).map((b) => b.map((x) => x.id)), [[1, 2, 3], [4, 5, 6], [7]]);
+  assert.deepEqual(chunkRooms(r, 2).map((b) => b.map((x) => x.id)), [[1, 2], [3, 4], [5, 6], [7]]);
   assert.deepEqual(chunkRooms([]), []);
 });
 
@@ -150,8 +153,11 @@ export function groupCapacity(group) {
   return clampCapacity(c);
 }
 
-/** Кабинеты блоками по `size` (по 2 в ряд, лишние блоком ниже). */
-export function chunkRooms(rooms, size = 2) {
+/** Сколько кабинетов в одном ряду таблицы (решение владельца). */
+export const ROOMS_PER_ROW = 3;
+
+/** Кабинеты блоками по `size` (по 3 в ряд, лишние блоком ниже). */
+export function chunkRooms(rooms, size = ROOMS_PER_ROW) {
   const out = [];
   for (let i = 0; i < rooms.length; i += size) out.push(rooms.slice(i, i + size));
   return out;
@@ -246,7 +252,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 1. Верх: чипы «Чётные дни / Нечётные дни / По дням недели» (`FilterChip`), справа «Кабинетов [−] N [+]» (кнопки `size="sm"` иконки `Minus`/`Plus` из lucide-react, по 36px).
 2. Легенда одной строкой: закрашенный квадрат «занято (ученик)», пустой «свободно», красный «больше, чем мест», текст «6/8 = 6 учеников из 8 мест».
 3. Полоса учителей (чипы с цветной точкой, именем и «N уч.»), нажатие подсвечивает занятия учителя, остальные карточки `opacity-30`; над таблицей сводка выбранного учителя: «N учеников сейчас в M группах. Занятия: [17:00 каб. 4] …» с крестиком. Цвет учителя: `rgb(var(--color-chart-K))`, K по индексу учителя в `teacherStats` (по кругу 1…7).
-4. Таблица блоками по 2 кабинета (`chunkRooms`), у блока свои строки времени (`blockTimes`). Заголовок столбца «Кабинет {name}» с карандашом; нажатие превращает в поле ввода (Enter сохраняет через `onRenameRoom`, Escape отменяет, пустое имя не сохраняется, `maxLength` 24).
+4. Таблица блоками по 3 кабинета (`chunkRooms`, константа `ROOMS_PER_ROW`), у блока свои строки времени (`blockTimes`). Заголовок столбца «Кабинет {name}» с карандашом; нажатие превращает в поле ввода (Enter сохраняет через `onRenameRoom`, Escape отменяет, пустое имя не сохраняется, `maxLength` 24).
 5. Карточка группы: слева синий блок времени (`bg-navy`, белое `text-title` жирное, «начало» `text-caption`), справа две строки: «КОД · курс» (код `text-navy` жирный, нажатие `onOpenGroup`) и «N/M» с карандашом; ниже квадраты-места (`seatStates`, 13px, отступ 3px) и имя учителя (нажатие выбирает учителя). Нажатие на «N/M» раскрывает под карточкой «Вместимость группы [−] M [+] Готово» (`clampCapacity`, вызов `onChangeCapacity(groupId, newValue)` при каждом нажатии).
 6. Пустые состояния: нет кабинетов («Кабинеты не заведены»), нет групп этого типа дней («Нет групп с таким типом расписания»), в блоке нет групп («В этих кабинетах пока нет групп»).
 7. Состояния доступности: `aria-label` на иконочных кнопках, фокус-кольцо у кнопок, `title` на «N/M».
@@ -309,7 +315,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ## Self-Review
 
-- 2 столбца и блоки ниже: Task 1 `chunkRooms`, Task 2 п.4.
+- 3 столбца и блоки ниже: Task 1 `chunkRooms`, Task 2 п.4.
 - Переименование кабинета: Task 2 п.4, Task 3.
 - Вместимость группы (по умолчанию 12, 1…30), места под карточкой: Task 1, Task 2 п.5, Task 3.
 - Время крупно внутри карточки: Task 2 п.5.
