@@ -8,7 +8,7 @@ import { useToast } from '../ui/Toast.jsx';
 import { Card } from '../ui/Card.jsx';
 import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { RoomScheduleView } from './RoomScheduleView.jsx';
-import { DEFAULT_GROUP_CAPACITY, clampCapacity, nextRoomName } from '../../lib/roomSchedule.js';
+import { DEFAULT_GROUP_CAPACITY, clampCapacity, nextRoomName, groupTrialCounts } from '../../lib/roomSchedule.js';
 
 /**
  * Новый блок «Расписание кабинетов» (под старым RoomScheduleGrid): подписки, фильтр по типу дней
@@ -40,6 +40,13 @@ export function RoomScheduleBoard({ branchId }) {
   );
   const { data: rooms, loading: roomsLoading } = useCollection(roomsQuery);
 
+  // лиды с назначенным пробным: считаются жёлтыми местами; десятки документов
+  const trialLeadsQuery = useMemo(
+    () => (db && branchId ? query(collection(db, 'students'), where('branchId', '==', branchId), where('isArchived', '==', false), where('funnelStage', '==', 'trial_scheduled')) : null),
+    [branchId],
+  );
+  const { data: trialLeads } = useCollection(trialLeadsQuery);
+
   // orderBy('name') в Firestore сортирует как строки ("10" раньше "2") — для показа и «последнего» кабинета нужен натуральный порядок.
   const sortedRooms = useMemo(
     () => [...rooms].sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true })),
@@ -51,6 +58,8 @@ export function RoomScheduleBoard({ branchId }) {
     const roomIds = new Set(sortedRooms.map((r) => r.id));
     return groups.filter((g) => roomIds.has(g.roomId) && g.schedule?.time && g.schedule.type === dayType);
   }, [groups, sortedRooms, dayType]);
+
+  const trialCounts = useMemo(() => groupTrialCounts(viewGroups, trialLeads, new Date()), [viewGroups, trialLeads]);
 
   const handleDayTypeChange = (value) => {
     setNotice('');
@@ -108,9 +117,10 @@ export function RoomScheduleBoard({ branchId }) {
     }
   };
 
-  const handleRemoveLastRoom = async () => {
+  // Общий поток «убрать кабинет»: проверка активных групп, затем подтверждение и архивация.
+  const handleRemoveRoom = async (roomId) => {
     setNotice('');
-    const room = sortedRooms[sortedRooms.length - 1];
+    const room = sortedRooms.find((r) => r.id === roomId);
     if (!room) return;
     try {
       const usedByGroups = await getDocs(
@@ -126,6 +136,8 @@ export function RoomScheduleBoard({ branchId }) {
       showToast('Не удалось проверить кабинет.', { type: 'error' });
     }
   };
+
+  const handleRemoveLastRoom = () => handleRemoveRoom(sortedRooms[sortedRooms.length - 1]?.id);
 
   const confirmArchive = async () => {
     if (!user?.uid || !branchId || !archiveTarget) return;
@@ -152,12 +164,14 @@ export function RoomScheduleBoard({ branchId }) {
         hint="новый вид"
         rooms={sortedRooms}
         groups={viewGroups}
+        trialCounts={trialCounts}
         dayType={dayType}
         onDayTypeChange={handleDayTypeChange}
         onRenameRoom={handleRenameRoom}
         onChangeCapacity={handleChangeCapacity}
         onAddRoom={handleAddRoom}
         onRemoveLastRoom={handleRemoveLastRoom}
+        onRemoveRoom={handleRemoveRoom}
         onOpenGroup={(id) => navigate(`/groups/${id}`)}
         notice={notice}
         loading={groupsLoading || roomsLoading}
