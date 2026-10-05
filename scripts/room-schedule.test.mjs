@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_GROUP_CAPACITY, ROOMS_PER_ROW, groupCapacity, clampCapacity, chunkRooms, seatStates, fillTone,
   blockTimes, teacherStats, nextRoomName, teacherColorIndex,
+  LESSON_MINUTES, roomHueIndex, timeToMinutes, minutesToTime, meetsOnDate, roomStatus, roomLoad, groupTrialCounts,
 } from '../src/lib/roomSchedule.js';
 
 test('вместимость по умолчанию 12', () => {
@@ -92,4 +93,94 @@ test('цвет учителя: пустой и неожиданный ключ �
     assert.ok(Number.isInteger(i) && i >= 1 && i <= 7);
   }
   assert.equal(teacherColorIndex(''), teacherColorIndex(undefined));
+});
+
+test('оттенок кабинета 1…7 по кругу', () => {
+  assert.equal(roomHueIndex(0), 1);
+  assert.equal(roomHueIndex(6), 7);
+  assert.equal(roomHueIndex(7), 1);
+  assert.equal(roomHueIndex(15), 2);
+});
+
+test('места с пробными: ученик, пробный, свободно, больше мест', () => {
+  assert.deepEqual(seatStates(2, 5, 1), ['full', 'full', 'trial', 'free', 'free']);
+  assert.deepEqual(seatStates(3, 4, 1), ['full', 'full', 'full', 'trial']);
+  assert.deepEqual(seatStates(3, 4, 3), ['full', 'full', 'full', 'trial', 'over', 'over']);
+  assert.deepEqual(seatStates(5, 3, 1), ['full', 'full', 'full', 'over', 'over', 'over']);
+  assert.deepEqual(seatStates(2, 3), ['full', 'full', 'free']);
+});
+
+test('цвет заполнения учитывает пробных', () => {
+  assert.equal(fillTone(4, 8), 'ok');
+  assert.equal(fillTone(4, 8, 2), 'mid');
+  assert.equal(fillTone(6, 8, 2), 'full');
+});
+
+test('время в минуты и обратно', () => {
+  assert.equal(LESSON_MINUTES, 90);
+  assert.equal(timeToMinutes('17:20'), 1040);
+  assert.equal(minutesToTime(1040), '17:20');
+  assert.equal(minutesToTime(timeToMinutes('09:05') + 90), '10:35');
+});
+
+test('группа проходит в этот день: чётный, нечётный, по дням недели', () => {
+  const even = { schedule: { type: 'even' } };
+  const odd = { schedule: { type: 'odd' } };
+  const wd = { schedule: { type: 'weekdays', weekdays: [1, 3] } };
+  const d6 = new Date(2026, 9, 6); // вторник, 6 число
+  const d7 = new Date(2026, 9, 7); // среда, 7 число
+  assert.equal(meetsOnDate(even, d6), true);
+  assert.equal(meetsOnDate(even, d7), false);
+  assert.equal(meetsOnDate(odd, d7), true);
+  assert.equal(meetsOnDate(wd, d7), true);
+  assert.equal(meetsOnDate(wd, d6), false);
+  assert.equal(meetsOnDate({ schedule: {} }, d6), false);
+});
+
+test('статус кабинета сейчас', () => {
+  const g = (id, time) => ({ id, code: id, schedule: { time } });
+  const gs = [g('a', '09:00'), g('b', '17:00'), g('c', '18:30')];
+  assert.deepEqual(roomStatus([], 600), { kind: 'empty' });
+  assert.deepEqual(roomStatus(gs, 600, () => false), { kind: 'none' });
+  let s = roomStatus(gs, timeToMinutes('17:20'));
+  assert.equal(s.kind, 'live');
+  assert.equal(s.group.id, 'b');
+  assert.equal(s.endsAt, '18:30');
+  s = roomStatus(gs, timeToMinutes('12:00'));
+  assert.equal(s.kind, 'next');
+  assert.equal(s.group.id, 'b');
+  s = roomStatus(gs, timeToMinutes('20:30'));
+  assert.deepEqual(s, { kind: 'done' });
+  s = roomStatus(gs, timeToMinutes('09:10'), (x) => x.id !== 'a');
+  assert.equal(s.kind, 'next');
+});
+
+test('загрузка кабинета: занятия, места, занято, процент', () => {
+  const gs = [
+    { id: 'a', studentsCount: 6, capacity: 8 },
+    { id: 'b', studentsCount: 3 }, // вместимость по умолчанию 12
+  ];
+  assert.deepEqual(roomLoad(gs, { a: 1 }), { lessons: 2, seats: 20, used: 10, pct: 50 });
+  assert.deepEqual(roomLoad([], {}), { lessons: 0, seats: 0, used: 0, pct: 0 });
+  assert.equal(roomLoad([{ id: 'x', studentsCount: 30, capacity: 5 }], {}).pct, 100);
+});
+
+test('пробные по группам: по курсу, времени, чётности, без прошедших', () => {
+  const g = (id, courseId, time, type = 'even', extra = {}) => ({ id, courseId, schedule: { time, type, ...extra } });
+  const dt = (d, h, m) => ({ toDate: () => new Date(2026, 9, d, h, m) });
+  const lead = (courseId, date, stage = 'trial_scheduled') => ({ funnelStage: stage, trialCourseId: courseId, trialDate: date });
+  const today = new Date(2026, 9, 6, 8, 0);
+  const groups = [g('g1', 'c1', '17:00'), g('g2', 'c1', '17:00'), g('g3', 'c1', '18:30'), g('g4', 'c2', '17:00', 'odd')];
+  const leads = [
+    lead('c1', dt(6, 17, 0)),
+    lead('c1', dt(8, 17, 0)),
+    lead('c1', dt(10, 17, 0)),
+    lead('c1', dt(7, 17, 0)), // нечётный день, чётные группы не подходят
+    lead('c1', dt(1, 17, 0)), // прошлое
+    lead('c1', dt(6, 18, 30), 'closing'), // не назначенный пробный
+    lead('c2', dt(7, 17, 0)),
+  ];
+  assert.deepEqual(groupTrialCounts(groups, leads, today), { g1: 2, g2: 1, g3: 0, g4: 1 });
+  assert.deepEqual(groupTrialCounts([], leads, today), {});
+  assert.deepEqual(groupTrialCounts(groups, [], today), { g1: 0, g2: 0, g3: 0, g4: 0 });
 });
