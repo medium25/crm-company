@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_GROUP_CAPACITY, groupCapacity, clampCapacity, chunkRooms, seatStates, fillTone,
+  DEFAULT_GROUP_CAPACITY, ROOMS_PER_ROW, groupCapacity, clampCapacity, chunkRooms, seatStates, fillTone,
   blockTimes, teacherStats, nextRoomName,
 } from '../src/lib/roomSchedule.js';
 
@@ -21,9 +21,11 @@ test('вместимость группы из поля и границы 1…30
   assert.equal(clampCapacity(7.6), 8);
 });
 
-test('кабинеты по 2 в блоке', () => {
-  const r = [1, 2, 3, 4, 5].map((id) => ({ id }));
-  assert.deepEqual(chunkRooms(r).map((b) => b.map((x) => x.id)), [[1, 2], [3, 4], [5]]);
+test('кабинеты по 3 в блоке', () => {
+  assert.equal(ROOMS_PER_ROW, 3);
+  const r = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ id }));
+  assert.deepEqual(chunkRooms(r).map((b) => b.map((x) => x.id)), [[1, 2, 3], [4, 5, 6], [7]]);
+  assert.deepEqual(chunkRooms(r, 2).map((b) => b.map((x) => x.id)), [[1, 2], [3, 4], [5, 6], [7]]);
   assert.deepEqual(chunkRooms([]), []);
 });
 

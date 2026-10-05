@@ -1,9 +1,10 @@
 // Чистая логика блока «Расписание кабинетов» (дашборд): вместимость групп, места «как в
-// кинотеатре», блоки по 2 кабинета, статистика учителей. Без React и Firestore.
+// кинотеатре», блоки по 3 кабинета, статистика учителей. Без React и Firestore.
 
 export const DEFAULT_GROUP_CAPACITY = 12;
 export const MIN_CAPACITY = 1;
 export const MAX_CAPACITY = 30;
+export const ROOMS_PER_ROW = 3;
 
 /** @param {number} n */
 export function clampCapacity(n) {
@@ -17,8 +18,8 @@ export function groupCapacity(group) {
   return clampCapacity(c);
 }
 
-/** Кабинеты блоками по `size` (по 2 в ряд, лишние блоком ниже). */
-export function chunkRooms(rooms, size = 2) {
+/** Кабинеты блоками по `size` (по 3 в ряд, лишние блоком ниже). */
+export function chunkRooms(rooms, size = ROOMS_PER_ROW) {
   const out = [];
   for (let i = 0; i < rooms.length; i += size) out.push(rooms.slice(i, i + size));
   return out;
