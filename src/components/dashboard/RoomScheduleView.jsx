@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CalendarClock, Minus, Pencil, Plus, X } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
@@ -15,6 +15,7 @@ import {
   fillTone,
   groupCapacity,
   seatStates,
+  teacherColorIndex,
   teacherStats,
 } from '../../lib/roomSchedule.js';
 
@@ -34,9 +35,9 @@ const SEAT_CLASS = {
 
 const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40';
 
-/** Цвет учителя: один из 7 цветов графиков по кругу. */
-function teacherColor(index) {
-  const k = (index % 7) + 1;
+/** Цвет учителя: один из 7 цветов графиков, номер стабилен по ключу учителя (teacherColorIndex). */
+function teacherColor(key) {
+  const k = teacherColorIndex(key);
   return { solid: `rgb(var(--color-chart-${k}))`, soft: `rgb(var(--color-chart-${k}) / 0.2)` };
 }
 
@@ -69,12 +70,14 @@ function Seat({ state }) {
 /** Поле переименования кабинета. Сохраняет ровно один раз (Enter и потеря фокуса не дублируются). */
 function RoomNameEditor({ initial, onSave, onCancel }) {
   const done = useRef(false);
-  const finish = (value, save) => {
+  // restoreFocus: вернуть фокус на кнопку-карандаш. При потере фокуса из-за клика в другое
+  // место (relatedTarget) фокус не трогаем, чтобы не отбирать его у нажатого элемента.
+  const finish = (value, save, restoreFocus) => {
     if (done.current) return;
     done.current = true;
     const name = (value ?? '').trim();
-    if (save && name && name !== initial) onSave(name);
-    else onCancel();
+    if (save && name && name !== initial) onSave(name, restoreFocus);
+    else onCancel(restoreFocus);
   };
   return (
     <input
@@ -83,14 +86,14 @@ function RoomNameEditor({ initial, onSave, onCancel }) {
       maxLength={24}
       aria-label="Название кабинета"
       onFocus={(e) => e.target.select()}
-      onBlur={(e) => finish(e.target.value, true)}
+      onBlur={(e) => finish(e.target.value, true, !e.relatedTarget)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          finish(e.currentTarget.value, true);
+          finish(e.currentTarget.value, true, true);
         } else if (e.key === 'Escape') {
           e.preventDefault();
-          finish(null, false);
+          finish(null, false, true);
         }
       }}
       className="h-8 w-36 max-w-full rounded-field border border-navy bg-surface px-2 text-small font-bold text-text outline-none ring-2 ring-navy/20"
@@ -158,9 +161,56 @@ export function RoomScheduleView({
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [capGroupId, setCapGroupId] = useState(null);
   const [selectedKey, setSelectedKey] = useState(null);
+  const [prevDayType, setPrevDayType] = useState(dayType);
+
+  // Сброс правок: смена типа дней, загрузка, потеря прав, исчезнувший кабинет или группа.
+  // Состояние поправляется прямо в рендере (без лишнего кадра со «старым» редактором).
+  if (prevDayType !== dayType) {
+    setPrevDayType(dayType);
+    if (editingRoomId !== null) setEditingRoomId(null);
+    if (capGroupId !== null) setCapGroupId(null);
+  } else {
+    if (editingRoomId !== null && (loading || !canEdit || !rooms.some((r) => r.id === editingRoomId))) {
+      setEditingRoomId(null);
+    }
+    if (capGroupId !== null && (loading || !canEdit || !groups.some((g) => g.id === capGroupId))) {
+      setCapGroupId(null);
+    }
+  }
+
+  // Возврат фокуса: ключ элемента [data-focus] в корне блока, куда фокус надо вернуть.
+  const rootRef = useRef(null);
+  const pendingFocus = useRef(null);
+  // Какая из кнопок «−»/«+» вместимости нажата последней (на случай, если она станет disabled).
+  const capButton = useRef(null);
+  const findFocusable = (key) => rootRef.current?.querySelector(`[data-focus="${CSS.escape(key)}"]`) ?? null;
+  const restoreFocusTo = (key) => {
+    pendingFocus.current = key;
+  };
+
+  useEffect(() => {
+    if (pendingFocus.current) {
+      const el = findFocusable(pendingFocus.current);
+      pendingFocus.current = null;
+      el?.focus();
+    }
+    if (capButton.current) {
+      const el = findFocusable(capButton.current);
+      if (!el) {
+        capButton.current = null;
+      } else if (el.disabled && (document.activeElement === el || document.activeElement === document.body)) {
+        // Кнопка упёрлась в границу и стала недоступной: фокус уходит на соседнюю кнопку.
+        const other = capButton.current.startsWith('capdec:')
+          ? capButton.current.replace('capdec:', 'capinc:')
+          : capButton.current.replace('capinc:', 'capdec:');
+        capButton.current = other;
+        findFocusable(other)?.focus();
+      }
+    }
+  });
 
   const stats = teacherStats(groups);
-  const colorByKey = new Map(stats.map((t, i) => [t.key, teacherColor(i)]));
+  const colorByKey = new Map(stats.map((t) => [t.key, teacherColor(t.key)]));
   const selected = stats.find((t) => t.key === selectedKey) ?? null;
   const roomNameById = new Map(rooms.map((r) => [r.id, r.name]));
   const toggleTeacher = (key) => setSelectedKey((cur) => (cur === key ? null : key));
@@ -200,7 +250,11 @@ export function RoomScheduleView({
               {canEdit ? (
                 <button
                   type="button"
-                  onClick={() => setCapGroupId(editingCap ? null : g.id)}
+                  data-focus={`cap:${g.id}`}
+                  onClick={() => {
+                    capButton.current = null;
+                    setCapGroupId(editingCap ? null : g.id);
+                  }}
                   title={countTitle}
                   aria-label={`${countTitle}. Группа ${g.code}`}
                   aria-expanded={editingCap}
@@ -218,7 +272,7 @@ export function RoomScheduleView({
               <div
                 role="img"
                 aria-label={`Занято ${students} из ${capacity} мест`}
-                className="flex min-w-0 flex-wrap gap-[3px]"
+                className="flex min-w-0 max-w-full flex-wrap gap-[3px]"
               >
                 {seatStates(students, capacity).map((state, i) => (
                   <Seat key={i} state={state} />
@@ -228,8 +282,8 @@ export function RoomScheduleView({
                 type="button"
                 onClick={() => toggleTeacher(key)}
                 aria-pressed={selected?.key === key}
-                title="Подсветить занятия учителя"
-                className={`truncate rounded-field text-caption text-muted hover:text-navy hover:underline ${FOCUS}`}
+                title={`${g.teacherName}: подсветить занятия учителя`}
+                className={`max-w-full min-w-0 truncate rounded-field text-caption text-muted hover:text-navy hover:underline ${FOCUS}`}
               >
                 {g.teacherName}
               </button>
@@ -242,8 +296,12 @@ export function RoomScheduleView({
             <button
               type="button"
               aria-label="Уменьшить вместимость"
+              data-focus={`capdec:${g.id}`}
               disabled={capacity <= MIN_CAPACITY}
-              onClick={() => onChangeCapacity?.(g.id, clampCapacity(capacity - 1))}
+              onClick={() => {
+                capButton.current = `capdec:${g.id}`;
+                onChangeCapacity?.(g.id, clampCapacity(capacity - 1));
+              }}
               className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-border-strong bg-surface text-text hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
             >
               <Minus className="h-3 w-3" aria-hidden="true" />
@@ -252,15 +310,23 @@ export function RoomScheduleView({
             <button
               type="button"
               aria-label="Увеличить вместимость"
+              data-focus={`capinc:${g.id}`}
               disabled={capacity >= MAX_CAPACITY}
-              onClick={() => onChangeCapacity?.(g.id, clampCapacity(capacity + 1))}
+              onClick={() => {
+                capButton.current = `capinc:${g.id}`;
+                onChangeCapacity?.(g.id, clampCapacity(capacity + 1));
+              }}
               className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-border-strong bg-surface text-text hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
             >
               <Plus className="h-3 w-3" aria-hidden="true" />
             </button>
             <button
               type="button"
-              onClick={() => setCapGroupId(null)}
+              onClick={() => {
+                capButton.current = null;
+                restoreFocusTo(`cap:${g.id}`);
+                setCapGroupId(null);
+              }}
               className={`rounded-badge px-2 text-caption font-bold text-navy hover:bg-navy/10 ${FOCUS}`}
             >
               Готово
@@ -276,11 +342,15 @@ export function RoomScheduleView({
       return (
         <RoomNameEditor
           initial={room.name}
-          onSave={(name) => {
+          onSave={(name, restoreFocus) => {
             onRenameRoom?.(room.id, name);
+            if (restoreFocus) restoreFocusTo(`room:${room.id}`);
             setEditingRoomId(null);
           }}
-          onCancel={() => setEditingRoomId(null)}
+          onCancel={(restoreFocus) => {
+            if (restoreFocus) restoreFocusTo(`room:${room.id}`);
+            setEditingRoomId(null);
+          }}
         />
       );
     }
@@ -288,6 +358,7 @@ export function RoomScheduleView({
     return (
       <button
         type="button"
+        data-focus={`room:${room.id}`}
         onClick={() => setEditingRoomId(room.id)}
         title="Переименовать кабинет"
         aria-label={`Переименовать кабинет ${room.name}`}
@@ -305,7 +376,7 @@ export function RoomScheduleView({
     const blockGroups = groups.filter((g) => ids.includes(g.roomId));
     return (
       <div key={index} className="mb-4 overflow-x-auto">
-        <table className="w-full min-w-[840px] table-fixed border-collapse">
+        <table className="w-full min-w-[720px] table-fixed border-collapse">
           <thead>
             <tr>
               {Array.from({ length: ROOMS_PER_ROW }, (_, i) => {
@@ -313,6 +384,8 @@ export function RoomScheduleView({
                 return (
                   <th
                     key={room?.id ?? `empty-${i}`}
+                    scope="col"
+                    aria-hidden={room ? undefined : 'true'}
                     className="h-10 border-b border-r border-border bg-surface-alt px-2.5 py-2 text-left text-body font-bold text-text last:border-r-0"
                   >
                     {room && renderRoomHead(room)}
@@ -407,7 +480,7 @@ export function RoomScheduleView({
   }
 
   return (
-    <div>
+    <div ref={rootRef}>
       <SectionTitle title={title} hint={hint} />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -416,7 +489,8 @@ export function RoomScheduleView({
             key={t.value}
             active={dayType === t.value}
             onClick={() => onDayTypeChange?.(t.value)}
-            className={FOCUS}
+            disabled={loading}
+            className={`${FOCUS} disabled:cursor-not-allowed disabled:opacity-50`}
           >
             {t.label}
           </FilterChip>
@@ -428,7 +502,7 @@ export function RoomScheduleView({
               variant="icon-round"
               size="sm"
               aria-label="Убрать последний кабинет"
-              disabled={rooms.length === 0}
+              disabled={loading || rooms.length === 0}
               onClick={() => onRemoveLastRoom?.()}
               className={FOCUS}
             >
@@ -441,6 +515,7 @@ export function RoomScheduleView({
               variant="icon-round"
               size="sm"
               aria-label="Добавить кабинет"
+              disabled={loading}
               onClick={() => onAddRoom?.()}
               className={FOCUS}
             >
@@ -469,14 +544,18 @@ export function RoomScheduleView({
                 type="button"
                 aria-pressed={active}
                 onClick={() => toggleTeacher(t.key)}
-                className={`inline-flex h-9 items-center gap-2 rounded-field border bg-surface px-3 text-small font-semibold text-text hover:bg-surface-alt ${FOCUS} ${
+                className={`inline-flex h-9 max-w-full items-center gap-2 rounded-field border bg-surface px-3 text-small font-semibold text-text hover:bg-surface-alt ${FOCUS} ${
                   active ? '' : 'border-border-strong'
                 }`}
                 style={active ? { borderColor: color.solid, boxShadow: `0 0 0 2px ${color.soft}` } : undefined}
               >
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color.solid }} aria-hidden="true" />
-                {t.name}
-                <b className="font-bold">{t.students}</b> уч.
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.solid }} aria-hidden="true" />
+                <span className="min-w-0 truncate" title={t.name}>
+                  {t.name}
+                </span>
+                <span className="shrink-0 whitespace-nowrap">
+                  <b className="font-bold">{t.students}</b> уч.
+                </span>
               </button>
             );
           })}

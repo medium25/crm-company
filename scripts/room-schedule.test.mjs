@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_GROUP_CAPACITY, ROOMS_PER_ROW, groupCapacity, clampCapacity, chunkRooms, seatStates, fillTone,
-  blockTimes, teacherStats, nextRoomName,
+  blockTimes, teacherStats, nextRoomName, teacherColorIndex,
 } from '../src/lib/roomSchedule.js';
 
 test('вместимость по умолчанию 12', () => {
@@ -74,4 +74,22 @@ test('название нового кабинета: следующее чис�
   assert.equal(nextRoomName([{ name: '4' }, { name: '10' }, { name: 'Большой' }]), '11');
   assert.equal(nextRoomName([{ name: 'А' }, { name: 'Б' }]), '3');
   assert.equal(nextRoomName([]), '1');
+});
+
+test('цвет учителя: стабильный индекс 1…7 по ключу', () => {
+  for (const key of ['t1', 't2', 'MR IBROHIM', 'Ms Kristina', 'x', '12345abcde']) {
+    const i = teacherColorIndex(key);
+    assert.ok(Number.isInteger(i) && i >= 1 && i <= 7, `индекс ${i} для ${key}`);
+    assert.equal(teacherColorIndex(key), i);
+    assert.equal(teacherColorIndex(key), i);
+  }
+  assert.notEqual(teacherColorIndex('t1'), teacherColorIndex('t2'));
+});
+
+test('цвет учителя: пустой и неожиданный ключ не ломают', () => {
+  for (const key of ['', undefined, null, 42]) {
+    const i = teacherColorIndex(key);
+    assert.ok(Number.isInteger(i) && i >= 1 && i <= 7);
+  }
+  assert.equal(teacherColorIndex(''), teacherColorIndex(undefined));
 });

@@ -10,8 +10,8 @@ const INITIAL_ROOMS = [
   { id: 'r4', name: '7' },
 ];
 
-function group(id, code, courseName, teacherId, teacherName, roomId, time, studentsCount, capacity) {
-  return { id, code, courseName, teacherId, teacherName, roomId, studentsCount, capacity, schedule: { type: 'even', time } };
+function group(id, code, courseName, teacherId, teacherName, roomId, time, studentsCount, capacity, type = 'even') {
+  return { id, code, courseName, teacherId, teacherName, roomId, studentsCount, capacity, schedule: { type, time } };
 }
 
 const INITIAL_GROUPS = [
@@ -27,6 +27,10 @@ const INITIAL_GROUPS = [
   group('g10', 'RJZ18', 'RUS TILI', 't4', 'MS ZIYODA', 'r3', '18:30', 6, 6),
   group('g11', 'IJI19', 'INGLIZ TILI', 't1', 'MR IBROHIM', 'r4', '12:00', 5), // вместимость по умолчанию (12)
   group('g12', 'RJK11', 'RUS TILI', 't2', 'MS KRISTINA', 'r4', '15:30', 9, 8), // больше, чем мест
+  // Нечётные дни и дни недели: чтобы вкладки показывали данные, а цвета учителей не прыгали.
+  group('g13', 'IJI20', 'INGLIZ TILI', 't1', 'MR IBROHIM', 'r1', '10:30', 8, 10, 'odd'),
+  group('g14', 'RJK12', 'RUS TILI', 't2', 'MS KRISTINA', 'r2', '14:00', 5, 8, 'odd'),
+  group('g15', 'RJZ19', 'RUS TILI', 't4', 'MS ZIYODA', 'r3', '09:00', 7, 8, 'weekdays'),
 ];
 
 /** Витрина «Расписание кабинетов»: локальное состояние и данные примера, без Firestore. */

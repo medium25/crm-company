@@ -69,3 +69,18 @@ export function nextRoomName(rooms) {
   const nums = rooms.map((r) => parseInt(r.name, 10)).filter(Number.isFinite);
   return String(nums.length ? Math.max(...nums) + 1 : rooms.length + 1);
 }
+
+/**
+ * Стабильный номер цвета учителя 1…7 (цвета графиков) по ключу teacherId ?? teacherName.
+ * Не зависит от списка на экране, поэтому цвет не меняется между «Чётные»/«Нечётные».
+ * Два учителя могут совпасть по цвету.
+ */
+export function teacherColorIndex(key) {
+  const s = String(key ?? '');
+  let h = 2166136261; // FNV-1a
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 7) + 1;
+}
