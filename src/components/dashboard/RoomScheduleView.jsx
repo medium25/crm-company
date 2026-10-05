@@ -136,6 +136,8 @@ function Legend() {
  * @param {string} [props.notice] предупреждение над таблицей
  * @param {boolean} [props.loading]
  * @param {boolean} [props.canEdit] без прав скрываются карандаши и кнопки (по умолчанию true)
+ * @param {string} [props.title] заголовок блока (по умолчанию «Расписание кабинетов»)
+ * @param {string} [props.hint] приглушённая подпись рядом с заголовком
  */
 export function RoomScheduleView({
   rooms,
@@ -150,6 +152,8 @@ export function RoomScheduleView({
   notice,
   loading = false,
   canEdit = true,
+  title = 'Расписание кабинетов',
+  hint,
 }) {
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [capGroupId, setCapGroupId] = useState(null);
@@ -404,7 +408,7 @@ export function RoomScheduleView({
 
   return (
     <div>
-      <SectionTitle title="Расписание кабинетов" />
+      <SectionTitle title={title} hint={hint} />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {DAY_TYPE_TABS.map((t) => (
