@@ -1,0 +1,83 @@
+import { useState } from 'react';
+import { Card } from '../ui/Card.jsx';
+import { RoomScheduleView } from '../dashboard/RoomScheduleView.jsx';
+import { clampCapacity, nextRoomName } from '../../lib/roomSchedule.js';
+
+const INITIAL_ROOMS = [
+  { id: 'r1', name: '4' },
+  { id: 'r2', name: '5' },
+  { id: 'r3', name: '6' },
+  { id: 'r4', name: '7' },
+];
+
+function group(id, code, courseName, teacherId, teacherName, roomId, time, studentsCount, capacity) {
+  return { id, code, courseName, teacherId, teacherName, roomId, studentsCount, capacity, schedule: { type: 'even', time } };
+}
+
+const INITIAL_GROUPS = [
+  group('g1', 'IJI17', 'INGLIZ TILI', 't1', 'MR IBROHIM', 'r1', '17:00', 7, 8),
+  group('g2', 'IJI18', 'INGLIZ TILI', 't1', 'MR IBROHIM', 'r1', '18:30', 3, 8),
+  group('g3', 'RJK9', 'RUS TILI', 't2', 'MS KRISTINA', 'r2', '09:00', 6, 8),
+  group('g4', 'RJK10', 'RUS TILI', 't2', 'MS KRISTINA', 'r2', '10:30', 4, 8),
+  group('g5', 'RJSh17', 'RUS TILI', 't3', 'MS SHAXZODA', 'r2', '17:00', 6, 8),
+  group('g6', 'RJSh18', 'RUS TILI', 't3', 'MS SHAXZODA', 'r2', '18:30', 10, 10),
+  group('g7', 'RJZ14', 'RUS TILI', 't4', 'MS ZIYODA', 'r3', '14:00', 3, 8),
+  group('g8', 'RJZ15', 'RUS TILI', 't4', 'MS ZIYODA', 'r3', '15:30', 6, 8),
+  group('g9', 'RJZ17', 'RUS TILI', 't4', 'MS ZIYODA', 'r3', '17:00', 3, 8),
+  group('g10', 'RJZ18', 'RUS TILI', 't4', 'MS ZIYODA', 'r3', '18:30', 6, 6),
+  group('g11', 'IJI19', 'INGLIZ TILI', 't1', 'MR IBROHIM', 'r4', '12:00', 5), // вместимость по умолчанию (12)
+  group('g12', 'RJK11', 'RUS TILI', 't2', 'MS KRISTINA', 'r4', '15:30', 9, 8), // больше, чем мест
+];
+
+/** Витрина «Расписание кабинетов»: локальное состояние и данные примера, без Firestore. */
+export function RoomScheduleShowcase() {
+  const [rooms, setRooms] = useState(INITIAL_ROOMS);
+  const [groups, setGroups] = useState(INITIAL_GROUPS);
+  const [dayType, setDayType] = useState('even');
+  const [notice, setNotice] = useState('');
+  const [opened, setOpened] = useState('');
+  const [nextId, setNextId] = useState(5);
+
+  const visibleGroups = groups.filter((g) => g.schedule.type === dayType);
+
+  function addRoom() {
+    setNotice('');
+    setRooms((rs) => [...rs, { id: `r${nextId}`, name: nextRoomName(rs) }]);
+    setNextId((n) => n + 1);
+  }
+
+  function removeLastRoom() {
+    const last = rooms[rooms.length - 1];
+    if (!last) return;
+    if (groups.some((g) => g.roomId === last.id)) {
+      setNotice(`В кабинете «${last.name}» есть группы. Сначала переведите их в другой кабинет.`);
+      return;
+    }
+    setNotice('');
+    setRooms((rs) => rs.slice(0, -1));
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Card>
+        <RoomScheduleView
+          rooms={rooms}
+          groups={visibleGroups}
+          dayType={dayType}
+          onDayTypeChange={setDayType}
+          onRenameRoom={(id, name) => setRooms((rs) => rs.map((r) => (r.id === id ? { ...r, name } : r)))}
+          onChangeCapacity={(id, capacity) =>
+            setGroups((gs) => gs.map((g) => (g.id === id ? { ...g, capacity: clampCapacity(capacity) } : g)))
+          }
+          onAddRoom={addRoom}
+          onRemoveLastRoom={removeLastRoom}
+          onOpenGroup={(id) => setOpened(groups.find((g) => g.id === id)?.code ?? '')}
+          notice={notice}
+        />
+      </Card>
+      <p className="text-small text-muted">
+        {opened ? `Нажата группа ${opened}: в дашборде здесь переход на страницу группы.` : 'Данные примерные. Нажмите на код группы, чтобы проверить переход.'}
+      </p>
+    </div>
+  );
+}

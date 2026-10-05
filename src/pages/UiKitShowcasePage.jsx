@@ -4,6 +4,7 @@ import { FormControlsShowcase } from '../components/dev/FormControlsShowcase.jsx
 import { DataDisplayShowcase } from '../components/dev/DataDisplayShowcase.jsx';
 import { OverlaysShowcase } from '../components/dev/OverlaysShowcase.jsx';
 import { FeedbackShowcase } from '../components/dev/FeedbackShowcase.jsx';
+import { RoomScheduleShowcase } from '../components/dev/RoomScheduleShowcase.jsx';
 
 const SECTIONS = [
   ['Кнопки и бейджи', ButtonsAndBadgesShowcase],
@@ -11,6 +12,7 @@ const SECTIONS = [
   ['Данные (StatCard, Card, Tabs, Table)', DataDisplayShowcase],
   ['Модалки и toast', OverlaysShowcase],
   ['Пусто и загрузка', FeedbackShowcase],
+  ['Расписание кабинетов', RoomScheduleShowcase],
 ];
 
 /**
