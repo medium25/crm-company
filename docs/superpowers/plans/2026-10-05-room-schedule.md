@@ -1,4 +1,4 @@
-# Расписание кабинетов: новая сетка (2 столбца, места как в кинотеатре) Implementation Plan
+# Расписание кабинетов: новая сетка (3 столбца, места как в кинотеатре) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -135,7 +135,7 @@ Expected: FAIL (`Cannot find module '../src/lib/roomSchedule.js'`).
 
 ```js
 // Чистая логика блока «Расписание кабинетов» (дашборд): вместимость групп, места «как в
-// кинотеатре», блоки по 2 кабинета, статистика учителей. Без React и Firestore.
+// кинотеатре», блоки по 3 кабинета, статистика учителей. Без React и Firestore.
 
 export const DEFAULT_GROUP_CAPACITY = 12;
 export const MIN_CAPACITY = 1;
@@ -222,7 +222,7 @@ Expected: `# pass 8`, `# fail 0`.
 
 ```bash
 git add src/lib/roomSchedule.js scripts/room-schedule.test.mjs package.json
-git commit -m "feat(rooms): логика расписания кабинетов — места, блоки по 2, учителя, вместимость 12 по умолчанию
+git commit -m "feat(rooms): логика расписания кабинетов — места, блоки по 3, учителя, вместимость 12 по умолчанию
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
@@ -270,7 +270,7 @@ Expected: `check-design: ок`, lint без новых замечаний, `✓ 
 
 ```bash
 git add src/components/dashboard/RoomScheduleView.jsx src/components/dev/RoomScheduleShowcase.jsx src/pages/UiKitShowcasePage.jsx
-git commit -m "feat(rooms): RoomScheduleView — 2 кабинета в ряд, время в карточке, места как в кинотеатре, учителя; витрина
+git commit -m "feat(rooms): RoomScheduleView — 3 кабинета в ряд, время в карточке, места как в кинотеатре, учителя; витрина
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
