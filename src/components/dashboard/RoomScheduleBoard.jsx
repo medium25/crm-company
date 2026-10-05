@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, getDocs, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
@@ -25,7 +25,9 @@ export function RoomScheduleBoard({ branchId }) {
   const [notice, setNotice] = useState('');
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [archiving, setArchiving] = useState(false);
+  const addingRef = useRef(false);
 
+  // те же запросы, что в RoomScheduleGrid: Firestore делит подписку, держим оба блока независимыми
   const groupsQuery = useMemo(
     () => (db && branchId ? query(collection(db, 'groups'), where('branchId', '==', branchId), where('isArchived', '==', false), where('status', '==', 'active')) : null),
     [branchId],
@@ -38,11 +40,17 @@ export function RoomScheduleBoard({ branchId }) {
   );
   const { data: rooms, loading: roomsLoading } = useCollection(roomsQuery);
 
+  // orderBy('name') в Firestore сортирует как строки ("10" раньше "2") — для показа и «последнего» кабинета нужен натуральный порядок.
+  const sortedRooms = useMemo(
+    () => [...rooms].sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true })),
+    [rooms],
+  );
+
   // В представление идут только группы, которые оно реально покажет: в загруженном кабинете, со временем, нужного типа дней.
   const viewGroups = useMemo(() => {
-    const roomIds = new Set(rooms.map((r) => r.id));
+    const roomIds = new Set(sortedRooms.map((r) => r.id));
     return groups.filter((g) => roomIds.has(g.roomId) && g.schedule?.time && g.schedule.type === dayType);
-  }, [groups, rooms, dayType]);
+  }, [groups, sortedRooms, dayType]);
 
   const handleDayTypeChange = (value) => {
     setNotice('');
@@ -51,6 +59,7 @@ export function RoomScheduleBoard({ branchId }) {
 
   const handleChangeCapacity = async (groupId, capacity) => {
     setNotice('');
+    if (!user?.uid || !branchId || !Number.isFinite(capacity)) return;
     try {
       await updateDoc(doc(db, 'groups', groupId), {
         capacity: clampCapacity(capacity),
@@ -62,8 +71,10 @@ export function RoomScheduleBoard({ branchId }) {
     }
   };
 
-  const handleRenameRoom = async (roomId, name) => {
+  const handleRenameRoom = async (roomId, rawName) => {
     setNotice('');
+    const name = (rawName ?? '').trim();
+    if (!name || !user?.uid || !branchId) return;
     try {
       await updateDoc(doc(db, 'rooms', roomId), {
         name,
@@ -77,9 +88,11 @@ export function RoomScheduleBoard({ branchId }) {
 
   const handleAddRoom = async () => {
     setNotice('');
+    if (!user?.uid || !branchId || addingRef.current) return;
+    addingRef.current = true;
     try {
       await addDoc(collection(db, 'rooms'), {
-        name: nextRoomName(rooms),
+        name: nextRoomName(sortedRooms),
         capacity: DEFAULT_GROUP_CAPACITY,
         branchId,
         isArchived: false,
@@ -90,12 +103,14 @@ export function RoomScheduleBoard({ branchId }) {
       });
     } catch {
       showToast('Не удалось добавить кабинет.', { type: 'error' });
+    } finally {
+      addingRef.current = false;
     }
   };
 
   const handleRemoveLastRoom = async () => {
     setNotice('');
-    const room = rooms[rooms.length - 1];
+    const room = sortedRooms[sortedRooms.length - 1];
     if (!room) return;
     try {
       const usedByGroups = await getDocs(
@@ -113,6 +128,7 @@ export function RoomScheduleBoard({ branchId }) {
   };
 
   const confirmArchive = async () => {
+    if (!user?.uid || !branchId || !archiveTarget) return;
     setArchiving(true);
     try {
       await updateDoc(doc(db, 'rooms', archiveTarget.id), {
@@ -134,7 +150,7 @@ export function RoomScheduleBoard({ branchId }) {
       <RoomScheduleView
         title="Расписание кабинетов"
         hint="новый вид"
-        rooms={rooms}
+        rooms={sortedRooms}
         groups={viewGroups}
         dayType={dayType}
         onDayTypeChange={handleDayTypeChange}
