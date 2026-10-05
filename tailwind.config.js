@@ -51,6 +51,8 @@ export default {
           DEFAULT: 'rgb(var(--color-warning) / <alpha-value>)',
           bg:      'rgb(var(--color-warning-bg) / <alpha-value>)',
         },
+        trial:    'rgb(var(--color-trial) / <alpha-value>)',
+        burgundy: 'rgb(var(--color-burgundy) / <alpha-value>)',
         info: {
           DEFAULT: 'rgb(var(--color-info) / <alpha-value>)',
           bg:      'rgb(var(--color-info-bg) / <alpha-value>)',

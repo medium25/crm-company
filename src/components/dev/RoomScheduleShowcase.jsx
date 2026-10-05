@@ -33,6 +33,12 @@ const INITIAL_GROUPS = [
   group('g15', 'RJZ19', 'RUS TILI', 't4', 'MS ZIYODA', 'r3', '09:00', 7, 8, 'weekdays'),
 ];
 
+// «Сейчас» зафиксировано: чётный вторник 6 октября 2026, 17:20, чтобы статус «Идёт: …» был виден.
+const SHOWCASE_NOW = new Date(2026, 9, 6, 17, 20);
+
+// Записанные на пробный по группам (в дашборде их считает groupTrialCounts по лидам).
+const INITIAL_TRIALS = { g1: 1, g3: 1, g5: 2, g8: 1, g11: 2, g12: 1, g13: 1 };
+
 /** Витрина «Расписание кабинетов»: локальное состояние и данные примера, без Firestore. */
 export function RoomScheduleShowcase() {
   const [rooms, setRooms] = useState(INITIAL_ROOMS);
@@ -50,15 +56,20 @@ export function RoomScheduleShowcase() {
     setNextId((n) => n + 1);
   }
 
-  function removeLastRoom() {
-    const last = rooms[rooms.length - 1];
-    if (!last) return;
-    if (groups.some((g) => g.roomId === last.id)) {
-      setNotice(`В кабинете «${last.name}» есть группы. Сначала переведите их в другой кабинет.`);
+  function removeRoom(id) {
+    const room = rooms.find((r) => r.id === id);
+    if (!room) return;
+    if (groups.some((g) => g.roomId === id)) {
+      setNotice(`В кабинете «${room.name}» есть группы. Сначала переведите их в другой кабинет.`);
       return;
     }
     setNotice('');
-    setRooms((rs) => rs.slice(0, -1));
+    setRooms((rs) => rs.filter((r) => r.id !== id));
+  }
+
+  function removeLastRoom() {
+    const last = rooms[rooms.length - 1];
+    if (last) removeRoom(last.id);
   }
 
   return (
@@ -75,6 +86,9 @@ export function RoomScheduleShowcase() {
           }
           onAddRoom={addRoom}
           onRemoveLastRoom={removeLastRoom}
+          onRemoveRoom={removeRoom}
+          trialCounts={INITIAL_TRIALS}
+          now={SHOWCASE_NOW}
           onOpenGroup={(id) => setOpened(groups.find((g) => g.id === id)?.code ?? '')}
           notice={notice}
         />

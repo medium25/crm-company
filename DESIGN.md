@@ -16,7 +16,7 @@
 | Текст | `caption` 12, `small` 13 (таблицы, подписи), `body` 14, `control` 15 (кнопки, поля), `title` 17 (заголовки блоков), `page` 22, `kpi` 36 |
 | Радиусы | `card` 16 (карточки, модалки), `row` 12 (плитки, строки), `field` 12 (кнопки, поля), `badge` пилюля; круг — `rounded-full` |
 | Тени | `shadow-soft` (карточки), `shadow-card` (строки таблиц), `shadow-hover`, `shadow-modal` |
-| Цвета | `bg surface card card-head surface-alt border border-strong text muted navy orange success danger warning info chip chart-1..7` |
+| Цвета | `bg surface card card-head surface-alt border border-strong text muted navy orange success danger warning info trial burgundy chip chart-1..7` (`trial` жёлтый: записан на пробный; `burgundy`: больше, чем мест) |
 
 ## Что использовать вместо чего
 

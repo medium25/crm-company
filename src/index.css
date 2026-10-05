@@ -46,6 +46,8 @@
   --color-freeze-red: 251 234 234;
   --color-warning: 229 132 43;
   --color-warning-bg: 253 240 227;
+  --color-trial: 245 194 62;
+  --color-burgundy: 140 29 64;
   --color-info: 47 111 228;
   --color-info-bg: 234 243 255;
   --color-chip: 238 240 243;
@@ -85,6 +87,8 @@
   --color-freeze-red: 58 31 32;
   --color-warning: 240 154 74;
   --color-warning-bg: 58 42 24;
+  --color-trial: 245 194 62;
+  --color-burgundy: 214 90 128;
   --color-info: 91 143 242;
   --color-info-bg: 27 42 61;
   --color-chip: 40 48 60;
