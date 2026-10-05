@@ -184,3 +184,16 @@ test('пробные по группам: по курсу, времени, чё�
   assert.deepEqual(groupTrialCounts([], leads, today), {});
   assert.deepEqual(groupTrialCounts(groups, [], today), { g1: 0, g2: 0, g3: 0, g4: 0 });
 });
+
+test('пробные: группы слота по дням недели с разными днями не теряют пробный', () => {
+  const groups = [
+    { id: 'w1', courseId: 'c1', schedule: { time: '17:00', type: 'weekdays', weekdays: [1, 3] } },
+    { id: 'w2', courseId: 'c1', schedule: { time: '17:00', type: 'weekdays', weekdays: [2, 4] } },
+  ];
+  const leads = [{ funnelStage: 'trial_scheduled', trialCourseId: 'c1', trialDate: { toDate: () => new Date(2026, 9, 6, 17, 0) } }];
+  assert.deepEqual(groupTrialCounts(groups, leads, new Date(2026, 9, 6, 8, 0)), { w1: 1, w2: 0 });
+});
+
+test('загрузка кабинета: нечисловое studentsCount не даёт NaN', () => {
+  assert.deepEqual(roomLoad([{ id: 'x', studentsCount: 'abc', capacity: 5 }], {}), { lessons: 1, seats: 5, used: 0, pct: 0 });
+});

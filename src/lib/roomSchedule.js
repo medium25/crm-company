@@ -97,7 +97,11 @@ export function roomStatus(groups, nowMinutes, meetsToday = () => true) {
 /** Загрузка кабинета по группам: число занятий, места, занято (ученики и пробные), процент. */
 export function roomLoad(groups, trialCounts = {}) {
   const seats = groups.reduce((s, g) => s + groupCapacity(g), 0);
-  const used = groups.reduce((s, g) => s + (g.studentsCount ?? 0) + (trialCounts[g.id] ?? 0), 0);
+  const students = (g) => {
+    const n = Number(g.studentsCount);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  };
+  const used = groups.reduce((s, g) => s + students(g) + (trialCounts[g.id] ?? 0), 0);
   return { lessons: groups.length, seats, used, pct: seats ? Math.min(100, Math.round((used / seats) * 100)) : 0 };
 }
 
@@ -130,7 +134,7 @@ export function groupTrialCounts(groups, leads, today) {
     let remaining = booked.filter(
       (l) => l.courseId === courseId
         && minutesToTime(l.date.getHours() * 60 + l.date.getMinutes()) === schedule.time
-        && meetsOnDate(slotGroups[0], l.date),
+        && slotGroups.some((sg) => meetsOnDate(sg, l.date)),
     ).length;
     for (const g of slotGroups) {
       const take = Math.min(TRIALS_PER_GROUP, remaining);
