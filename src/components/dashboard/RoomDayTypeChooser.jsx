@@ -85,14 +85,6 @@ export function RoomDayTypeChooser({ rooms, groups, timeSlots, onPick, loading =
                   {s.groups} {plural(s.groups, 'группа', 'группы', 'групп')}
                 </span>
                 {rooms.length > 0 && <MiniMap rooms={rooms} summary={s} />}
-                <span className="mt-2 flex items-center gap-4 text-caption text-muted">
-                  <span className="inline-flex items-center gap-1.5">
-                    <i className="inline-block h-2.5 w-2.5 rounded-badge" style={{ backgroundColor: 'rgb(var(--color-chart-1))' }} aria-hidden="true" /> занято (цвет кабинета)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <i className="inline-block h-2.5 w-2.5 rounded-badge bg-chip" aria-hidden="true" /> можно открыть
-                  </span>
-                </span>
               </button>
             );
           })}
