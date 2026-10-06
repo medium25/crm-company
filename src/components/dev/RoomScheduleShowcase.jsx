@@ -43,12 +43,12 @@ const INITIAL_TRIALS = { g1: 1, g3: 1, g5: 2, g8: 1, g11: 2, g12: 1, g13: 1 };
 export function RoomScheduleShowcase() {
   const [rooms, setRooms] = useState(INITIAL_ROOMS);
   const [groups, setGroups] = useState(INITIAL_GROUPS);
-  const [dayType, setDayType] = useState('all');
+  const [dayType, setDayType] = useState('even');
   const [notice, setNotice] = useState('');
   const [opened, setOpened] = useState('');
   const [nextId, setNextId] = useState(5);
 
-  const visibleGroups = groups.filter((g) => dayType === 'all' || g.schedule.type === dayType);
+  const visibleGroups = groups.filter((g) => g.schedule.type === dayType);
 
   function addRoom() {
     setNotice('');

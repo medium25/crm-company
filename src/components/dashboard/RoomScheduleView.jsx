@@ -22,12 +22,9 @@ import {
 } from '../../lib/roomSchedule.js';
 
 const DAY_TYPE_TABS = [
-  { value: 'all', label: 'Все дни' },
-  { value: 'odd', label: 'Нечётные дни' },
   { value: 'even', label: 'Чётные дни' },
+  { value: 'odd', label: 'Нечётные дни' },
 ];
-
-const DAY_TYPE_LABEL = { even: 'Чётные', odd: 'Нечётные', weekdays: 'По дням недели' };
 
 // Времена начала занятий по умолчанию — те же, что у записи на пробный (settings.trialTimeSlots).
 export const DEFAULT_ROOM_TIME_SLOTS = ['09:00', '10:30', '14:00', '15:30', '17:00', '18:30', '20:00'];
@@ -168,8 +165,7 @@ function Legend() {
  * @param {{id: string, code: string, courseName: string, teacherId?: string, teacherName: string,
  *   studentsCount?: number, capacity?: number, roomId: string, schedule: {time: string, type?: string}}[]} props.groups
  *   уже отфильтрованы по типу дней
- * @param {'all'|'even'|'odd'} props.dayType «Все дни» показывает группы любого типа расписания (и «по дням недели»);
- *   в этом режиме у группы подписан её тип дней
+ * @param {'even'|'odd'} props.dayType
  * @param {(value: string) => void} props.onDayTypeChange
  * @param {(roomId: string, name: string) => void} [props.onRenameRoom]
  * @param {(groupId: string, capacity: number) => void} [props.onChangeCapacity]
@@ -417,22 +413,15 @@ export function RoomScheduleView({
                   <Seat key={i} state={state} />
                 ))}
               </div>
-              <div className="flex min-w-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => toggleTeacher(key)}
-                  aria-pressed={selected?.key === key}
-                  title={`${g.teacherName}: подсветить занятия учителя`}
-                  className={`min-w-0 truncate rounded-field text-caption text-muted hover:text-navy hover:underline ${FOCUS}`}
-                >
-                  {g.teacherName}
-                </button>
-                {dayType === 'all' && DAY_TYPE_LABEL[g.schedule?.type] && (
-                  <span className="shrink-0 rounded-badge bg-chip px-1.5 text-caption font-semibold text-muted">
-                    {DAY_TYPE_LABEL[g.schedule.type]}
-                  </span>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleTeacher(key)}
+                aria-pressed={selected?.key === key}
+                title={`${g.teacherName}: подсветить занятия учителя`}
+                className={`max-w-full min-w-0 self-start truncate rounded-field text-caption text-muted hover:text-navy hover:underline ${FOCUS}`}
+              >
+                {g.teacherName}
+              </button>
             </div>
           </div>
         </div>

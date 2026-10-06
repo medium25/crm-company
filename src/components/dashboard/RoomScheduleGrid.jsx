@@ -9,9 +9,8 @@ import { EmptyState } from '../ui/EmptyState.jsx';
 import { CalendarClock } from 'lucide-react';
 
 const DAY_TYPE_TABS = [
-  { value: 'all', label: 'Все дни' },
-  { value: 'odd', label: 'Нечётные дни' },
   { value: 'even', label: 'Чётные дни' },
+  { value: 'odd', label: 'Нечётные дни' },
 ];
 
 /**
@@ -24,7 +23,7 @@ const DAY_TYPE_TABS = [
  */
 export function RoomScheduleGrid({ branchId }) {
   const navigate = useNavigate();
-  const [dayType, setDayType] = useState('all');
+  const [dayType, setDayType] = useState('even');
 
   const groupsQuery = useMemo(
     () => (db && branchId ? query(collection(db, 'groups'), where('branchId', '==', branchId), where('isArchived', '==', false), where('status', '==', 'active')) : null),
@@ -38,7 +37,7 @@ export function RoomScheduleGrid({ branchId }) {
   );
   const { data: rooms, loading: roomsLoading } = useCollection(roomsQuery);
 
-  const filteredGroups = useMemo(() => groups.filter((g) => dayType === 'all' || g.schedule.type === dayType), [groups, dayType]);
+  const filteredGroups = useMemo(() => groups.filter((g) => g.schedule.type === dayType), [groups, dayType]);
 
   const timeSlots = useMemo(
     () => [...new Set(filteredGroups.map((g) => g.schedule?.time).filter(Boolean))].sort(),
