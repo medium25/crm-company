@@ -189,3 +189,21 @@ export function teacherColorIndex(key) {
   }
   return ((h >>> 0) % 7) + 1;
 }
+
+/**
+ * Сводка по типу дней для стартовых карточек: число групп, времена начала (стандартные + любые
+ * стоящие), клетки «кабинет × время» (true — в кабинете есть группа этого типа) и число свободных.
+ * @param {{id: string}[]} rooms
+ * @param {Array<Object>} groups
+ * @param {string[]} timeSlots
+ * @param {'even'|'odd'} type
+ * @returns {{groups: number, times: string[], cells: boolean[][], free: number}} cells[время][кабинет]
+ */
+export function dayTypeSummary(rooms, groups, timeSlots, type) {
+  const roomIds = new Set(rooms.map((r) => r.id));
+  const gs = groups.filter((g) => g.schedule?.type === type && g.schedule?.time && roomIds.has(g.roomId));
+  const times = [...new Set([...timeSlots, ...gs.map((g) => g.schedule.time)])].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+  const busy = new Set(gs.map((g) => `${g.roomId}|${g.schedule.time}`));
+  const cells = times.map((t) => rooms.map((r) => busy.has(`${r.id}|${t}`)));
+  return { groups: gs.length, times, cells, free: cells.flat().filter((v) => !v).length };
+}

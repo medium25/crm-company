@@ -9,6 +9,7 @@ import { useToast } from '../ui/Toast.jsx';
 import { Card } from '../ui/Card.jsx';
 import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 import { RoomScheduleView, DEFAULT_ROOM_TIME_SLOTS } from './RoomScheduleView.jsx';
+import { RoomDayTypeChooser } from './RoomDayTypeChooser.jsx';
 import { DEFAULT_GROUP_CAPACITY, clampCapacity, nextRoomName, groupTrialCounts } from '../../lib/roomSchedule.js';
 
 /**
@@ -22,7 +23,7 @@ export function RoomScheduleBoard({ branchId }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [dayType, setDayType] = useState('even');
+  const [dayType, setDayType] = useState(null) // null — стартовый экран выбора чётных/нечётных дней;
   const [notice, setNotice] = useState('');
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [archiving, setArchiving] = useState(false);
@@ -63,10 +64,11 @@ export function RoomScheduleBoard({ branchId }) {
   );
 
   // В представление идут только группы, которые оно реально покажет: в загруженном кабинете, со временем, нужного типа дней.
-  const viewGroups = useMemo(() => {
+  const timedGroups = useMemo(() => {
     const roomIds = new Set(sortedRooms.map((r) => r.id));
-    return groups.filter((g) => roomIds.has(g.roomId) && g.schedule?.time && g.schedule.type === dayType);
-  }, [groups, sortedRooms, dayType]);
+    return groups.filter((g) => roomIds.has(g.roomId) && g.schedule?.time);
+  }, [groups, sortedRooms]);
+  const viewGroups = useMemo(() => timedGroups.filter((g) => g.schedule.type === dayType), [timedGroups, dayType]);
 
   const trialCounts = useMemo(() => groupTrialCounts(viewGroups, trialLeads, new Date()), [viewGroups, trialLeads]);
 
@@ -166,8 +168,19 @@ export function RoomScheduleBoard({ branchId }) {
     }
   };
 
+  const chooser = dayType === null;
+
   return (
     <Card>
+      {chooser ? (
+        <RoomDayTypeChooser
+          rooms={sortedRooms}
+          groups={timedGroups}
+          timeSlots={timeSlots}
+          onPick={handleDayTypeChange}
+          loading={groupsLoading || roomsLoading}
+        />
+      ) : (
       <RoomScheduleView
         title="Расписание кабинетов"
         hint="новый вид"
@@ -185,8 +198,10 @@ export function RoomScheduleBoard({ branchId }) {
         onOpenGroup={(id) => navigate(`/groups/${id}`)}
         notice={notice}
         loading={groupsLoading || roomsLoading}
+        onBack={() => handleDayTypeChange(null)}
         canEdit
       />
+      )}
 
       <ConfirmDialog
         open={Boolean(archiveTarget)}

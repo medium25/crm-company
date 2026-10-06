@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CalendarClock, EllipsisVertical, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CalendarClock, EllipsisVertical, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { FilterChip } from '../ui/FilterChip.jsx';
@@ -181,6 +181,8 @@ function Legend() {
  * @param {boolean} [props.canEdit] без прав скрываются меню, карандаши и кнопки (по умолчанию true)
  * @param {string[]} [props.timeSlots] все времена начала занятий; в карточке кабинета показываются
  *   все, а время без группы подписано «можно открыть группу» (по умолчанию DEFAULT_ROOM_TIME_SLOTS)
+ * @param {() => void} [props.onBack] если задан, вместо переключателя дней показывается «← К выбору дней»
+ *   и название выбранных дней (выбор дней делается на стартовом экране)
  * @param {string} [props.title] заголовок блока (по умолчанию «Расписание кабинетов»)
  * @param {string} [props.hint] приглушённая подпись рядом с заголовком
  */
@@ -203,6 +205,7 @@ export function RoomScheduleView({
   title = 'Расписание кабинетов',
   hint,
   timeSlots = DEFAULT_ROOM_TIME_SLOTS,
+  onBack,
 }) {
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [menuRoomId, setMenuRoomId] = useState(null);
@@ -723,17 +726,27 @@ export function RoomScheduleView({
       <SectionTitle title={title} hint={hint} />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        {DAY_TYPE_TABS.map((t) => (
-          <FilterChip
-            key={t.value}
-            active={dayType === t.value}
-            onClick={() => onDayTypeChange?.(t.value)}
-            disabled={loading}
-            className={`${FOCUS} disabled:cursor-not-allowed disabled:opacity-50`}
-          >
-            {t.label}
-          </FilterChip>
-        ))}
+        {onBack ? (
+          <>
+            <Button variant="secondary" size="sm" onClick={onBack} className={FOCUS}>
+              <ArrowLeft className="mr-1 h-4 w-4" aria-hidden="true" />
+              К выбору дней
+            </Button>
+            <span className="text-control font-bold text-text">{DAY_TYPE_TABS.find((t) => t.value === dayType)?.label}</span>
+          </>
+        ) : (
+          DAY_TYPE_TABS.map((t) => (
+            <FilterChip
+              key={t.value}
+              active={dayType === t.value}
+              onClick={() => onDayTypeChange?.(t.value)}
+              disabled={loading}
+              className={`${FOCUS} disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              {t.label}
+            </FilterChip>
+          ))
+        )}
         <div className="ml-auto flex items-center gap-2 text-small text-muted">
           Кабинетов
           {canEdit && (
