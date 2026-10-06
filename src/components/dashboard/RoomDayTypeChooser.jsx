@@ -4,8 +4,8 @@ import { Skeleton } from '../ui/Skeleton.jsx';
 import { dayTypeSummary, roomHueIndex } from '../../lib/roomSchedule.js';
 
 const CHOICES = [
-  { type: 'even', title: 'Чётные дни', note: '2, 4, 6 … числа месяца' },
-  { type: 'odd', title: 'Нечётные дни', note: '1, 3, 5 … числа месяца' },
+  { type: 'even', title: 'Чётные дни' },
+  { type: 'odd', title: 'Нечётные дни' },
 ];
 
 function plural(n, one, few, many) {
@@ -21,7 +21,7 @@ function MiniMap({ rooms, summary }) {
   return (
     <div
       role="img"
-      aria-label={`Занятость кабинетов: ${summary.groups} групп, свободных времён ${summary.free}`}
+      aria-label={`Занятость кабинетов: ${summary.groups} групп`}
       className="mt-3 grid items-center gap-[3px]"
       style={{ gridTemplateColumns: `2.5rem repeat(${rooms.length}, minmax(0, 1fr))` }}
     >
@@ -81,12 +81,8 @@ export function RoomDayTypeChooser({ rooms, groups, timeSlots, onPick, loading =
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <span className="block text-page font-bold text-text">{c.title}</span>
-                <span className="block text-caption text-muted">{c.note}</span>
                 <span className="mt-2 block text-small font-semibold text-text">
-                  {s.groups} {plural(s.groups, 'группа', 'группы', 'групп')} ·{' '}
-                  <span className="text-success">
-                    {s.free} {plural(s.free, 'свободное время', 'свободных времени', 'свободных времён')}
-                  </span>
+                  {s.groups} {plural(s.groups, 'группа', 'группы', 'групп')}
                 </span>
                 {rooms.length > 0 && <MiniMap rooms={rooms} summary={s} />}
                 <span className="mt-2 flex items-center gap-4 text-caption text-muted">
