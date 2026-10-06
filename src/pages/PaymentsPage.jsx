@@ -186,7 +186,9 @@ export function PaymentsPage() {
       const bv = getValue(b);
       if (av < bv) return -1;
       if (av > bv) return 1;
-      return 0;
+      // Одинаковое значение (например, много оплат за один день) — по времени создания оплаты;
+      // при сортировке «по убыванию» список разворачивается, и сверху оказывается самая поздняя.
+      return (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0);
     });
     if (sortDir === 'desc') list.reverse();
     return list;
