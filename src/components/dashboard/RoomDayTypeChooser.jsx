@@ -60,7 +60,7 @@ function MiniMap({ rooms, summary }) {
 export function RoomDayTypeChooser({ rooms, groups, timeSlots, onPick, loading = false }) {
   return (
     <div>
-      <SectionTitle title="Расписание кабинетов" hint="выберите дни — откроется расписание" />
+      <SectionTitle title="Расписание кабинетов" />
       {loading ? (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <Skeleton className="h-64 w-full" />
