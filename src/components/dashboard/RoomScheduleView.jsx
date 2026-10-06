@@ -19,8 +19,8 @@ import {
 } from '../../lib/roomSchedule.js';
 
 const DAY_TYPE_TABS = [
-  { value: 'even', label: 'Чётные дни' },
   { value: 'odd', label: 'Нечётные дни' },
+  { value: 'even', label: 'Чётные дни' },
 ];
 
 // Времена начала занятий по умолчанию — те же, что у записи на пробный (settings.trialTimeSlots).

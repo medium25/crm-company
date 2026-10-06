@@ -4,8 +4,8 @@ import { Skeleton } from '../ui/Skeleton.jsx';
 import { dayTypeSummary, roomHueIndex } from '../../lib/roomSchedule.js';
 
 const CHOICES = [
-  { type: 'even', title: 'Чётные дни' },
   { type: 'odd', title: 'Нечётные дни' },
+  { type: 'even', title: 'Чётные дни' },
 ];
 
 function plural(n, one, few, many) {
