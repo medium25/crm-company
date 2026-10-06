@@ -354,8 +354,8 @@ export function RoomScheduleView({
     const countClass = `inline-flex shrink-0 items-center gap-1 rounded-badge px-2 py-0.5 text-small font-bold ${TONE_CLASS[fillTone(students, capacity, trials)]}`;
 
     return (
-      <div key={g.id} className={`transition-opacity ${dim ? 'opacity-30' : ''}`}>
-        <div className="flex items-stretch overflow-hidden rounded-row border border-border-strong bg-surface">
+      <div key={g.id} className={`flex flex-col transition-opacity ${dim ? 'opacity-30' : ''}`}>
+        <div className="flex min-h-[4.5rem] flex-1 items-stretch overflow-hidden rounded-row border border-border-strong bg-surface">
           <div
             className="flex w-16 shrink-0 flex-col items-center justify-center py-2 text-white"
             style={{ backgroundColor: 'var(--hue)' }}
@@ -570,7 +570,7 @@ export function RoomScheduleView({
     return (
       <div
         key={`free:${time}`}
-        className="flex items-stretch overflow-hidden rounded-row border border-dashed border-border-strong"
+        className="flex min-h-[4.5rem] items-stretch overflow-hidden rounded-row border border-dashed border-border-strong"
       >
         <div
           className="flex w-16 shrink-0 flex-col items-center justify-center py-2"
@@ -629,7 +629,7 @@ export function RoomScheduleView({
             style={{ width: `${load.pct}%`, backgroundColor: 'var(--hue)' }}
           />
         </div>
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-3 grid auto-rows-fr gap-2">
           {slotTimes.length === 0 ? (
             <p className="px-0.5 text-small text-muted">Занятий нет</p>
           ) : (
