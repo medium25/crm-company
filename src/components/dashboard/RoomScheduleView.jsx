@@ -27,6 +27,9 @@ const DAY_TYPE_TABS = [
   { value: 'weekdays', label: 'По дням недели' },
 ];
 
+// Времена начала занятий по умолчанию — те же, что у записи на пробный (settings.trialTimeSlots).
+export const DEFAULT_ROOM_TIME_SLOTS = ['09:00', '10:30', '14:00', '15:30', '17:00', '18:30', '20:00'];
+
 const TONE_CLASS = { ok: 'text-success', mid: 'text-warning', full: 'text-burgundy' };
 
 const SEAT_CLASS = {
@@ -177,6 +180,8 @@ function Legend() {
  * @param {string} [props.notice] предупреждение над карточками
  * @param {boolean} [props.loading]
  * @param {boolean} [props.canEdit] без прав скрываются меню, карандаши и кнопки (по умолчанию true)
+ * @param {string[]} [props.timeSlots] все времена начала занятий; в карточке кабинета показываются
+ *   все, а время без группы подписано «можно открыть группу» (по умолчанию DEFAULT_ROOM_TIME_SLOTS)
  * @param {string} [props.title] заголовок блока (по умолчанию «Расписание кабинетов»)
  * @param {string} [props.hint] приглушённая подпись рядом с заголовком
  */
@@ -198,6 +203,7 @@ export function RoomScheduleView({
   canEdit = true,
   title = 'Расписание кабинетов',
   hint,
+  timeSlots = DEFAULT_ROOM_TIME_SLOTS,
 }) {
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [menuRoomId, setMenuRoomId] = useState(null);
@@ -559,12 +565,38 @@ export function RoomScheduleView({
     );
   }
 
+  // Время без группы в этом кабинете — свободный лот: показываем, что тут можно открыть группу.
+  function renderFreeSlot(time) {
+    return (
+      <div
+        key={`free:${time}`}
+        className="flex items-stretch overflow-hidden rounded-row border border-dashed border-border-strong"
+      >
+        <div
+          className="flex w-16 shrink-0 flex-col items-center justify-center py-2"
+          style={{ backgroundColor: mixSurface(28), color: HUE_TITLE }}
+        >
+          <span className="text-title font-bold tabular-nums">{time}</span>
+          <span className="text-caption opacity-80">начало</span>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-2.5 py-1.5">
+          <span className="text-small font-bold text-text">Свободно</span>
+          <span className="text-caption text-muted">Можно открыть группу</span>
+        </div>
+      </div>
+    );
+  }
+
   function renderRoomCard(room, index) {
     const roomGroups = groups
       .filter((g) => g.roomId === room.id)
       .sort((a, b) => startOf(a) - startOf(b));
     const load = roomLoad(roomGroups, trialCounts);
     const status = roomStatus(roomGroups, nowMinutes, (g) => meetsOnDate(g, now));
+    // Все времена дня: стандартные + время любой уже стоящей группы (нестандартное тоже видно).
+    const slotTimes = [...new Set([...timeSlots, ...roomGroups.map((g) => g.schedule?.time).filter(Boolean)])].sort(
+      (a, b) => timeToMinutes(a) - timeToMinutes(b),
+    );
     return (
       <section
         key={room.id}
@@ -598,10 +630,13 @@ export function RoomScheduleView({
           />
         </div>
         <div className="mt-3 flex flex-col gap-2">
-          {roomGroups.length === 0 ? (
+          {slotTimes.length === 0 ? (
             <p className="px-0.5 text-small text-muted">Занятий нет</p>
           ) : (
-            roomGroups.map(renderGroup)
+            slotTimes.map((time) => {
+              const atTime = roomGroups.filter((g) => g.schedule?.time === time);
+              return atTime.length > 0 ? atTime.map(renderGroup) : renderFreeSlot(time);
+            })
           )}
         </div>
       </section>

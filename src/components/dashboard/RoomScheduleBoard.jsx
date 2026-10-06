@@ -2,12 +2,13 @@ import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, getDocs, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
+import { useDoc } from '../../hooks/useDoc.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Card } from '../ui/Card.jsx';
 import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
-import { RoomScheduleView } from './RoomScheduleView.jsx';
+import { RoomScheduleView, DEFAULT_ROOM_TIME_SLOTS } from './RoomScheduleView.jsx';
 import { DEFAULT_GROUP_CAPACITY, clampCapacity, nextRoomName, groupTrialCounts } from '../../lib/roomSchedule.js';
 
 /**
@@ -39,6 +40,14 @@ export function RoomScheduleBoard({ branchId }) {
     [branchId],
   );
   const { data: rooms, loading: roomsLoading } = useCollection(roomsQuery);
+
+  // Времена начала занятий — те же, что в записи на пробный (settings.trialTimeSlots, «Справочники»).
+  const settingsRef = useMemo(() => (db && branchId ? doc(db, 'settings', branchId) : null), [branchId]);
+  const { data: branchSettings } = useDoc(settingsRef);
+  const timeSlots = useMemo(() => {
+    const slots = branchSettings?.trialTimeSlots;
+    return Array.isArray(slots) && slots.length > 0 ? slots : DEFAULT_ROOM_TIME_SLOTS;
+  }, [branchSettings]);
 
   // лиды с назначенным пробным: считаются жёлтыми местами; десятки документов
   const trialLeadsQuery = useMemo(
@@ -165,6 +174,7 @@ export function RoomScheduleBoard({ branchId }) {
         rooms={sortedRooms}
         groups={viewGroups}
         trialCounts={trialCounts}
+        timeSlots={timeSlots}
         dayType={dayType}
         onDayTypeChange={handleDayTypeChange}
         onRenameRoom={handleRenameRoom}
