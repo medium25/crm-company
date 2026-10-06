@@ -12,7 +12,6 @@ import { useToast } from '../components/ui/Toast.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart.jsx';
-import { RoomScheduleGrid } from '../components/dashboard/RoomScheduleGrid.jsx';
 import { RoomScheduleBoard } from '../components/dashboard/RoomScheduleBoard.jsx';
 import { TrialsMonthChart } from '../components/charts/TrialsMonthChart.jsx';
 import { PaymentSourceAnalysis } from '../components/payments/PaymentSourceAnalysis.jsx';
@@ -528,10 +527,6 @@ export function DashboardPage() {
           <Skeleton className="h-64 w-full rounded-card" />
         )}
       </Card>
-
-      <div className="mt-6">
-        <RoomScheduleGrid branchId={activeBranchId} />
-      </div>
 
       <div className="mt-6">
         <RoomScheduleBoard branchId={activeBranchId} />

@@ -13,7 +13,7 @@ import { RoomDayTypeChooser } from './RoomDayTypeChooser.jsx';
 import { DEFAULT_GROUP_CAPACITY, clampCapacity, nextRoomName, groupTrialCounts } from '../../lib/roomSchedule.js';
 
 /**
- * Новый блок «Расписание кабинетов» (под старым RoomScheduleGrid): подписки, фильтр по типу дней
+ * Блок «Расписание кабинетов» на дашборде: подписки, выбор чётных/нечётных дней
  * и запись в Firestore — вместимость группы, название кабинета, добавление и архивация кабинета.
  * Само отображение — в RoomScheduleView.
  * @param {Object} props
@@ -29,7 +29,6 @@ export function RoomScheduleBoard({ branchId }) {
   const [archiving, setArchiving] = useState(false);
   const addingRef = useRef(false);
 
-  // те же запросы, что в RoomScheduleGrid: Firestore делит подписку, держим оба блока независимыми
   const groupsQuery = useMemo(
     () => (db && branchId ? query(collection(db, 'groups'), where('branchId', '==', branchId), where('isArchived', '==', false), where('status', '==', 'active')) : null),
     [branchId],
@@ -183,7 +182,6 @@ export function RoomScheduleBoard({ branchId }) {
       ) : (
       <RoomScheduleView
         title="Расписание кабинетов"
-        hint="новый вид"
         rooms={sortedRooms}
         groups={viewGroups}
         trialCounts={trialCounts}
