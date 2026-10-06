@@ -74,27 +74,37 @@ function writeCache(branchId, stats) {
 
 const TONE_TEXT = { danger: 'text-danger', success: 'text-success', muted: 'text-muted' };
 const ROLE_SUFFIX_LABEL = { operator: 'оператор', admin: 'администратор' };
-const TONE_BG = { danger: 'bg-danger/10', success: 'bg-success/10', muted: 'bg-muted/10' };
 // Раскрытая разбивка окрашивается в тон того сегмента, чью стрелку нажали —
 // чтобы было видно, к какому именно числу относятся эти «По операторам».
 const TONE_BAR = { danger: 'bg-danger', success: 'bg-success', muted: 'bg-muted', navy: 'bg-navy' };
 
-/** Один сегмент внутри MetricGroup — своя подложка + крупное число + подпись (с процентом и стрелкой «подробнее» на одной строке). */
+/**
+ * Один сегмент внутри MetricGroup — белая плитка с крупным числом и подписью (с процентом и стрелкой
+ * «подробнее» на одной строке). Число цвета группы (--hue задаёт MetricGroup); красным — только плохие
+ * числа (tone="danger").
+ */
 function MetricSegment({ value, label, percent, tone, onClick, detailsOpen, onToggleDetails }) {
-  const toneText = TONE_TEXT[tone] ?? 'text-navy-num';
+  const danger = tone === 'danger';
+  const numberColor = danger ? undefined : { color: 'var(--hue)' };
   return (
     <div
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
-      className={`flex-1 rounded-row px-3 py-3 text-center ${TONE_BG[tone] ?? 'bg-navy/5'} ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
+      className={`flex-1 rounded-row border border-border-strong bg-surface px-3 py-3 text-center ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
     >
-      <p className={`text-kpi font-bold tracking-tight ${toneText}`}>{value}</p>
+      <p className={`text-kpi font-bold tracking-tight ${danger ? 'text-danger' : ''}`} style={numberColor}>
+        {value}
+      </p>
       <div className="mt-1 flex items-center justify-center gap-1">
         <span className="text-caption text-muted">
           {label}
-          {percent != null && <span className={`ml-1 font-semibold ${toneText}`}>{percent}%</span>}
+          {percent != null && (
+            <span className={`ml-1 font-semibold ${danger ? 'text-danger' : ''}`} style={numberColor}>
+              {percent}%
+            </span>
+          )}
         </span>
         {onToggleDetails && (
           <button
@@ -119,10 +129,24 @@ function MetricArrow() {
   return <ArrowRight className="h-4 w-4 shrink-0 self-center text-muted" aria-hidden="true" />;
 }
 
-/** Карточка группы связанных метрик — просто ряд сегментов, без заголовка. */
-function MetricGroup({ children }) {
+/**
+ * Карточка группы связанных метрик — пастельная подложка цвета группы (hue — номер цвета графиков 1…7,
+ * как у кабинетов в расписании) с белыми плитками внутри. Шрифт блока — Helvetica Neue (на системах без
+ * неё — Helvetica/Arial).
+ */
+const METRIC_FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+function MetricGroup({ children, hue = 1 }) {
+  const color = `rgb(var(--color-chart-${hue}))`;
   return (
-    <div className="flex h-full items-stretch justify-center gap-2 rounded-card border border-border-strong bg-card p-4 shadow-card">
+    <div
+      className="flex h-full items-stretch justify-center gap-2 rounded-card border-[1.5px] p-4 shadow-card"
+      style={{
+        '--hue': color,
+        fontFamily: METRIC_FONT,
+        backgroundColor: `color-mix(in srgb, ${color} 14%, rgb(var(--color-surface)))`,
+        borderColor: `color-mix(in srgb, ${color} 38%, rgb(var(--color-surface)))`,
+      }}
+    >
       {children}
     </div>
   );
@@ -405,7 +429,7 @@ export function DashboardPage() {
         <>
           <div className="grid grid-cols-1 gap-4">
             <div className="flex flex-col gap-2">
-              <MetricGroup>
+              <MetricGroup hue={1}>
                 <MetricSegment
                   value={stats.activeStudents}
                   label="активные"
@@ -428,7 +452,7 @@ export function DashboardPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <MetricGroup>
+              <MetricGroup hue={2}>
                 <MetricSegment
                   value={`−${stats.leftActiveGroup}`}
                   label="ушли"
@@ -458,7 +482,7 @@ export function DashboardPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
-                <MetricGroup>
+                <MetricGroup hue={3}>
                   <MetricSegment value={effectiveTrialToday?.planned ?? 0} label="планировали прийти сегодня" tone="muted" />
                   <MetricArrow />
                   <MetricSegment
@@ -473,7 +497,7 @@ export function DashboardPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <MetricGroup>
+                <MetricGroup hue={3}>
                   <MetricSegment
                     value={effectiveTrialMonth?.total ?? 0}
                     label={`пробные за ${currentMonthName}`}
