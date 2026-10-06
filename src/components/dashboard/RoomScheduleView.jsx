@@ -786,35 +786,6 @@ export function RoomScheduleView({
         </p>
       )}
 
-      {!loading && stats.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {stats.map((t) => {
-            const color = colorByKey.get(t.key);
-            const active = selected?.key === t.key;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                aria-pressed={active}
-                onClick={() => toggleTeacher(t.key)}
-                className={`inline-flex h-9 max-w-full items-center gap-2 rounded-field border bg-surface px-3 text-small font-semibold text-text hover:bg-surface-alt ${FOCUS} ${
-                  active ? '' : 'border-border-strong'
-                }`}
-                style={active ? { borderColor: color.solid, boxShadow: `0 0 0 2px ${color.soft}` } : undefined}
-              >
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.solid }} aria-hidden="true" />
-                <span className="min-w-0 truncate" title={t.name}>
-                  {t.name}
-                </span>
-                <span className="shrink-0 whitespace-nowrap">
-                  <b className="font-bold">{t.students}</b> уч.
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {!loading && renderSummary()}
 
       {body}
