@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, getDocs, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, format, startOfMonth, subDays, subMonths } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, Pencil, CalendarDays, UserCheck, Archive } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -14,6 +15,7 @@ import { FilterBar } from '../components/layout/FilterBar.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Modal } from '../components/ui/Modal.jsx';
+import { LeftMonthCards } from '../components/students/LeftMonthCards.jsx';
 import { Select } from '../components/ui/Select.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { DatePicker } from '../components/ui/DatePicker.jsx';
@@ -52,9 +54,11 @@ const SECTION_TABS = [
 
 const PAGE_SIZE = 25;
 
-// «Покинувшие»: «Архив всех покинувших» хранит ушедших за последние 6 месяцев, «С желанием вернуться» — за последний год.
+// «Покинувшие»: «Архив всех покинувших» хранит ушедших за последние 6 календарных месяцев (с текущим), «С желанием вернуться» — за последний год.
+// Начало окна архива — 1-е число месяца, отстоящего на 5 назад: сегодня октябрь → архив с мая.
 const LEFT_ARCHIVE_MONTHS = 6;
 const LEFT_RETURN_MONTHS = 12;
+const archiveWindowStart = () => startOfMonth(subMonths(new Date(), LEFT_ARCHIVE_MONTHS - 1));
 
 export function StudentsPage() {
   const navigate = useNavigate();
@@ -80,6 +84,8 @@ export function StudentsPage() {
   const leftView = searchParams.get('leftView') || null;
   // Дата исключения (yyyy-MM-dd) — фильтр списка «Покинувшие»: кто ушёл из группы в этот день.
   const leftDate = searchParams.get('leftDate') || '';
+  // Месяц (yyyy-MM) внутри «Архива всех покинувших» — открывается кликом по карточке месяца.
+  const leftMonth = searchParams.get('leftMonth') || '';
 
   // «Покинувшие»/«Замороженные»/«На пробном» — отдельные секции с
   // фиксированным фильтром статуса; общий фильтр «Статус» из «Все ученики»
@@ -190,7 +196,7 @@ export function StudentsPage() {
   const leftViewCounts = useMemo(() => {
     if (section !== 'left') return { month: 0, return: 0, all: 0 };
     const monthStart = startOfMonth(new Date());
-    const archiveStart = subMonths(new Date(), LEFT_ARCHIVE_MONTHS);
+    const archiveStart = archiveWindowStart();
     let month = 0;
     let ret = 0;
     let all = 0;
@@ -213,11 +219,33 @@ export function StudentsPage() {
       // Конкретная дата исключения заменяет «в этом месяце»/«архив»: ищем по всему списку покинувших
       // (с желанием вернуться — остаётся своим отбором).
       if (leftDate) return (leftView !== 'return' || enr.returnIntent === 'return') && format(leftAtDate, 'yyyy-MM-dd') === leftDate;
-      if (leftView === 'all') return leftAtDate >= subMonths(new Date(), LEFT_ARCHIVE_MONTHS);
+      if (leftView === 'all') {
+        if (leftMonth) return format(leftAtDate, 'yyyy-MM') === leftMonth;
+        return leftAtDate >= archiveWindowStart();
+      }
       if (leftView === 'month') return leftAtDate >= monthStart;
       return enr.returnIntent === leftView;
     });
-  }, [section, leftAllStudents, leftEnrollmentByStudent, leftView, leftDate]);
+  }, [section, leftAllStudents, leftEnrollmentByStudent, leftView, leftDate, leftMonth]);
+
+  // Карточки месяцев «Архива»: от текущего к старому, по числу покинувших в месяце (последний уход студента).
+  const leftMonthCards = useMemo(() => {
+    if (section !== 'left') return [];
+    const counts = new Map();
+    for (const s of leftAllStudents) {
+      const key = format(leftEnrollmentByStudent.get(s.id).leftAt.toDate(), 'yyyy-MM');
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const now = new Date();
+    return Array.from({ length: LEFT_ARCHIVE_MONTHS }, (_, i) => {
+      const d = subMonths(startOfMonth(now), i);
+      const key = format(d, 'yyyy-MM');
+      const label = format(d, 'LLLL yyyy', { locale: ru });
+      return { key, label: label.charAt(0).toUpperCase() + label.slice(1), count: counts.get(key) ?? 0 };
+    });
+  }, [section, leftAllStudents, leftEnrollmentByStudent]);
+  // Пока месяц не выбран (и нет поиска/даты) в «Архиве» показываем карточки месяцев, а не общий список.
+  const showMonthCards = section === 'left' && leftView === 'all' && !leftMonth && !leftDate && !search;
 
   // Пробные считаем и показываем только с учителем: студент с действующей
   // записью (enrollment) у учителя. Лиды, лишь записанные на пробную дату, — нет.
@@ -814,8 +842,13 @@ export function StudentsPage() {
           )}
 
           {section === 'left' && leftView && (
-            <button type="button" onClick={() => setFilter({ leftView: null, leftDate: null })} className="mb-4 flex items-center gap-1 text-control text-link">
+            <button type="button" onClick={() => setFilter({ leftView: null, leftDate: null, leftMonth: null })} className="mb-4 flex items-center gap-1 text-control text-link">
               <ArrowLeft className="h-4 w-4" /> Назад к разделам
+            </button>
+          )}
+          {section === 'left' && leftView === 'all' && leftMonth && (
+            <button type="button" onClick={() => setFilter({ leftMonth: null })} className="mb-4 flex items-center gap-1 text-control text-link">
+              <ArrowLeft className="h-4 w-4" /> Назад к месяцам
             </button>
           )}
 
@@ -840,6 +873,17 @@ export function StudentsPage() {
             )}
           </FilterBar>
 
+          {showMonthCards && !loading && !error && <LeftMonthCards months={leftMonthCards} onPick={(key) => setFilter({ leftMonth: key })} />}
+
+          {section === 'left' && leftView === 'all' && leftMonth && !leftDate && !loading && (
+            <p className="mb-3 text-control text-text">
+              {leftMonthCards.find((m) => m.key === leftMonth)?.label ?? leftMonth}:{' '}
+              <span className="font-bold">
+                {filtered.length} {pluralize(filtered.length, ['покинувший', 'покинувших', 'покинувших'])}
+              </span>
+            </p>
+          )}
+
           {section === 'left' && leftDate && !loading && (
             <p className="mb-3 text-control text-text">
               Покинули группу {leftDate.split('-').reverse().join('.')}:{' '}
@@ -855,7 +899,7 @@ export function StudentsPage() {
             </p>
           )}
 
-          {loading && (
+          {loading && !showMonthCards && (
             <div className="flex flex-col gap-2">
               <SkeletonRow columns={6} />
               <SkeletonRow columns={6} />
@@ -865,7 +909,7 @@ export function StudentsPage() {
 
           {error && <p className="text-control text-danger">Не удалось загрузить. Проверьте соединение.</p>}
 
-          {!loading && !error && filtered.length === 0 && (
+          {!loading && !error && !showMonthCards && filtered.length === 0 && (
             <EmptyState
               icon={section === 'paused' ? Snowflake : section === 'trial' ? GraduationCap : CircleUserRound}
               title={
@@ -888,7 +932,7 @@ export function StudentsPage() {
             </div>
           )}
 
-          {!loading && !error && filtered.length > 0 && section !== 'trial' && (
+          {!loading && !error && !showMonthCards && filtered.length > 0 && section !== 'trial' && (
             <>
               <Table
                 columns={section === 'paused' ? pausedColumns : columns}
