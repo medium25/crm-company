@@ -92,7 +92,7 @@ function MetricSegment({ value, label, percent, tone, onClick, detailsOpen, onTo
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
-      className={`flex-1 rounded-row border border-border-strong bg-surface px-3 py-3 text-center ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
+      className={`flex-1 rounded-row border border-border-strong bg-surface px-3 py-5 text-center ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
     >
       <p className={`text-kpi font-bold tracking-tight ${danger ? 'text-danger' : ''}`} style={numberColor}>
         {value}
@@ -140,7 +140,7 @@ function MetricGroup({ children, hue = 1 }) {
   const color = hue === 'graphite' ? 'rgb(var(--color-orange))' : `rgb(var(--color-chart-${hue}))`;
   return (
     <div
-      className="flex h-full items-stretch justify-center gap-2 rounded-card border-[1.5px] p-4 shadow-card"
+      className="flex h-full items-stretch justify-center gap-2 rounded-card border-[1.5px] px-4 py-5 shadow-card"
       style={{
         '--hue': color,
         fontFamily: METRIC_FONT,
