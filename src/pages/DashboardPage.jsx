@@ -136,7 +136,8 @@ function MetricArrow() {
  */
 const METRIC_FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 function MetricGroup({ children, hue = 1 }) {
-  const color = `rgb(var(--color-chart-${hue}))`;
+  // hue: число 1…7 — цвет графиков; 'graphite' — графитовый акцент интерфейса (токен --color-orange, как иконки плиток)
+  const color = hue === 'graphite' ? 'rgb(var(--color-orange))' : `rgb(var(--color-chart-${hue}))`;
   return (
     <div
       className="flex h-full items-stretch justify-center gap-2 rounded-card border-[1.5px] p-4 shadow-card"
@@ -482,7 +483,7 @@ export function DashboardPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
-                <MetricGroup hue={3}>
+                <MetricGroup hue="graphite">
                   <MetricSegment value={effectiveTrialToday?.planned ?? 0} label="планировали прийти сегодня" tone="muted" />
                   <MetricArrow />
                   <MetricSegment
@@ -497,7 +498,7 @@ export function DashboardPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <MetricGroup hue={3}>
+                <MetricGroup hue="graphite">
                   <MetricSegment
                     value={effectiveTrialMonth?.total ?? 0}
                     label={`пробные за ${currentMonthName}`}
