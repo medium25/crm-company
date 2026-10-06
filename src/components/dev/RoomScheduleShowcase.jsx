@@ -33,9 +33,6 @@ const INITIAL_GROUPS = [
   group('g15', 'RJZ19', 'RUS TILI', 't4', 'MS ZIYODA', 'r3', '09:00', 7, 8, 'weekdays'),
 ];
 
-// «Сейчас» зафиксировано: чётный вторник 6 октября 2026, 17:20, чтобы статус «Идёт: …» был виден.
-const SHOWCASE_NOW = new Date(2026, 9, 6, 17, 20);
-
 // Записанные на пробный по группам (в дашборде их считает groupTrialCounts по лидам).
 const INITIAL_TRIALS = { g1: 1, g3: 1, g5: 2, g8: 1, g11: 2, g12: 1, g13: 1 };
 
@@ -88,7 +85,6 @@ export function RoomScheduleShowcase() {
           onRemoveLastRoom={removeLastRoom}
           onRemoveRoom={removeRoom}
           trialCounts={INITIAL_TRIALS}
-          now={SHOWCASE_NOW}
           onOpenGroup={(id) => setOpened(groups.find((g) => g.id === id)?.code ?? '')}
           notice={notice}
         />

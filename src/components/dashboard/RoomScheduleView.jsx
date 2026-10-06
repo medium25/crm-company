@@ -11,10 +11,7 @@ import {
   clampCapacity,
   fillTone,
   groupCapacity,
-  meetsOnDate,
   roomHueIndex,
-  roomLoad,
-  roomStatus,
   seatStates,
   teacherColorIndex,
   teacherStats,
@@ -73,21 +70,6 @@ function studentsOf(g) {
 
 function startOf(g) {
   return g.schedule?.time ? timeToMinutes(g.schedule.time) : Infinity;
-}
-
-function statusText(st) {
-  switch (st.kind) {
-    case 'live':
-      return `Идёт: ${st.group.code} · ${studentsOf(st.group)}/${groupCapacity(st.group)} · до ${st.endsAt}`;
-    case 'next':
-      return `Свободен до ${st.group.schedule.time}`;
-    case 'done':
-      return 'Сегодня занятий больше нет';
-    case 'none':
-      return 'Сегодня занятий нет';
-    default:
-      return 'Групп нет';
-  }
 }
 
 function Seat({ state }) {
@@ -175,7 +157,6 @@ function Legend() {
  *   (без него пункта нет)
  * @param {(groupId: string) => void} [props.onOpenGroup]
  * @param {Record<string, number>} [props.trialCounts] записанных на пробный по группам (по умолчанию {})
- * @param {Date} [props.now] «сейчас» для статуса кабинета (по умолчанию текущее время, обновляется раз в минуту)
  * @param {string} [props.notice] предупреждение над карточками
  * @param {boolean} [props.loading]
  * @param {boolean} [props.canEdit] без прав скрываются меню, карандаши и кнопки (по умолчанию true)
@@ -198,7 +179,6 @@ export function RoomScheduleView({
   onRemoveRoom,
   onOpenGroup,
   trialCounts = {},
-  now: nowProp,
   notice,
   loading = false,
   canEdit = true,
@@ -212,16 +192,6 @@ export function RoomScheduleView({
   const [capGroupId, setCapGroupId] = useState(null);
   const [selectedKey, setSelectedKey] = useState(null);
   const [prevDayType, setPrevDayType] = useState(dayType);
-
-  // «Сейчас»: проп now (витрина, тесты) или часы, которые обновляются раз в минуту.
-  const [clock, setClock] = useState(() => new Date());
-  useEffect(() => {
-    if (nowProp) return undefined;
-    const id = setInterval(() => setClock(new Date()), 60000);
-    return () => clearInterval(id);
-  }, [nowProp]);
-  const now = nowProp ?? clock;
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
   // Сброс правок: смена типа дней, загрузка, потеря прав, исчезнувший кабинет или группа.
   // Состояние поправляется прямо в рендере (без лишнего кадра со «старым» редактором).
@@ -585,8 +555,6 @@ export function RoomScheduleView({
     const roomGroups = groups
       .filter((g) => g.roomId === room.id)
       .sort((a, b) => startOf(a) - startOf(b));
-    const load = roomLoad(roomGroups, trialCounts);
-    const status = roomStatus(roomGroups, nowMinutes, (g) => meetsOnDate(g, now));
     // Все времена дня: стандартные + время любой уже стоящей группы (нестандартное тоже видно).
     const slotTimes = [...new Set([...timeSlots, ...roomGroups.map((g) => g.schedule?.time).filter(Boolean)])].sort(
       (a, b) => timeToMinutes(a) - timeToMinutes(b),
@@ -600,29 +568,6 @@ export function RoomScheduleView({
       >
         <div className="flex min-h-8 items-center pr-9">{renderRoomTitle(room)}</div>
         {canEdit && renderKebab(room)}
-        <p className="mt-0.5 text-body text-muted">
-          {load.lessons} {plural(load.lessons, 'занятие', 'занятия', 'занятий')} · {load.seats}{' '}
-          {plural(load.seats, 'место', 'места', 'мест')}
-        </p>
-        <p className="mt-1 flex items-center gap-1.5 text-caption font-bold" style={{ color: HUE_TITLE }}>
-          <span
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: 'var(--hue)' }}
-            aria-hidden="true"
-          />
-          {statusText(status)}
-        </p>
-        <div
-          role="img"
-          aria-label={`Загрузка кабинета ${load.pct}%`}
-          className="mt-2.5 h-2 rounded-full"
-          style={{ backgroundColor: mixSurface(22) }}
-        >
-          <div
-            className="h-full rounded-full"
-            style={{ width: `${load.pct}%`, backgroundColor: 'var(--hue)' }}
-          />
-        </div>
         <div className="mt-3 grid auto-rows-fr gap-2">
           {slotTimes.length === 0 ? (
             <p className="px-0.5 text-small text-muted">Занятий нет</p>
