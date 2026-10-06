@@ -396,14 +396,6 @@ export function RoomScheduleView({
                     {count}
                   </span>
                 )}
-                {trials > 0 && (
-                  <span
-                    title="Записаны на пробный на это время"
-                    className="inline-flex items-center rounded-badge bg-trial/20 px-1.5 py-0.5 text-caption font-bold text-warning"
-                  >
-                    +{trials} проб.
-                  </span>
-                )}
               </span>
             </div>
             <div className="mt-1 flex flex-col gap-0.5">
