@@ -747,35 +747,6 @@ export function RoomScheduleView({
             </FilterChip>
           ))
         )}
-        <div className="ml-auto flex items-center gap-2 text-small text-muted">
-          Кабинетов
-          {canEdit && (
-            <Button
-              variant="icon-round"
-              size="sm"
-              aria-label="Убрать последний кабинет"
-              disabled={loading || rooms.length === 0}
-              onClick={() => onRemoveLastRoom?.()}
-              className={FOCUS}
-            >
-              <Minus className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          )}
-          <b className="min-w-[1.25rem] text-center text-control text-text">{rooms.length}</b>
-          {canEdit && (
-            <Button
-              variant="icon-round"
-              size="sm"
-              aria-label="Добавить кабинет"
-              data-focus="addroom-top"
-              disabled={loading}
-              onClick={() => onAddRoom?.()}
-              className={FOCUS}
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          )}
-        </div>
       </div>
 
       <Legend />
