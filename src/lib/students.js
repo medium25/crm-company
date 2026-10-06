@@ -1,4 +1,5 @@
-import { collection, doc, getDocs, query, updateDoc, where, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
+import { collection, deleteField, doc, getDoc, getDocs, query, updateDoc, where, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
+import { logActivity } from './activityLog.js';
 import { NON_TERMINAL_STAGES } from './leadFunnel.js';
 import { notifySheetsExport } from './sheetsExportHook.js';
 
@@ -93,4 +94,62 @@ export async function archiveStudent(db, student, user) {
   }
   await batch.commit();
   if (stillInFunnel) notifySheetsExport(student.id, 'lost', student.rawColumns);
+}
+
+/**
+ * Возвращает покинувшего студента в ту группу, из которой он ушёл (обратное к LeaveGroupModal /
+ * archiveStudent): запись снова открыта (active, если уже была активирована, иначе trial), дата ухода,
+ * причина и желание вернуться стираются, у группы studentsCount +1, статус студента пересчитывается.
+ * Если студент был архивирован целиком (isArchived) — снимаем архив и у него.
+ * Не восстанавливаем, когда группа закрыта/в архиве или студент уже снова числится в этой группе —
+ * тогда бросаем ошибку с кодом 'group_closed' / 'already_in_group', а запись в таком случае
+ * оформляется обычным «Добавить в группу».
+ * @param {import('firebase/firestore').Firestore} db
+ * @param {Object} enrollment запись со status 'left'|'archived'
+ * @param {Object} student документ студента
+ * @param {{uid: string, fullName: string}} user
+ */
+export async function restoreLeftEnrollment(db, enrollment, student, user) {
+  const groupSnap = await getDoc(doc(db, 'groups', enrollment.groupId));
+  const group = groupSnap.exists() ? groupSnap.data() : null;
+  if (!group || group.isArchived || group.status !== 'active') {
+    const err = new Error('group_closed');
+    err.code = 'group_closed';
+    throw err;
+  }
+  const sameGroup = await getDocs(
+    query(collection(db, 'enrollments'), where('studentId', '==', enrollment.studentId), where('groupId', '==', enrollment.groupId), where('isArchived', '==', false)),
+  );
+  if (sameGroup.docs.some((d) => d.id !== enrollment.id && ['active', 'trial', 'paused'].includes(d.data().status))) {
+    const err = new Error('already_in_group');
+    err.code = 'already_in_group';
+    throw err;
+  }
+
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'enrollments', enrollment.id), {
+    status: enrollment.activatedAt ? 'active' : 'trial',
+    isArchived: false,
+    leftAt: deleteField(),
+    leftReason: deleteField(),
+    returnIntent: deleteField(),
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid,
+  });
+  batch.update(doc(db, 'groups', enrollment.groupId), { studentsCount: increment(1) });
+  if (student?.isArchived) {
+    batch.update(doc(db, 'students', enrollment.studentId), {
+      isArchived: false,
+      archivedAt: deleteField(),
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid,
+    });
+  }
+  await batch.commit();
+  await recomputeStudentAggregates(db, enrollment.studentId);
+  await logActivity(
+    db,
+    { entityType: 'group', entityId: enrollment.groupId, action: 'enrollment_restored', field: 'studentsCount', after: enrollment.studentName ?? student?.fullName ?? '' },
+    user,
+  ).catch(() => {});
 }

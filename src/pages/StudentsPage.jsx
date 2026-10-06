@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, getDocs, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
-import { differenceInCalendarDays, format, startOfMonth, subDays } from 'date-fns';
+import { differenceInCalendarDays, format, startOfMonth, subDays, subMonths } from 'date-fns';
 import { CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, Pencil, CalendarDays, UserCheck, Archive } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
-import { useDoc } from '../hooks/useDoc.js';
 import { useToast } from '../components/ui/Toast.jsx';
-import { churnPeriodRange } from '../lib/stats.js';
+import { restoreLeftEnrollment } from '../lib/students.js';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { FilterBar } from '../components/layout/FilterBar.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
+import { Modal } from '../components/ui/Modal.jsx';
 import { Select } from '../components/ui/Select.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { DatePicker } from '../components/ui/DatePicker.jsx';
@@ -52,9 +52,13 @@ const SECTION_TABS = [
 
 const PAGE_SIZE = 25;
 
+// «Покинувшие»: «Архив всех покинувших» хранит ушедших за последние 6 месяцев, «С желанием вернуться» — за последний год.
+const LEFT_ARCHIVE_MONTHS = 6;
+const LEFT_RETURN_MONTHS = 12;
+
 export function StudentsPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, staff } = useAuth();
   const { activeBranchId } = useBranch();
   const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -63,6 +67,8 @@ export function StudentsPage() {
   const [editFreezeTarget, setEditFreezeTarget] = useState(null);
   const [editFreezeEndTarget, setEditFreezeEndTarget] = useState(null);
   const [unfreezeTarget, setUnfreezeTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null); // { student, enrollment }
+  const [restoring, setRestoring] = useState(false);
 
   const section = searchParams.get('section') || null;
   const search = searchParams.get('q') || '';
@@ -132,14 +138,9 @@ export function StudentsPage() {
   );
   const { data: enrollments } = useCollection(enrollmentsQuery);
 
-  // «Покинувшие» — та же метрика, что карточка дашборда «Ушли из активной
-  // группы»: уникальные студенты с enrollment.status=='left' в текущем
-  // churnPeriod, а НЕ students.status=='left' (студент мог уйти из одной
-  // группы и тут же стать trial/active в другой — карточка его всё равно
-  // считает, а students.status уже не 'left').
-  const settingsRef = useMemo(() => (db && activeBranchId ? doc(db, 'settings', activeBranchId) : null), [activeBranchId]);
-  const { data: settings } = useDoc(settingsRef);
-  const churnPeriod = settings?.churnPeriod ?? 'year';
+  // «Покинувшие» — по enrollment.status=='left' (а НЕ students.status=='left': студент мог
+  // уйти из одной группы и тут же стать trial/active в другой). Окна: «Архив» — 6 месяцев,
+  // «С желанием вернуться» — год (см. LEFT_ARCHIVE_MONTHS / LEFT_RETURN_MONTHS).
 
   const leftEnrollmentsQuery = useMemo(
     () => (db && activeBranchId && section === 'left' ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('status', 'in', ['left', 'archived'])) : null),
@@ -162,17 +163,18 @@ export function StudentsPage() {
   // иначе карточка дашборда и этот список снова разойдутся (469ea6a).
   const leftEnrollmentByStudent = useMemo(() => {
     if (section !== 'left') return new Map();
-    const { start, end } = churnPeriodRange(churnPeriod);
+    // Берём всё за последний год (самое длинное окно: «с желанием вернуться»); окно «Архива» — 6 месяцев — режется ниже.
+    const start = subMonths(new Date(), LEFT_RETURN_MONTHS);
     const map = new Map();
     for (const e of leftEnrollments) {
       if (!e.activatedAt || !e.leftAt) continue;
       const leftAt = e.leftAt.toDate();
-      if (leftAt < start || leftAt > end) continue;
+      if (leftAt < start || leftAt > new Date()) continue;
       const current = map.get(e.studentId);
       if (!current || leftAt > current.leftAt.toDate()) map.set(e.studentId, e);
     }
     return map;
-  }, [section, leftEnrollments, churnPeriod]);
+  }, [section, leftEnrollments]);
 
   // «Покинувшие» — 3 отдела: ушли в этом месяце (по дате ухода из
   // конкретной группы), и по желанию вернуться (returnIntent с
@@ -188,14 +190,18 @@ export function StudentsPage() {
   const leftViewCounts = useMemo(() => {
     if (section !== 'left') return { month: 0, return: 0, all: 0 };
     const monthStart = startOfMonth(new Date());
+    const archiveStart = subMonths(new Date(), LEFT_ARCHIVE_MONTHS);
     let month = 0;
     let ret = 0;
+    let all = 0;
     for (const s of leftAllStudents) {
       const enr = leftEnrollmentByStudent.get(s.id);
-      if (enr.leftAt.toDate() >= monthStart) month += 1;
+      const leftAt = enr.leftAt.toDate();
+      if (leftAt >= monthStart) month += 1;
+      if (leftAt >= archiveStart) all += 1;
       if (enr.returnIntent === 'return') ret += 1;
     }
-    return { month, return: ret, all: leftAllStudents.length };
+    return { month, return: ret, all };
   }, [section, leftAllStudents, leftEnrollmentByStudent]);
 
   const leftStudents = useMemo(() => {
@@ -207,7 +213,7 @@ export function StudentsPage() {
       // Конкретная дата исключения заменяет «в этом месяце»/«архив»: ищем по всему списку покинувших
       // (с желанием вернуться — остаётся своим отбором).
       if (leftDate) return (leftView !== 'return' || enr.returnIntent === 'return') && format(leftAtDate, 'yyyy-MM-dd') === leftDate;
-      if (leftView === 'all') return true;
+      if (leftView === 'all') return leftAtDate >= subMonths(new Date(), LEFT_ARCHIVE_MONTHS);
       if (leftView === 'month') return leftAtDate >= monthStart;
       return enr.returnIntent === leftView;
     });
@@ -451,6 +457,27 @@ export function StudentsPage() {
     }
   };
 
+  const confirmRestore = async () => {
+    if (!restoreTarget?.enrollment) return;
+    setRestoring(true);
+    try {
+      await restoreLeftEnrollment(db, restoreTarget.enrollment, restoreTarget.student, { uid: user.uid, fullName: staff?.fullName ?? '' });
+      showToast(`${restoreTarget.student.fullName}: восстановлен в группе ${restoreTarget.enrollment.groupCode ?? ''}.`);
+      setRestoreTarget(null);
+    } catch (err) {
+      const text =
+        err?.code === 'group_closed'
+          ? 'Группа закрыта — оформите студента через «Добавить в группу».'
+          : err?.code === 'already_in_group'
+            ? 'Студент уже числится в этой группе.'
+            : 'Не удалось восстановить.';
+      showToast(text, { type: 'error' });
+      setRestoreTarget(null);
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const selectedStudents = filtered.filter((st) => selected.has(st.id));
 
   const exportSelected = () => {
@@ -539,6 +566,23 @@ export function StudentsPage() {
             key: 'leftAt',
             label: 'Дата исключения',
             render: (st) => formatDate(leftEnrollmentByStudent.get(st.id)?.leftAt),
+          },
+          {
+            key: 'restore',
+            label: '',
+            width: '140px',
+            render: (st) => (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRestoreTarget({ student: st, enrollment: leftEnrollmentByStudent.get(st.id) });
+                }}
+              >
+                Восстановить
+              </Button>
+            ),
           },
         ]
       : []),
@@ -744,8 +788,8 @@ export function StudentsPage() {
         <div className="flex flex-col gap-3">
           {[
             { key: 'month', label: 'В этом месяце', count: leftViewCounts.month, icon: CalendarDays },
-            { key: 'return', label: 'С желанием вернуться', count: leftViewCounts.return, icon: UserCheck },
-            { key: 'all', label: 'Архив всех покинувших', count: leftViewCounts.all, icon: Archive },
+            { key: 'return', label: 'С желанием вернуться', note: 'за последний год', count: leftViewCounts.return, icon: UserCheck },
+            { key: 'all', label: 'Архив всех покинувших', note: 'за последние 6 месяцев', count: leftViewCounts.all, icon: Archive },
           ].map((t) => {
             const Icon = t.icon;
             return (
@@ -753,7 +797,10 @@ export function StudentsPage() {
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-soft text-orange">
                   <Icon className="h-6 w-6" strokeWidth={1.75} />
                 </span>
-                <span className="flex-1 text-title font-bold text-text">{t.label}</span>
+                <span className="flex-1">
+                  <span className="block text-title font-bold text-text">{t.label}</span>
+                  {t.note && <span className="block text-caption text-muted">{t.note}</span>}
+                </span>
                 <span className="text-control text-muted">{t.count} {pluralize(t.count, ['студент', 'студента', 'студентов'])}</span>
                 <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
               </Card>
@@ -867,6 +914,28 @@ export function StudentsPage() {
           )}
         </>
       )}
+
+      <Modal
+        open={Boolean(restoreTarget)}
+        onClose={() => setRestoreTarget(null)}
+        title="Восстановить студента"
+        width="form"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRestoreTarget(null)} disabled={restoring}>
+              Отмена
+            </Button>
+            <Button onClick={confirmRestore} loading={restoring}>
+              Восстановить
+            </Button>
+          </>
+        }
+      >
+        <p className="text-control text-text">
+          Вернуть «{restoreTarget?.student.fullName}» в группу {restoreTarget?.enrollment?.groupCode ?? ''}? Он снова станет учеником
+          группы, дата ухода и причина сотрутся.
+        </p>
+      </Modal>
 
       <EditFreezeStartModal enrollment={editFreezeTarget} onClose={() => setEditFreezeTarget(null)} />
 
