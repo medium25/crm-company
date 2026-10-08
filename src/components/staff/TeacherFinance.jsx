@@ -188,6 +188,30 @@ export function TeacherFinance({ teacher }) {
     })();
   }, [past, payroll, terms, activeBranchId, teacher.id, pp.from, pp.to, user.uid]);
 
+  // Оборот и зарплата предыдущего периода: берём из записанного (payroll); пока не записано — считаем по оплатам.
+  const lastKey = past[0].key;
+  const stored = payroll[lastKey];
+  const [lastCalc, setLastCalc] = useState(null);
+  useEffect(() => {
+    setLastCalc(null);
+    if (stored || !db || !activeBranchId) return undefined;
+    let cancelled = false;
+    getDocs(
+      query(collection(db, 'transactions'), where('branchId', '==', activeBranchId), where('type', '==', 'payment'), where('date', '>=', Timestamp.fromDate(past[0].start)), where('date', '<=', Timestamp.fromDate(past[0].end))),
+    )
+      .then((snap) => {
+        if (cancelled) return;
+        const pays = paymentsInPeriod(snap.docs.map((d) => d.data()), teacher.id, past[0]);
+        setLastCalc({ paid: pays.reduce((sum, x) => sum + (Number(x.amount) || 0), 0), salary: termsConfigured(terms) ? salaryFor(pays, terms).total : null });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [lastKey, stored, activeBranchId, teacher.id, terms]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lastPaid = stored ? Number(stored.paid) || 0 : lastCalc?.paid ?? null;
+  const lastSalary = stored ? stored.amount : lastCalc?.salary ?? null;
+
   const [editingPeriod, setEditingPeriod] = useState(false);
   const savePeriod = async (next) => {
     try {
@@ -231,45 +255,43 @@ export function TeacherFinance({ teacher }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-1 overflow-hidden rounded-card border border-border-strong bg-card md:grid-cols-2 xl:grid-cols-4">
-        <div className="p-4">
-          <p className="text-caption text-muted">Период выплаты · этот месяц</p>
-          <p className="mt-1 text-title font-bold text-text">{fmtRange(cur)}</p>
-          <p className="text-caption text-muted">
-            {pp.from === 1 && pp.to === 31 ? 'весь месяц: с 1-го по последнее число' : `каждый месяц с ${pp.from}-го по ${pp.to === 31 ? 'последнее' : `${pp.to}-е`} число`}
-          </p>
-          <button type="button" onClick={() => setEditingPeriod((v) => !v)} className="mt-2 text-small font-bold text-link hover:underline">
+      <div className="rounded-card border border-border-strong bg-card p-5">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <p className="flex items-center gap-1.5 text-caption text-muted">
+              <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" aria-hidden="true" />
+              Оборот за {format(cur.start, 'LLLL', { locale: ru })} · {fmtRangeShort(cur)}
+            </p>
+            <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-1">
+              <p className="text-page font-bold tracking-tight text-text md:text-kpi">{fmtSum(curPaid)}</p>
+              <span className="mb-1.5 rounded-badge bg-success/15 px-2.5 py-0.5 text-caption text-success">
+                зарплата <b className="font-bold">{termsConfigured(terms) ? fmtSum(live.total) : '—'}</b>
+              </span>
+            </div>
+            <p className="text-caption text-muted">
+              {curPays.length} {pluralize(curPays.length, ['оплата', 'оплаты', 'оплат'])}
+              {termsConfigured(terms) ? ` · зарплата зафиксируется ${format(fixationDate(cur), 'd MMMM', { locale: ru })}` : ' · задайте условия работы ниже'}
+            </p>
+          </div>
+          <div>
+            <p className="text-caption text-muted">
+              Оборот за {format(past[0].start, 'LLLL', { locale: ru })} · {fmtRangeShort(past[0])}
+            </p>
+            <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-1">
+              <p className="text-page font-bold tracking-tight text-muted md:text-kpi">{lastPaid === null ? '—' : fmtSum(lastPaid)}</p>
+              <span className="mb-1.5 rounded-badge bg-chip px-2.5 py-0.5 text-caption text-muted">
+                зарплата <b className="font-bold text-text">{lastSalary === null ? '—' : fmtSum(lastSalary)}</b>
+              </span>
+            </div>
+            <p className="text-caption text-muted">{stored ? 'зарплата зафиксирована' : termsConfigured(terms) ? 'зарплата считается…' : 'задайте условия работы ниже'}</p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-x-2 border-t border-border pt-3 text-small text-muted">
+          Период выплаты: <b className="text-text">{fmtRange(cur)}</b>
+          {pp.from === 1 && pp.to === 31 ? ' (весь месяц, до последнего числа)' : ` (с ${pp.from}-го по ${pp.to === 31 ? 'последнее' : `${pp.to}-е`} число каждого месяца)`}
+          <button type="button" onClick={() => setEditingPeriod((v) => !v)} className="font-bold text-link hover:underline">
             {editingPeriod ? 'Скрыть настройку' : 'Изменить'}
           </button>
-        </div>
-        <div className="border-t border-border-strong p-4 md:border-l md:border-t-0">
-          <p className="text-caption text-muted">Оплатили ученики за период</p>
-          <p className="mt-1 text-page font-bold text-text">{fmtSum(curPaid)}</p>
-          <p className="text-caption text-muted">
-            {curPays.length} {pluralize(curPays.length, ['оплата', 'оплаты', 'оплат'])} · {fmtRangeShort(cur)}
-          </p>
-        </div>
-        <div className="border-t border-border-strong bg-navy/10 p-4 xl:border-l xl:border-t-0">
-          <p className="flex flex-wrap items-center gap-2 text-caption text-muted">
-            Зарплата за {format(cur.start, 'LLLL', { locale: ru })}
-            <span className="inline-flex items-center gap-1.5 rounded-badge bg-success/15 px-2 py-0.5 text-caption font-bold text-success">
-              <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" aria-hidden="true" /> сейчас
-            </span>
-          </p>
-          <p className="mt-1 text-page font-bold text-navy">{termsConfigured(terms) ? fmtSum(live.total) : '—'}</p>
-          <p className="text-caption text-muted">
-            {termsConfigured(terms)
-              ? `за ${fmtRangeShort(cur)} · зафиксируется ${format(fixationDate(cur), 'd MMMM', { locale: ru })}`
-              : `за ${fmtRangeShort(cur)} · задайте условия работы ниже`}
-          </p>
-        </div>
-        <div className="border-t border-border-strong p-4 md:border-l md:border-t-0">
-          <p className="text-caption text-muted">Прошлая зарплата · за {format(past[0].start, 'LLLL', { locale: ru })}</p>
-          <p className="mt-1 text-page font-bold text-text">{payroll[past[0].key] ? fmtSum(payroll[past[0].key].amount) : '—'}</p>
-          <p className="text-caption text-muted">
-            за {fmtRangeShort(past[0])}
-            {payroll[past[0].key] ? ' · зафиксирована' : termsConfigured(terms) ? ' · считается…' : ' · задайте условия работы'}
-          </p>
         </div>
       </div>
 
