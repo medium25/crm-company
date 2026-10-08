@@ -229,6 +229,14 @@ function App() {
                   }
                 />
                 <Route
+                  path="staff/:dept/:teacherId"
+                  element={
+                    <ProtectedRoute allow={['ceo', 'manager']}>
+                      <StaffPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="settings"
                   element={
                     <ProtectedRoute allow={['ceo', 'manager', 'admin']}>

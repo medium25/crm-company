@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, GraduationCap, Users } from 'lucide-react';
+import { doc } from 'firebase/firestore';
+import { db } from '../firebase.js';
+import { useDoc } from '../hooks/useDoc.js';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
+import { TeacherCards } from '../components/staff/TeacherCards.jsx';
 
 /**
  * Отделы компании. tone — токен цвета (danger/success/navy), от него считается пастельная
@@ -18,17 +22,32 @@ const mix = (tone, pct) => `color-mix(in srgb, ${toneColor(tone)} ${pct}%, rgb(v
 
 /**
  * Раздел «Сотрудники» (пункт бокового меню; только CEO и менеджер) — три отдела крупными карточками.
- * /staff — список отделов, /staff/:key — страница отдела (пока пустая).
+ * /staff — список отделов, /staff/:key — страница отдела (в «Учебном отделе» — карточки учителей),
+ * /staff/:key/:teacherId — страница учителя (пока пустая).
  * Управление самими сотрудниками (роли, цвета, доступ) — в «Настройки → Назначение сотрудников».
  */
 export function StaffPage() {
   const navigate = useNavigate();
-  const { dept } = useParams();
+  const { dept, teacherId } = useParams();
   const current = DEPARTMENTS.find((d) => d.key === dept);
   // Карточка под курсором/фокусом: подъём на 2 px и тень цвета отдела.
   const [active, setActive] = useState(null);
+  const teacherRef = useMemo(() => (db && teacherId ? doc(db, 'teachers', teacherId) : null), [teacherId]);
+  const { data: teacher } = useDoc(teacherRef);
 
   if (dept && !current) return <PageHeader title="Отдел не найден" actions={<Link to="/staff" className="text-control text-link">К отделам</Link>} />;
+
+  // Страница учителя — пока пустая, только имя и возврат к отделу.
+  if (current && teacherId) {
+    return (
+      <>
+        <Link to={`/staff/${current.key}`} className="mb-4 flex items-center gap-1 text-control text-link">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {current.title}
+        </Link>
+        <PageHeader title={teacher?.displayName ?? ''} />
+      </>
+    );
+  }
 
   if (current) {
     return (
@@ -37,6 +56,7 @@ export function StaffPage() {
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Все отделы
         </Link>
         <PageHeader title={current.title} />
+        {current.key === 'academic' && <TeacherCards onOpen={(t) => navigate(`/staff/academic/${t.id}`)} />}
       </>
     );
   }
