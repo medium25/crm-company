@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { collection, doc, FieldPath, getDocs, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -324,11 +323,19 @@ export function TeacherFinance({ teacher }) {
   const dirty = JSON.stringify({ m: draft.mode, p: draft.groupPercents, f: draft.fixedAmount }) !== JSON.stringify({ m: terms?.mode ?? 'percent', p: terms?.groupPercents ?? {}, f: Number(terms?.fixedAmount) || 0 });
   const draftSalary = salaryFor(curPays, draft);
 
+  const closeTerms = () => {
+    setMode(teacher.payTerms?.mode ?? 'percent');
+    setPercents(teacher.payTerms?.groupPercents ?? {});
+    setFixed(String(teacher.payTerms?.fixedAmount ?? ''));
+    setTermsOpen(false);
+  };
+
   const saveTerms = async () => {
     setSaving(true);
     try {
       await updateDoc(doc(db, 'teachers', teacher.id), { payTerms: draft, updatedAt: serverTimestamp(), updatedBy: user.uid });
       showToast('Условия работы сохранены.');
+      setTermsOpen(false);
     } catch {
       showToast('Не удалось сохранить условия.', { type: 'error' });
     } finally {
@@ -341,8 +348,8 @@ export function TeacherFinance({ teacher }) {
   const termsSummary = !termsConfigured(terms)
     ? 'не заданы'
     : terms.mode === 'fixed'
-      ? `фиксированная оплата · ${fmtSum(terms.fixedAmount)}`
-      : `процент от оборота · задан у ${orderedGroups.filter((g) => Number(terms.groupPercents?.[g.id]) > 0).length} из ${orderedGroups.length} групп`;
+      ? `Фиксированная оплата · ${fmtSum(terms.fixedAmount)}`
+      : `Процент от оборота · задан у ${orderedGroups.filter((g) => Number(terms.groupPercents?.[g.id]) > 0).length} из ${orderedGroups.length} групп`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -383,26 +390,41 @@ export function TeacherFinance({ teacher }) {
           </p>
           <TurnoverChart points={chartPoints} />
         </div>
-        <div className="mt-5 flex flex-wrap items-center gap-x-2 border-t border-border pt-3 text-small text-muted">
-          Период выплаты: <b className="text-text">{fmtRange(cur)}</b>
-          <button type="button" onClick={() => setEditingPeriod(true)} className="font-bold text-link hover:underline">
-            Изменить
-          </button>
+        <div className="mt-5 flex flex-col divide-y divide-border border-t border-border">
+          <div className="flex flex-wrap items-center gap-x-2 py-3 text-small text-muted">
+            Период выплаты: <b className="text-text">{fmtRange(cur)}</b>
+            <button type="button" onClick={() => setEditingPeriod(true)} className="font-bold text-link hover:underline">
+              Изменить
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 pt-3 text-small text-muted">
+            Условия работы: <b className="text-text">{termsSummary}</b>
+            <button type="button" onClick={() => setTermsOpen(true)} className="font-bold text-link hover:underline">
+              Изменить
+            </button>
+          </div>
         </div>
-        <div className="mt-3 border-t border-border pt-3">
-          <button
-            type="button"
-            onClick={() => setTermsOpen((v) => !v)}
-            aria-expanded={termsOpen}
-            className="flex w-full items-center justify-between gap-3 text-left"
-          >
-            <span className="text-small text-muted">
-              <b className="text-body font-bold text-text">Условия работы</b> · {termsSummary}
-            </span>
-            <ChevronDown className={`h-5 w-5 shrink-0 text-muted transition-transform ${termsOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-          </button>
-          {termsOpen && (
-            <div className="mt-4">
+      </div>
+
+      {editingPeriod && <PeriodModal pp={pp} onSave={savePeriod} onClose={() => setEditingPeriod(false)} />}
+
+      <Modal
+        open={termsOpen}
+        onClose={closeTerms}
+        title="Условия работы"
+        width="table"
+        footer={
+          <>
+            {dirty && <span className="mr-auto text-caption text-muted">Есть несохранённые изменения</span>}
+            <Button variant="secondary" onClick={closeTerms}>
+              Отмена
+            </Button>
+            <Button onClick={saveTerms} loading={saving} disabled={!dirty}>
+              Сохранить условия
+            </Button>
+          </>
+        }
+      >
         <div className="mb-4 inline-flex rounded-badge bg-chip p-1">
           {[
             ['percent', 'Процент от оборота'],
@@ -482,19 +504,7 @@ export function TeacherFinance({ teacher }) {
             <p className="text-caption text-muted">Столько получает учитель за каждый период, независимо от оплат учеников.</p>
           </div>
         )}
-
-        <div className="mt-4 flex items-center justify-end gap-3">
-          {dirty && <span className="text-caption text-muted">Есть несохранённые изменения</span>}
-          <Button onClick={saveTerms} loading={saving} disabled={!dirty}>
-            Сохранить условия
-          </Button>
-        </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {editingPeriod && <PeriodModal pp={pp} onSave={savePeriod} onClose={() => setEditingPeriod(false)} />}
+      </Modal>
 
       <div>
         <p className="mb-2 text-body font-bold text-text">Прошлые месяцы</p>
