@@ -16,10 +16,28 @@ function efficiencyOf(teacher) {
   return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null;
 }
 
-function TeacherCard({ teacher, index, onOpen }) {
-  const hue = `rgb(var(--color-chart-${(index % 7) + 1}))`;
-  const mix = (pct) => `color-mix(in srgb, ${hue} ${pct}%, rgb(var(--color-surface)))`;
+// Цвет карточки по эффективности: зелёный — хорошо, жёлтый — средне, красный — плохо.
+const TIERS = {
+  good: 'rgb(var(--color-success))',
+  mid: 'rgb(214 158 30)',
+  bad: 'rgb(var(--color-danger))',
+};
+
+/**
+ * Уровень эффективности: есть число (teachers.efficiency, 0–100) — по порогам 70 / 40; пока числа нет —
+ * временное случайное, но устойчивое распределение по id учителя (не меняется между открытиями).
+ */
+function tierOf(teacher, eff) {
+  if (eff !== null) return eff >= 70 ? 'good' : eff >= 40 ? 'mid' : 'bad';
+  let h = 2166136261;
+  for (const ch of String(teacher.id)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return ['good', 'mid', 'bad'][(h >>> 0) % 3];
+}
+
+function TeacherCard({ teacher, onOpen }) {
   const eff = efficiencyOf(teacher);
+  const hue = TIERS[tierOf(teacher, eff)];
+  const mix = (pct) => `color-mix(in srgb, ${hue} ${pct}%, rgb(var(--color-surface)))`;
   return (
     <button
       type="button"
@@ -81,8 +99,8 @@ export function TeacherCards({ onOpen }) {
 
   return (
     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-      {teachers.map((t, i) => (
-        <TeacherCard key={t.id} teacher={t} index={i} onOpen={onOpen} />
+      {teachers.map((t) => (
+        <TeacherCard key={t.id} teacher={t} onOpen={onOpen} />
       ))}
     </div>
   );
