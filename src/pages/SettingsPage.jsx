@@ -12,7 +12,7 @@ import { useAuth } from '../hooks/useAuth.js';
 
 const TABS = [
   { key: 'branch', label: 'Филиал' },
-  { key: 'staff', label: 'Сотрудники' },
+  { key: 'staff', label: 'Назначение сотрудников' },
   { key: 'leadAssignment', label: 'Распределение лидов' },
   { key: 'operatorScoring', label: 'Оценка операторов' },
   { key: 'directories', label: 'Справочники' },
