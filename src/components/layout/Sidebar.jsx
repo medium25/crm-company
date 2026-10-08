@@ -82,12 +82,13 @@ export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
                 to={item.to}
                 end={item.to === '/'}
                 className={({ isActive }) =>
-                  `group relative flex flex-col items-center gap-1.5 border-l-[3px] py-3.5 text-center text-[13px] leading-tight transition-colors ${
-                    collapsed ? 'px-2' : 'px-3'
+                  // Плитки: в покое без рамок, при наведении — карточка с тенью, активная — светло-синяя плитка.
+                  `group relative mx-2 mb-1 flex flex-col items-center gap-1.5 rounded-card border py-3 text-center text-[13px] leading-tight transition-all ${
+                    collapsed ? 'px-1' : 'px-2'
                   } ${
                     isActive
-                      ? 'border-l-navy bg-orange-soft/40 font-bold text-navy'
-                      : 'border-l-transparent text-muted hover:bg-surface-alt hover:text-text'
+                      ? 'border-navy/25 bg-navy/10 font-bold text-navy'
+                      : 'border-transparent text-muted hover:border-border hover:bg-surface hover:text-text hover:shadow-card'
                   }`
                 }
               >
