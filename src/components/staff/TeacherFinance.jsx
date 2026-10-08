@@ -54,29 +54,65 @@ function PercentStepper({ value, onChange }) {
   );
 }
 
-function DayInput({ value, onCommit, label }) {
-  const [text, setText] = useState(String(value));
-  useEffect(() => setText(String(value)), [value]);
-  const commit = () => {
-    const n = Math.round(Number(text));
-    if (Number.isFinite(n) && n >= 1 && n <= 31) {
-      if (n !== value) onCommit(n);
-    } else {
-      setText(String(value));
-    }
-  };
+/** «5 октября — 4 ноября» (без года) и короткая «5 окт — 4 ноя» для плиток. */
+const fmtRange = (p) => `${format(p.start, 'd MMMM', { locale: ru })} — ${format(p.end, 'd MMMM', { locale: ru })}`;
+const fmtRangeShort = (p) => `${format(p.start, 'd MMM', { locale: ru }).replace('.', '')} — ${format(p.end, 'd MMM', { locale: ru }).replace('.', '')}`;
+
+/** Сетка чисел 1–31 для выбора одного числа месяца. */
+function DayGrid({ label, value, onChange }) {
   return (
-    <input
-      type="number"
-      min={1}
-      max={31}
-      value={text}
-      aria-label={label}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-      className="h-9 w-14 rounded-field border border-border-strong bg-surface text-center text-control font-bold text-text outline-none focus:border-navy [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-    />
+    <div>
+      <p className="mb-1.5 text-caption font-bold text-text">{label}</p>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => onChange(d)}
+            aria-pressed={value === d}
+            className={`h-8 rounded-field text-caption font-bold ${value === d ? 'bg-navy text-white' : 'bg-chip text-text hover:bg-border'}`}
+          >
+            {d}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Настройка периода выплаты: два числа месяца выбираются в сетках, рядом сразу видно, какие даты
+ * получатся в этом месяце. Сохраняется кнопкой (случайный клик не меняет расчёт).
+ */
+function PeriodEditor({ pp, onSave, onClose }) {
+  const [from, setFrom] = useState(pp.from);
+  const [to, setTo] = useState(pp.to);
+  const preview = currentPayPeriod(new Date(), { from, to });
+  return (
+    <div className="rounded-card border border-border-strong bg-card p-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <DayGrid label="Период начинается с числа" value={from} onChange={setFrom} />
+        <DayGrid label="и заканчивается числом" value={to} onChange={setTo} />
+      </div>
+      <p className="mt-3 text-small text-text">
+        В этом месяце: <b>{fmtRange(preview)}</b>
+        {from > to && <span className="text-muted"> (период переходит на следующий месяц)</span>}
+      </p>
+      <p className="mt-0.5 text-caption text-muted">31 — последний день месяца (в коротких месяцах период закончится раньше).</p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <Button variant="secondary" size="sm" onClick={() => { setFrom(1); setTo(31); }}>
+          Весь месяц (1 → 31)
+        </Button>
+        <span className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button size="sm" onClick={() => onSave({ from, to })} disabled={from === pp.from && to === pp.to}>
+            Сохранить период
+          </Button>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -152,9 +188,12 @@ export function TeacherFinance({ teacher }) {
     })();
   }, [past, payroll, terms, activeBranchId, teacher.id, pp.from, pp.to, user.uid]);
 
-  const savePeriod = async (patch) => {
+  const [editingPeriod, setEditingPeriod] = useState(false);
+  const savePeriod = async (next) => {
     try {
-      await updateDoc(doc(db, 'teachers', teacher.id), { payPeriod: { ...pp, ...patch }, updatedAt: serverTimestamp(), updatedBy: user.uid });
+      await updateDoc(doc(db, 'teachers', teacher.id), { payPeriod: next, updatedAt: serverTimestamp(), updatedBy: user.uid });
+      setEditingPeriod(false);
+      showToast('Период выплаты сохранён.');
     } catch {
       showToast('Не удалось сохранить период.', { type: 'error' });
     }
@@ -192,26 +231,25 @@ export function TeacherFinance({ teacher }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-1 overflow-hidden rounded-card border border-border-strong bg-card md:grid-cols-3">
+      <div className="grid grid-cols-1 overflow-hidden rounded-card border border-border-strong bg-card md:grid-cols-2 xl:grid-cols-4">
         <div className="p-4">
-          <p className="text-caption text-muted">Период выплаты</p>
-          <div className="my-2 flex items-center gap-2">
-            <DayInput value={pp.from} onCommit={(n) => savePeriod({ from: n })} label="Период с числа" />
-            <span className="text-muted" aria-hidden="true">→</span>
-            <DayInput value={pp.to} onCommit={(n) => savePeriod({ to: n })} label="Период по число" />
-          </div>
+          <p className="text-caption text-muted">Период выплаты · этот месяц</p>
+          <p className="mt-1 text-title font-bold text-text">{fmtRange(cur)}</p>
           <p className="text-caption text-muted">
-            с {pp.from}-го по {pp.to}-е число
+            каждый месяц с {pp.from}-го по {pp.to}-е число
           </p>
+          <button type="button" onClick={() => setEditingPeriod((v) => !v)} className="mt-2 text-small font-bold text-link hover:underline">
+            {editingPeriod ? 'Скрыть настройку' : 'Изменить'}
+          </button>
         </div>
         <div className="border-t border-border-strong p-4 md:border-l md:border-t-0">
           <p className="text-caption text-muted">Оплатили ученики за период</p>
           <p className="mt-1 text-page font-bold text-text">{fmtSum(curPaid)}</p>
           <p className="text-caption text-muted">
-            {curPays.length} {pluralize(curPays.length, ['оплата', 'оплаты', 'оплат'])}
+            {curPays.length} {pluralize(curPays.length, ['оплата', 'оплаты', 'оплат'])} · {fmtRangeShort(cur)}
           </p>
         </div>
-        <div className="border-t border-border-strong bg-navy/10 p-4 md:border-l md:border-t-0">
+        <div className="border-t border-border-strong bg-navy/10 p-4 xl:border-l xl:border-t-0">
           <p className="flex flex-wrap items-center gap-2 text-caption text-muted">
             Зарплата за {format(cur.start, 'LLLL', { locale: ru })}
             <span className="inline-flex items-center gap-1.5 rounded-badge bg-success/15 px-2 py-0.5 text-caption font-bold text-success">
@@ -220,10 +258,22 @@ export function TeacherFinance({ teacher }) {
           </p>
           <p className="mt-1 text-page font-bold text-navy">{termsConfigured(terms) ? fmtSum(live.total) : '—'}</p>
           <p className="text-caption text-muted">
-            {termsConfigured(terms) ? `зафиксируется ${format(fixationDate(cur), 'd MMMM', { locale: ru })}` : 'задайте условия работы ниже'}
+            {termsConfigured(terms)
+              ? `за ${fmtRangeShort(cur)} · зафиксируется ${format(fixationDate(cur), 'd MMMM', { locale: ru })}`
+              : `за ${fmtRangeShort(cur)} · задайте условия работы ниже`}
+          </p>
+        </div>
+        <div className="border-t border-border-strong p-4 md:border-l md:border-t-0">
+          <p className="text-caption text-muted">Прошлая зарплата · за {format(past[0].start, 'LLLL', { locale: ru })}</p>
+          <p className="mt-1 text-page font-bold text-text">{payroll[past[0].key] ? fmtSum(payroll[past[0].key].amount) : '—'}</p>
+          <p className="text-caption text-muted">
+            за {fmtRangeShort(past[0])}
+            {payroll[past[0].key] ? ' · зафиксирована' : termsConfigured(terms) ? ' · считается…' : ' · задайте условия работы'}
           </p>
         </div>
       </div>
+
+      {editingPeriod && <PeriodEditor pp={pp} onSave={savePeriod} onClose={() => setEditingPeriod(false)} />}
 
       <div>
         <p className="mb-2 text-body font-bold text-text">Прошлые месяцы</p>
@@ -236,6 +286,7 @@ export function TeacherFinance({ teacher }) {
               <div key={p.key} className="rounded-row border-[1.5px] px-3 py-2.5" style={tileStyle(i)}>
                 <p className="text-caption font-bold uppercase">{format(p.start, 'LLL', { locale: ru }).replace('.', '')}</p>
                 <p className="mt-0.5 text-title font-bold">{item ? fmtMln(item.amount) : '—'}</p>
+                <p className="text-caption opacity-80">{fmtRangeShort(p)}</p>
                 {delta !== null && (
                   <p className="text-caption opacity-80">
                     {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}% к прошлому
