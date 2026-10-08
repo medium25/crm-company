@@ -9,7 +9,7 @@ import {
   CircleUserRound,
   GraduationCap,
   Coins,
-  BarChart3,
+  UserCog,
   Settings,
   ChevronsLeft,
   ChevronsRight,
@@ -35,7 +35,7 @@ const ITEMS = [
   { key: 'students', to: '/students', label: 'Студенты', icon: CircleUserRound },
   { key: 'teachersGroups', to: '/teachers-groups', label: 'Учителя и группы', icon: GraduationCap },
   { key: 'payments', to: '/payments', label: 'Финансы', icon: Coins },
-  { key: 'reports', to: '/reports', label: 'Отчёты и статистика', icon: BarChart3 },
+  { key: 'staff', to: '/staff', label: 'Сотрудники', icon: UserCog },
   { key: 'settings', to: '/settings', label: 'Настройки', icon: Settings },
 ];
 
@@ -46,9 +46,9 @@ const ITEMS = [
  * AddStaffModal) — см. использование ниже.
  */
 const ROLE_ITEM_KEYS = {
-  ceo: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
-  manager: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
-  admin: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'reports', 'settings'],
+  ceo: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'staff', 'settings'],
+  manager: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'staff', 'settings'],
+  admin: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'settings'],
   teacher: ['teachersGroups'],
 };
 

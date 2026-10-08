@@ -14,7 +14,6 @@ export const TEST_SECTION_OPTIONS = [
   { value: 'students', label: 'Студенты' },
   { value: 'teachersGroups', label: 'Учителя и группы' },
   { value: 'payments', label: 'Финансы' },
-  { value: 'reports', label: 'Отчёты и статистика' },
 ];
 
 /**

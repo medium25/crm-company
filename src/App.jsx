@@ -25,6 +25,7 @@ import { ReportsLandingPage } from './pages/ReportsLandingPage.jsx';
 import { StatsDepartmentsPage } from './pages/StatsDepartmentsPage.jsx';
 import { SalesStatsPage } from './pages/SalesStatsPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
+import { StaffPage } from './pages/StaffPage.jsx';
 import { UiKitShowcasePage } from './pages/UiKitShowcasePage.jsx';
 
 // section → путь первого экрана этого раздела — для редиректа теста на
@@ -37,7 +38,6 @@ const SECTION_PATHS = {
   students: '/students',
   teachersGroups: '/teachers-groups',
   payments: '/payments',
-  reports: '/reports',
 };
 
 // Учитель в меню не видит «Дашборд» — прямой заход на '/' уводит его сразу
@@ -209,6 +209,14 @@ function App() {
                   element={
                     <ProtectedRoute section="reports">
                       <SalesStatsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="staff"
+                  element={
+                    <ProtectedRoute allow={['ceo', 'manager']}>
+                      <StaffPage />
                     </ProtectedRoute>
                   }
                 />
