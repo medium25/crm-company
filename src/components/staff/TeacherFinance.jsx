@@ -98,7 +98,7 @@ function PeriodEditor({ pp, onSave, onClose }) {
         В этом месяце: <b>{fmtRange(preview)}</b>
         {from > to && <span className="text-muted"> (период переходит на следующий месяц)</span>}
       </p>
-      <p className="mt-0.5 text-caption text-muted">31 — последний день месяца (в коротких месяцах период закончится раньше).</p>
+      <p className="mt-0.5 text-caption text-muted">«31» — это последнее число месяца: в месяце из 30 дней период закончится 30-го, в феврале — 28-го (29-го).</p>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <Button variant="secondary" size="sm" onClick={() => { setFrom(1); setTo(31); }}>
           Весь месяц (1 → 31)
@@ -236,7 +236,7 @@ export function TeacherFinance({ teacher }) {
           <p className="text-caption text-muted">Период выплаты · этот месяц</p>
           <p className="mt-1 text-title font-bold text-text">{fmtRange(cur)}</p>
           <p className="text-caption text-muted">
-            каждый месяц с {pp.from}-го по {pp.to}-е число
+            {pp.from === 1 && pp.to === 31 ? 'весь месяц: с 1-го по последнее число' : `каждый месяц с ${pp.from}-го по ${pp.to === 31 ? 'последнее' : `${pp.to}-е`} число`}
           </p>
           <button type="button" onClick={() => setEditingPeriod((v) => !v)} className="mt-2 text-small font-bold text-link hover:underline">
             {editingPeriod ? 'Скрыть настройку' : 'Изменить'}
