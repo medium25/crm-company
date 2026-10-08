@@ -1,6 +1,6 @@
 // src/pages/LeadsPage.jsx
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Moon, Sun } from 'lucide-react';
 import { collection, doc, query, where, orderBy, onSnapshot, getCountFromServer, updateDoc, setDoc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase.js';
@@ -29,6 +29,7 @@ import { setSearchSource, clearSearchSource } from '../lib/searchSource.js';
 import { advanceStage, nextCallDueAt, firstTouchDueAt, secondTouchDueAt, unreachableCallDueAt } from '../lib/leadFunnel.js';
 import { playNewLeadChime } from '../lib/notificationSound.js';
 import { recentMonths } from '../lib/lostMonths.js';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 /**
  * Заявки — 7-стадийная воронка продаж (2026-08-13-leads-funnel-redesign.md).
@@ -675,12 +676,9 @@ export function LeadsPage() {
           проскроллили/подсветили, обычный «назад» увёл бы на пустой список
           без этого состояния). */}
       {highlightLeadId && fromTasks && (
-        <Link
-          to={`/tasks?focus=${highlightLeadId}`}
-          className="fixed bottom-4 left-4 z-10 flex items-center gap-1 rounded-full bg-navy px-4 py-2 text-[13px] font-bold text-white shadow-hover hover:bg-navy-hover"
-        >
-          ← К задачам
-        </Link>
+        <BackButton to={`/tasks?focus=${highlightLeadId}`} className="fixed bottom-4 left-4 z-10 shadow-hover">
+          К задачам
+        </BackButton>
       )}
       {/* fixed в угол экрана — не участвует в потоке страницы (колонки
           начинаются сразу сверху) и не переезжает поверх шапок колонок при

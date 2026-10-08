@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import { ArrowLeft, GraduationCap, Layers } from 'lucide-react';
+import { GraduationCap, Layers } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
@@ -9,6 +9,7 @@ import { EmptyState } from '../ui/EmptyState.jsx';
 import { Skeleton } from '../ui/Skeleton.jsx';
 import { AttendanceTab } from '../groups/AttendanceTab.jsx';
 import { formatPhone, pluralize, formatAvgMonths } from '../../lib/format.js';
+import { BackButton } from '../ui/BackButton.jsx';
 
 /**
  * «Посещаемость» в разделе «Студенты» — список учителей; по клику на
@@ -129,13 +130,9 @@ export function AttendanceByTeacher() {
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setTeacherId(null)}
-        className="mb-4 flex items-center gap-1 text-control text-link"
-      >
-        <ArrowLeft className="h-4 w-4" /> Все учителя
-      </button>
+      <BackButton onClick={() => setTeacherId(null)} className="mb-4">
+        Все учителя
+      </BackButton>
 
       <h2 className="mb-4 text-page font-bold text-text">{teacher?.displayName}</h2>
 

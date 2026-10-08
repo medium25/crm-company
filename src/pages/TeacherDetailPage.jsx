@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc } from 'firebase/firestore';
-import { ArrowLeft, Pencil, Layers } from 'lucide-react';
+import { Pencil, Layers } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
@@ -11,6 +11,7 @@ import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { TeacherFormModal } from '../components/teachers/TeacherFormModal.jsx';
 import { formatPhone, pluralize } from '../lib/format.js';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 export function TeacherDetailPage() {
   const { id } = useParams();
@@ -38,13 +39,9 @@ export function TeacherDetailPage() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => navigate('/teachers')}
-        className="mb-4 flex items-center gap-1 text-control text-muted hover:text-text"
-      >
-        <ArrowLeft className="h-4 w-4" /> Все учителя
-      </button>
+      <BackButton onClick={() => navigate('/teachers')} className="mb-4">
+        Все учителя
+      </BackButton>
 
       <PageHeader
         title={teacher.displayName}

@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Briefcase, Megaphone, ClipboardList, GraduationCap, Clock } from 'lucide-react';
+import { ChevronRight, Briefcase, Megaphone, ClipboardList, GraduationCap, Clock } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { Card } from '../components/ui/Card.jsx';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 const DEPARTMENTS = [
   { key: 'sales', to: '/reports/stats/sales', icon: Briefcase, title: 'Отдел продаж', sub: 'Воронка и оценка операторов.', enabled: true },
@@ -19,9 +20,7 @@ export function StatsDepartmentsPage() {
       <PageHeader
         title="Статистика"
         actions={
-          <button type="button" onClick={() => navigate('/reports')} className="flex items-center gap-1 text-body font-bold text-navy hover:text-navy-hover">
-            <ChevronLeft className="h-4 w-4" /> Отчёты и статистика
-          </button>
+          <BackButton onClick={() => navigate('/reports')}>Отчёты и статистика</BackButton>
         }
       />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

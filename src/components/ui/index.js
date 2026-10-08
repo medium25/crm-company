@@ -18,3 +18,4 @@ export { AttendanceCell } from './AttendanceCell.jsx';
 export { Tile } from './Tile.jsx';
 export { SectionTitle } from './SectionTitle.jsx';
 export { FilterChip } from './FilterChip.jsx';
+export { BackButton } from './BackButton.jsx';

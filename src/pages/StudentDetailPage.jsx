@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collection, doc, query, where, orderBy, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
-import { ArrowLeft, Pencil, Mail, Archive, History, Flag, FolderPlus, Wallet, CircleUserRound, RefreshCw, Trash2, Image as ImageIcon, ChevronDown } from 'lucide-react';
+import { Pencil, Mail, Archive, History, Flag, FolderPlus, Wallet, CircleUserRound, RefreshCw, Trash2, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useRole } from '../hooks/useRole.js';
@@ -37,6 +37,7 @@ import { CallLogsTab } from '../components/students/CallLogsTab.jsx';
 import { recalcBalance, deleteTransaction } from '../lib/billing.js';
 import { archiveStudent } from '../lib/students.js';
 import { formatDateLong, formatDate, formatDateTimeShort, formatMoney, formatMoneySigned, formatMonth, formatPhone, formatMethod } from '../lib/format.js';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 const TABS = [
   { key: 'groups', label: 'Группы' },
@@ -195,9 +196,9 @@ export function StudentDetailPage() {
 
   return (
     <>
-      <button type="button" onClick={() => navigate(-1)} className="mb-4 flex items-center gap-1 text-control text-muted hover:text-text">
-        <ArrowLeft className="h-4 w-4" /> Назад
-      </button>
+      <BackButton onClick={() => navigate(-1)} className="mb-4">
+        Назад
+      </BackButton>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
         <Card className="flex flex-col gap-4">

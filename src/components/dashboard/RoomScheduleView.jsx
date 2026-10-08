@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, CalendarClock, EllipsisVertical, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { CalendarClock, EllipsisVertical, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { BackButton } from '../ui/BackButton.jsx';
 import { Button } from '../ui/Button.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { FilterChip } from '../ui/FilterChip.jsx';
@@ -665,10 +666,7 @@ export function RoomScheduleView({
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {onBack ? (
           <>
-            <Button variant="secondary" size="sm" onClick={onBack} className={FOCUS}>
-              <ArrowLeft className="mr-1 h-4 w-4" aria-hidden="true" />
-              К выбору дней
-            </Button>
+            <BackButton onClick={onBack}>К выбору дней</BackButton>
             <span className="text-control font-bold text-text">{DAY_TYPE_TABS.find((t) => t.value === dayType)?.label}</span>
           </>
         ) : (

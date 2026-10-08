@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collection, doc, documentId, query, where, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
-import { ArrowLeft, Pencil, Archive, Mail, UserPlus, History, Download, Users } from 'lucide-react';
+import { Pencil, Archive, Mail, UserPlus, History, Download, Users } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useRole } from '../hooks/useRole.js';
@@ -31,6 +31,7 @@ import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollment
 import { formatDate, formatMoney, formatPhone, formatScheduleType } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
 import { MIN_FREEZE_BALANCE, MAX_FREEZES_PER_STUDENT, canFreezeStudent } from '../lib/billing.js';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 const TABS = [
   { key: 'attendance', label: 'Посещаемость' },
@@ -243,13 +244,9 @@ export function GroupDetailPage() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="mb-4 flex items-center gap-1 text-control text-muted hover:text-text"
-      >
-        <ArrowLeft className="h-4 w-4" /> Назад
-      </button>
+      <BackButton onClick={() => navigate(-1)} className="mb-4">
+        Назад
+      </BackButton>
 
       <h1 className="mb-6 text-kpi text-text">
         {group.code} <span className="text-muted">·</span> {group.courseName} <span className="text-muted">·</span>{' '}

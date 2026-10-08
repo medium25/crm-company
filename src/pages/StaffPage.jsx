@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Building2, GraduationCap, Users } from 'lucide-react';
+import { ArrowRight, Building2, GraduationCap, Users } from 'lucide-react';
 import { doc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { TeacherCards } from '../components/staff/TeacherCards.jsx';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 /**
  * Отделы компании. tone — токен цвета (danger/success/navy), от него считается пастельная
@@ -41,9 +42,9 @@ export function StaffPage() {
   if (current && teacherId) {
     return (
       <>
-        <Link to={`/staff/${current.key}`} className="mb-4 flex items-center gap-1 text-control text-link">
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {current.title}
-        </Link>
+        <BackButton to={`/staff/${current.key}`} className="mb-4">
+          {current.title}
+        </BackButton>
         <PageHeader title={teacher?.displayName ?? ''} />
       </>
     );
@@ -52,9 +53,9 @@ export function StaffPage() {
   if (current) {
     return (
       <>
-        <Link to="/staff" className="mb-4 flex items-center gap-1 text-control text-link">
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Все отделы
-        </Link>
+        <BackButton to="/staff" className="mb-4">
+          Все отделы
+        </BackButton>
         <PageHeader title={current.title} />
         {current.key === 'academic' && <TeacherCards onOpen={(t) => navigate(`/staff/academic/${t.id}`)} />}
       </>

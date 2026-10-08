@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, doc, getDocs, query, where, orderBy, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, format, startOfMonth, subDays, subMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { CircleUserRound, MessageSquare, Download, ArrowLeft, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, Pencil, CalendarDays, UserCheck, Archive } from 'lucide-react';
+import { CircleUserRound, MessageSquare, Download, ChevronRight, Wallet, CalendarCheck, UserX, Snowflake, GraduationCap, Pencil, CalendarDays, UserCheck, Archive } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -33,6 +33,7 @@ import { NoChargeHistoryList } from '../components/students/NoChargeHistoryList.
 import { AllStudentsSummary } from '../components/students/AllStudentsSummary.jsx';
 import { formatPhone, formatMoney, formatDate, formatDuration, formatAvgMonths, formatDaysLeft, pluralize } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Статус: все' },
@@ -802,9 +803,9 @@ export function StudentsPage() {
         }
       />
 
-      <button type="button" onClick={goToLanding} className="mb-6 flex items-center gap-1 text-control text-link">
-        <ArrowLeft className="h-4 w-4" /> Все разделы
-      </button>
+      <BackButton onClick={goToLanding} className="mb-6">
+        Все разделы
+      </BackButton>
 
       {section === 'attendance' ? (
         <AttendanceByTeacher />
@@ -842,14 +843,14 @@ export function StudentsPage() {
           )}
 
           {section === 'left' && leftView && (
-            <button type="button" onClick={() => setFilter({ leftView: null, leftDate: null, leftMonth: null })} className="mb-4 flex items-center gap-1 text-control text-link">
-              <ArrowLeft className="h-4 w-4" /> Назад к разделам
-            </button>
+            <BackButton onClick={() => setFilter({ leftView: null, leftDate: null, leftMonth: null })} className="mb-4">
+              Назад к разделам
+            </BackButton>
           )}
           {section === 'left' && leftView === 'all' && leftMonth && (
-            <button type="button" onClick={() => setFilter({ leftMonth: null })} className="mb-4 flex items-center gap-1 text-control text-link">
-              <ArrowLeft className="h-4 w-4" /> Назад к месяцам
-            </button>
+            <BackButton onClick={() => setFilter({ leftMonth: null })} className="mb-4">
+              Назад к месяцам
+            </BackButton>
           )}
 
           <FilterBar onReset={resetFilters}>

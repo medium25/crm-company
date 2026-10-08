@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { collection, query, where, orderBy, doc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore';
-import { Plus, UploadCloud, CheckCircle2, X, GraduationCap, ArrowLeft } from 'lucide-react';
+import { Plus, UploadCloud, CheckCircle2, X, GraduationCap } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useRole } from '../hooks/useRole.js';
@@ -20,6 +20,7 @@ import { ImportTeachersModal } from '../components/teachers/ImportTeachersModal.
 import { GroupFormModal } from '../components/groups/GroupFormModal.jsx';
 import { TeacherGroupsList } from '../components/students/TeacherGroupsList.jsx';
 import { formatPhone, pluralize } from '../lib/format.js';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 const BANNER_KEY = 'icon-crm:teachers-banner-dismissed';
 
@@ -149,9 +150,9 @@ export function TeachersAndGroupsPage() {
       />
 
       {teacherId && !isTeacher && (
-        <button type="button" onClick={() => openTeacher(null)} className="mb-6 flex items-center gap-1 text-control text-link">
-          <ArrowLeft className="h-4 w-4" /> Учителя и группы — назад
-        </button>
+        <BackButton onClick={() => openTeacher(null)} className="mb-6">
+          Учителя и группы — назад
+        </BackButton>
       )}
 
       {isTeacher && !teacherId ? (

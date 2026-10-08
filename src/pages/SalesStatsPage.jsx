@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, query, where } from 'firebase/firestore';
 import { format, startOfMonth } from 'date-fns';
-import { ChevronLeft, Settings2, TrendingUp, Info } from 'lucide-react';
+import { Settings2, TrendingUp, Info } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useBranch } from '../hooks/useBranch.js';
 import { useCollection } from '../hooks/useCollection.js';
@@ -15,6 +15,7 @@ import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { funnelByOperator, currentOverdueHoursByOperator } from '../lib/reports.js';
 import { operatorInitials } from '../components/leads/LeadCard.jsx';
 import { DEFAULT_OPERATOR_SCORE_CRITERIA, gradeRate, gradeOverdue, gradeLeadsVolume, countWorkingDays, overallGrade, formatOverdueHours } from '../lib/operatorScoring.js';
+import { BackButton } from '../components/ui/BackButton.jsx';
 
 const GRADE_BADGE = {
   good: 'bg-success/10 text-success',
@@ -179,9 +180,7 @@ export function SalesStatsPage() {
       <PageHeader
         title="Отдел продаж"
         actions={
-          <button type="button" onClick={() => navigate('/reports/stats')} className="flex items-center gap-1 text-[14px] font-bold text-navy hover:text-navy-hover">
-            <ChevronLeft className="h-4 w-4" /> Статистика
-          </button>
+          <BackButton onClick={() => navigate('/reports/stats')}>Статистика</BackButton>
         }
       />
 

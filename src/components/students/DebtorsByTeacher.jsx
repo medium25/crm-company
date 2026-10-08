@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { ArrowLeft, CalendarDays, GraduationCap, Flag, MessageSquare, ListTodo, Wallet } from 'lucide-react';
+import { CalendarDays, GraduationCap, Flag, MessageSquare, ListTodo, Wallet } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useBranch } from '../../hooks/useBranch.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -16,6 +16,7 @@ import { Badge } from '../ui/Badge.jsx';
 import { CommentsModal } from './CommentsModal.jsx';
 import { TaskListModal } from './TaskListModal.jsx';
 import { formatPhone, formatMoney, pluralize } from '../../lib/format.js';
+import { BackButton } from '../ui/BackButton.jsx';
 
 const PARITY_LABEL = { even: 'Чётные дни', odd: 'Нечётные дни' };
 
@@ -150,9 +151,9 @@ export function DebtorsByTeacher() {
   if (!teacherId) {
     return (
       <div>
-        <button type="button" onClick={() => setParity(null)} className="mb-4 flex items-center gap-1 text-control text-link">
-          <ArrowLeft className="h-4 w-4" /> {PARITY_LABEL[parity]} — назад
-        </button>
+        <BackButton onClick={() => setParity(null)} className="mb-4">
+          {PARITY_LABEL[parity]} — назад
+        </BackButton>
 
         {teachersInParity.length === 0 ? (
           <EmptyState icon={GraduationCap} title="Должников нет" />
@@ -264,9 +265,9 @@ export function DebtorsByTeacher() {
 
   return (
     <div>
-      <button type="button" onClick={() => setTeacherId(null)} className="mb-4 flex items-center gap-1 text-control text-link">
-        <ArrowLeft className="h-4 w-4" /> {structure[parity].get(teacherId)?.teacherName} — назад
-      </button>
+      <BackButton onClick={() => setTeacherId(null)} className="mb-4">
+        {structure[parity].get(teacherId)?.teacherName} — назад
+      </BackButton>
 
       {rows.length === 0 ? (
         <EmptyState icon={Wallet} title="Должников нет" />
