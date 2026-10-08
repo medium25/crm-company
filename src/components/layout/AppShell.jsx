@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -15,7 +15,6 @@ import { BillingBanner } from '../billing/BillingBanner.jsx';
 export function AppShell() {
   const { branches, activeBranchId, setActiveBranchId } = useBranch();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { pathname } = useLocation();
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg">
@@ -28,10 +27,7 @@ export function AppShell() {
             <div className="mb-4 flex empty:hidden">
               <BillingBanner />
             </div>
-            {/* key по пути: на каждый переход страница монтируется заново и «въезжает» (.page-enter); смена только ?параметров не анимируется. */}
-            <div key={pathname} className="page-enter">
-              <Outlet />
-            </div>
+            <Outlet />
           </div>
         </main>
       </div>
