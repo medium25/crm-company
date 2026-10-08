@@ -74,6 +74,8 @@ export function StudentsPage() {
   const [unfreezeTarget, setUnfreezeTarget] = useState(null);
   const [restoreTarget, setRestoreTarget] = useState(null); // { student, enrollment }
   const [restoring, setRestoring] = useState(false);
+  // Внутри «Посещаемости»/«Должников» открыт уровень со своей кнопкой «назад» — общую «Все разделы» тогда не показываем.
+  const [drilled, setDrilled] = useState(false);
 
   const section = searchParams.get('section') || null;
   const search = searchParams.get('q') || '';
@@ -803,14 +805,17 @@ export function StudentsPage() {
         }
       />
 
-      <BackButton onClick={goToLanding} className="mb-6">
-        Все разделы
-      </BackButton>
+      {/* Одна кнопка «назад» на экране: общая «Все разделы» — только на верхнем уровне раздела. */}
+      {!drilled && !(section === 'left' && leftView) && (
+        <BackButton onClick={goToLanding} className="mb-6">
+          Все разделы
+        </BackButton>
+      )}
 
       {section === 'attendance' ? (
-        <AttendanceByTeacher />
+        <AttendanceByTeacher onDrillChange={setDrilled} />
       ) : section === 'debtors' ? (
-        <DebtorsByTeacher />
+        <DebtorsByTeacher onDrillChange={setDrilled} />
       ) : section === 'noChargeHistory' ? (
         <NoChargeHistoryList />
       ) : section === 'left' && !leftView ? (
@@ -842,7 +847,7 @@ export function StudentsPage() {
             <AllStudentsSummary total={nonPausedStudents.length} breakdown={teacherBreakdown} />
           )}
 
-          {section === 'left' && leftView && (
+          {section === 'left' && leftView && !(leftView === 'all' && leftMonth) && (
             <BackButton onClick={() => setFilter({ leftView: null, leftDate: null, leftMonth: null })} className="mb-4">
               Назад к разделам
             </BackButton>

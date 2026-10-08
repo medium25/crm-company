@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { GraduationCap, Layers } from 'lucide-react';
 import { db } from '../../firebase.js';
@@ -16,9 +16,16 @@ import { BackButton } from '../ui/BackButton.jsx';
  * учителя показывается посещаемость всех его студентов сразу по всем его
  * группам (одна таблица-грид на группу, без захода в карточку группы).
  */
-export function AttendanceByTeacher() {
+export function AttendanceByTeacher({ onDrillChange }) {
   const { activeBranchId } = useBranch();
   const [teacherId, setTeacherId] = useState(null);
+
+  // Внутри раздела своя кнопка «назад» — страница тогда прячет общую «Все разделы», чтобы кнопка была одна.
+  const drilled = teacherId !== null;
+  useEffect(() => {
+    onDrillChange?.(drilled);
+    return () => onDrillChange?.(false);
+  }, [drilled, onDrillChange]);
 
   const teachersQuery = useMemo(
     () =>

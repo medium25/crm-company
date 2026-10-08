@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -36,7 +36,7 @@ function effectiveFlag(student, todayStr) {
  * таблица должников этого учителя (по группам этой чётности). Флаг/
  * комментарий/задача — прямо в строке, без захода в карточку студента.
  */
-export function DebtorsByTeacher() {
+export function DebtorsByTeacher({ onDrillChange }) {
   const navigate = useNavigate();
   const { activeBranchId } = useBranch();
   const { user } = useAuth();
@@ -45,6 +45,13 @@ export function DebtorsByTeacher() {
   const [teacherId, setTeacherId] = useState(null);
   const [taskTarget, setTaskTarget] = useState(null);
   const [commentTarget, setCommentTarget] = useState(null);
+
+  // Внутри раздела свои кнопки «назад» — страница тогда прячет общую «Все разделы», чтобы кнопка была одна.
+  const drilled = parity !== null;
+  useEffect(() => {
+    onDrillChange?.(drilled);
+    return () => onDrillChange?.(false);
+  }, [drilled, onDrillChange]);
 
   const groupsQuery = useMemo(
     () => (db && activeBranchId ? query(collection(db, 'groups'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
