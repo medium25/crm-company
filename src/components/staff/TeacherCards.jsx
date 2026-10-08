@@ -87,7 +87,7 @@ export function TeacherCards({ onOpen }) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-40 w-full" />
         ))}
@@ -98,7 +98,7 @@ export function TeacherCards({ onOpen }) {
   if (teachers.length === 0) return <EmptyState icon={GraduationCap} title="Учителей пока нет" />;
 
   return (
-    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
       {teachers.map((t) => (
         <TeacherCard key={t.id} teacher={t} onOpen={onOpen} />
       ))}
