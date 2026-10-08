@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { collection, doc, FieldPath, getDocs, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -8,6 +9,7 @@ import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Button } from '../ui/Button.jsx';
+import { Modal } from '../ui/Modal.jsx';
 import { pluralize } from '../../lib/format.js';
 import {
   DEFAULT_PAY_PERIOD,
@@ -74,38 +76,43 @@ function DayGrid({ label, value, onChange }) {
 }
 
 /**
- * Настройка периода выплаты: два числа месяца выбираются в сетках, рядом сразу видно, какие даты
- * получатся в этом месяце. Сохраняется кнопкой (случайный клик не меняет расчёт).
+ * Окно «Период выплаты»: два числа месяца выбираются в сетках, внизу сразу видно, какие даты получатся в этом
+ * месяце. Сохраняется кнопкой (случайный клик не меняет расчёт). Рендерится только пока открыто — выбор сбрасывается.
  */
-function PeriodEditor({ pp, onSave, onClose }) {
+function PeriodModal({ pp, onSave, onClose }) {
   const [from, setFrom] = useState(pp.from);
   const [to, setTo] = useState(pp.to);
   const preview = currentPayPeriod(new Date(), { from, to });
   return (
-    <div className="rounded-card border border-border-strong bg-card p-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <Modal
+      open
+      onClose={onClose}
+      title="Период выплаты"
+      width="table"
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => { setFrom(1); setTo(31); }}>
+            Весь месяц (1 → 31)
+          </Button>
+          <Button variant="secondary" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button onClick={() => onSave({ from, to })} disabled={from === pp.from && to === pp.to}>
+            Сохранить период
+          </Button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <DayGrid label="Период начинается с числа" value={from} onChange={setFrom} />
         <DayGrid label="и заканчивается числом" value={to} onChange={setTo} />
       </div>
-      <p className="mt-3 text-small text-text">
+      <p className="mt-4 text-control text-text">
         В этом месяце: <b>{fmtRange(preview)}</b>
         {from > to && <span className="text-muted"> (период переходит на следующий месяц)</span>}
       </p>
-      <p className="mt-0.5 text-caption text-muted">«31» — это последнее число месяца: в месяце из 30 дней период закончится 30-го, в феврале — 28-го (29-го).</p>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <Button variant="secondary" size="sm" onClick={() => { setFrom(1); setTo(31); }}>
-          Весь месяц (1 → 31)
-        </Button>
-        <span className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button size="sm" onClick={() => onSave({ from, to })} disabled={from === pp.from && to === pp.to}>
-            Сохранить период
-          </Button>
-        </span>
-      </div>
-    </div>
+      <p className="mt-1 text-caption text-muted">«31» — это последнее число месяца: в месяце из 30 дней период закончится 30-го, в феврале — 28-го (29-го).</p>
+    </Modal>
   );
 }
 
@@ -290,6 +297,7 @@ export function TeacherFinance({ teacher }) {
   ];
 
   const [editingPeriod, setEditingPeriod] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const savePeriod = async (next) => {
     try {
       await updateDoc(doc(db, 'teachers', teacher.id), { payPeriod: next, updatedAt: serverTimestamp(), updatedBy: user.uid });
@@ -329,6 +337,12 @@ export function TeacherFinance({ teacher }) {
   };
 
   const orderedGroups = useMemo(() => [...groups].sort((a, b) => String(a.code).localeCompare(String(b.code), 'ru', { numeric: true })), [groups]);
+
+  const termsSummary = !termsConfigured(terms)
+    ? 'не заданы'
+    : terms.mode === 'fixed'
+      ? `фиксированная оплата · ${fmtSum(terms.fixedAmount)}`
+      : `процент от оборота · задан у ${orderedGroups.filter((g) => Number(terms.groupPercents?.[g.id]) > 0).length} из ${orderedGroups.length} групп`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -371,55 +385,24 @@ export function TeacherFinance({ teacher }) {
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-x-2 border-t border-border pt-3 text-small text-muted">
           Период выплаты: <b className="text-text">{fmtRange(cur)}</b>
-          <button type="button" onClick={() => setEditingPeriod((v) => !v)} className="font-bold text-link hover:underline">
-            {editingPeriod ? 'Скрыть настройку' : 'Изменить'}
+          <button type="button" onClick={() => setEditingPeriod(true)} className="font-bold text-link hover:underline">
+            Изменить
           </button>
         </div>
-      </div>
-
-      {editingPeriod && <PeriodEditor pp={pp} onSave={savePeriod} onClose={() => setEditingPeriod(false)} />}
-
-      <div>
-        <p className="mb-2 text-body font-bold text-text">Прошлые месяцы</p>
-        {(() => {
-          // От старого месяца к новому; длина полосы — доля от самой большой зарплаты, лучший месяц залит тёмным.
-          const rows = [...past].reverse().map((p) => ({ period: p, amount: payroll[p.key]?.amount ?? null }));
-          const max = Math.max(0, ...rows.map((r) => r.amount ?? 0));
-          return (
-            <div className="flex flex-col gap-2">
-              {rows.map((r, i) => {
-                const prev = i > 0 ? rows[i - 1].amount : null;
-                const delta = r.amount !== null && prev ? Math.round(((r.amount - prev) / prev) * 100) : null;
-                const best = r.amount !== null && r.amount === max && max > 0;
-                const width = r.amount === null || max === 0 ? 35 : Math.round(35 + (r.amount / max) * 65);
-                return (
-                  <div
-                    key={r.period.key}
-                    className={`flex items-center justify-between gap-3 rounded-row border-[1.5px] px-3.5 py-2 ${best ? 'border-text bg-text text-surface' : 'border-border-strong bg-surface text-text'}`}
-                    style={{ width: `${width}%`, minWidth: '11rem' }}
-                  >
-                    <span>
-                      <span className="block text-caption font-bold uppercase">{format(r.period.start, 'LLLL', { locale: ru })}</span>
-                      <span className="block text-caption opacity-70">{fmtRangeShort(r.period)}</span>
-                    </span>
-                    <span className="whitespace-nowrap text-title font-bold">
-                      {r.amount === null ? '—' : fmtSum(r.amount)}
-                      {delta !== null && (
-                        <span className="ml-1.5 text-caption font-normal opacity-80">
-                          {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}%
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-      </div>
-
-      <div className="rounded-card border border-border-strong bg-card p-4">
-        <p className="mb-3 text-body font-bold text-text">Условия работы</p>
+        <div className="mt-3 border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => setTermsOpen((v) => !v)}
+            aria-expanded={termsOpen}
+            className="flex w-full items-center justify-between gap-3 text-left"
+          >
+            <span className="text-small text-muted">
+              <b className="text-body font-bold text-text">Условия работы</b> · {termsSummary}
+            </span>
+            <ChevronDown className={`h-5 w-5 shrink-0 text-muted transition-transform ${termsOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+          </button>
+          {termsOpen && (
+            <div className="mt-4">
         <div className="mb-4 inline-flex rounded-badge bg-chip p-1">
           {[
             ['percent', 'Процент от оборота'],
@@ -506,6 +489,50 @@ export function TeacherFinance({ teacher }) {
             Сохранить условия
           </Button>
         </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {editingPeriod && <PeriodModal pp={pp} onSave={savePeriod} onClose={() => setEditingPeriod(false)} />}
+
+      <div>
+        <p className="mb-2 text-body font-bold text-text">Прошлые месяцы</p>
+        {(() => {
+          // От старого месяца к новому; длина полосы — доля от самой большой зарплаты, лучший месяц залит тёмным.
+          const rows = [...past].reverse().map((p) => ({ period: p, amount: payroll[p.key]?.amount ?? null }));
+          const max = Math.max(0, ...rows.map((r) => r.amount ?? 0));
+          return (
+            <div className="flex flex-col gap-2">
+              {rows.map((r, i) => {
+                const prev = i > 0 ? rows[i - 1].amount : null;
+                const delta = r.amount !== null && prev ? Math.round(((r.amount - prev) / prev) * 100) : null;
+                const best = r.amount !== null && r.amount === max && max > 0;
+                const width = r.amount === null || max === 0 ? 35 : Math.round(35 + (r.amount / max) * 65);
+                return (
+                  <div
+                    key={r.period.key}
+                    className={`flex items-center justify-between gap-3 rounded-row border-[1.5px] px-3.5 py-2 ${best ? 'border-text bg-text text-surface' : 'border-border-strong bg-surface text-text'}`}
+                    style={{ width: `${width}%`, minWidth: '11rem' }}
+                  >
+                    <span>
+                      <span className="block text-caption font-bold uppercase">{format(r.period.start, 'LLLL', { locale: ru })}</span>
+                      <span className="block text-caption opacity-70">{fmtRangeShort(r.period)}</span>
+                    </span>
+                    <span className="whitespace-nowrap text-title font-bold">
+                      {r.amount === null ? '—' : fmtSum(r.amount)}
+                      {delta !== null && (
+                        <span className="ml-1.5 text-caption font-normal opacity-80">
+                          {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}%
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
