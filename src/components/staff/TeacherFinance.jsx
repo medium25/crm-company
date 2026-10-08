@@ -21,14 +21,6 @@ import {
 
 const fmtSum = (n) => `${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} сум`;
 const fmtMlnShort = (n) => (n / 1e6).toFixed(1).replace('.', ',').replace(',0', '');
-const fmtMln = (n) => `${(n / 1e6).toFixed(1).replace('.', ',')} млн`;
-
-/** Цвета плиток месяцев — от токенов графиков (chart-1…6), пастель как у карточек отделов. */
-function tileStyle(i) {
-  const hue = `rgb(var(--color-chart-${(i % 7) + 1}))`;
-  const mix = (pct) => `color-mix(in srgb, ${hue} ${pct}%, rgb(var(--color-surface)))`;
-  return { backgroundColor: mix(14), borderColor: mix(38), color: `color-mix(in srgb, ${hue} 60%, rgb(var(--color-text)))` };
-}
 
 /** Процент 0–100 со стрелками «−/+» (шаг 5) и ручным вводом. */
 function PercentStepper({ value, onChange }) {
@@ -389,25 +381,41 @@ export function TeacherFinance({ teacher }) {
 
       <div>
         <p className="mb-2 text-body font-bold text-text">Прошлые месяцы</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {[...past].reverse().map((p, i, arr) => {
-            const item = payroll[p.key];
-            const prev = i > 0 ? payroll[arr[i - 1].key] : null;
-            const delta = item && prev && prev.amount > 0 ? Math.round(((item.amount - prev.amount) / prev.amount) * 100) : null;
-            return (
-              <div key={p.key} className="rounded-row border-[1.5px] px-3 py-2.5" style={tileStyle(i)}>
-                <p className="text-caption font-bold uppercase">{format(p.start, 'LLL', { locale: ru }).replace('.', '')}</p>
-                <p className="mt-0.5 text-title font-bold">{item ? fmtMln(item.amount) : '—'}</p>
-                <p className="text-caption opacity-80">{fmtRangeShort(p)}</p>
-                {delta !== null && (
-                  <p className="text-caption opacity-80">
-                    {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}% к прошлому
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {(() => {
+          // От старого месяца к новому; длина полосы — доля от самой большой зарплаты, лучший месяц залит тёмным.
+          const rows = [...past].reverse().map((p) => ({ period: p, amount: payroll[p.key]?.amount ?? null }));
+          const max = Math.max(0, ...rows.map((r) => r.amount ?? 0));
+          return (
+            <div className="flex flex-col gap-2">
+              {rows.map((r, i) => {
+                const prev = i > 0 ? rows[i - 1].amount : null;
+                const delta = r.amount !== null && prev ? Math.round(((r.amount - prev) / prev) * 100) : null;
+                const best = r.amount !== null && r.amount === max && max > 0;
+                const width = r.amount === null || max === 0 ? 35 : Math.round(35 + (r.amount / max) * 65);
+                return (
+                  <div
+                    key={r.period.key}
+                    className={`flex items-center justify-between gap-3 rounded-row border-[1.5px] px-3.5 py-2 ${best ? 'border-text bg-text text-surface' : 'border-border-strong bg-surface text-text'}`}
+                    style={{ width: `${width}%`, minWidth: '11rem' }}
+                  >
+                    <span>
+                      <span className="block text-caption font-bold uppercase">{format(r.period.start, 'LLLL', { locale: ru })}</span>
+                      <span className="block text-caption opacity-70">{fmtRangeShort(r.period)}</span>
+                    </span>
+                    <span className="whitespace-nowrap text-title font-bold">
+                      {r.amount === null ? '—' : fmtSum(r.amount)}
+                      {delta !== null && (
+                        <span className="ml-1.5 text-caption font-normal opacity-80">
+                          {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}%
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="rounded-card border border-border-strong bg-card p-4">
