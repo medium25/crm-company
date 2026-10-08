@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, GraduationCap, Users } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
@@ -24,6 +25,8 @@ export function StaffPage() {
   const navigate = useNavigate();
   const { dept } = useParams();
   const current = DEPARTMENTS.find((d) => d.key === dept);
+  // Карточка под курсором/фокусом: подъём на 2 px и тень цвета отдела.
+  const [active, setActive] = useState(null);
 
   if (dept && !current) return <PageHeader title="Отдел не найден" actions={<Link to="/staff" className="text-control text-link">К отделам</Link>} />;
 
@@ -49,8 +52,17 @@ export function StaffPage() {
               key={d.key}
               type="button"
               onClick={() => navigate(`/staff/${d.key}`)}
-              className="group flex min-h-[15rem] flex-col rounded-card border-[1.5px] p-6 text-left transition hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40"
-              style={{ backgroundColor: mix(d.tone, 12), borderColor: mix(d.tone, 32) }}
+              onMouseEnter={() => setActive(d.key)}
+              onMouseLeave={() => setActive(null)}
+              onFocus={() => setActive(d.key)}
+              onBlur={() => setActive(null)}
+              className="flex min-h-[15rem] flex-col rounded-card border-[1.5px] p-6 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40"
+              style={{
+                backgroundColor: mix(d.tone, 12),
+                borderColor: mix(d.tone, 32),
+                transform: active === d.key ? 'translateY(-2px)' : undefined,
+                boxShadow: active === d.key ? `0 10px 28px color-mix(in srgb, ${toneColor(d.tone)} 30%, transparent)` : undefined,
+              }}
             >
               <span className="flex h-14 w-14 items-center justify-center rounded-card text-white" style={{ backgroundColor: toneColor(d.tone) }}>
                 <Icon className="h-7 w-7" strokeWidth={1.75} aria-hidden="true" />
