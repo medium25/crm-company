@@ -22,7 +22,7 @@ export function AppShell() {
       <Topbar branches={branches} activeBranchId={activeBranchId} onBranchChange={setActiveBranchId} onMenuClick={() => setMobileNavOpen(true)} />
       <div className="flex min-h-0 flex-1">
         <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="mx-auto max-w-content">
             {/* Баннер месячного начисления — над содержимым (в шапке по центру теперь логотип). */}
             <div className="mb-4 flex empty:hidden">
