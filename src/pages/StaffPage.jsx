@@ -56,7 +56,6 @@ export function StaffPage() {
         <BackButton to="/staff" className="mb-4">
           Все отделы
         </BackButton>
-        <PageHeader title={current.title} />
         {current.key === 'academic' && <TeacherCards onOpen={(t) => navigate(`/staff/academic/${t.id}`)} />}
       </>
     );
