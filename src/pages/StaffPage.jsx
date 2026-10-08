@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { ArrowRight, Building2, GraduationCap, Users } from 'lucide-react';
+import { ArrowRight, Building2, GraduationCap, Users, Wallet } from 'lucide-react';
 import { doc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { TeacherCards } from '../components/staff/TeacherCards.jsx';
+import { TeacherFinance } from '../components/staff/TeacherFinance.jsx';
 import { BackButton } from '../components/ui/BackButton.jsx';
 
 /**
@@ -24,12 +25,12 @@ const mix = (tone, pct) => `color-mix(in srgb, ${toneColor(tone)} ${pct}%, rgb(v
 /**
  * Раздел «Сотрудники» (пункт бокового меню; только CEO и менеджер) — три отдела крупными карточками.
  * /staff — список отделов, /staff/:key — страница отдела (в «Учебном отделе» — карточки учителей),
- * /staff/:key/:teacherId — страница учителя (пока пустая).
+ * /staff/:key/:teacherId — страница учителя (плитки разделов), /…/finance — «Финансы» учителя (TeacherFinance).
  * Управление самими сотрудниками (роли, цвета, доступ) — в «Настройки → Назначение сотрудников».
  */
 export function StaffPage() {
   const navigate = useNavigate();
-  const { dept, teacherId } = useParams();
+  const { dept, teacherId, section } = useParams();
   const current = DEPARTMENTS.find((d) => d.key === dept);
   // Карточка под курсором/фокусом: подъём на 2 px и тень цвета отдела.
   const [active, setActive] = useState(null);
@@ -38,14 +39,50 @@ export function StaffPage() {
 
   if (dept && !current) return <PageHeader title="Отдел не найден" actions={<Link to="/staff" className="text-control text-link">К отделам</Link>} />;
 
-  // Страница учителя — пока пустая, только имя и возврат к отделу.
+  // «Финансы» учителя: период, оплаты, зарплата, прошлые месяцы и условия работы.
+  if (current && teacherId && section === 'finance') {
+    return (
+      <>
+        <BackButton to={`/staff/${current.key}/${teacherId}`} className="mb-4">
+          {teacher?.displayName ?? 'Учитель'}
+        </BackButton>
+        <PageHeader title="Финансы" />
+        {teacher && <TeacherFinance teacher={teacher} />}
+      </>
+    );
+  }
+
+  // Страница учителя — плитки разделов; пока один раздел — «Финансы».
   if (current && teacherId) {
+    const stored = Object.entries(teacher?.payroll ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([, v]) => Number(v.amount) || 0);
+    const max = Math.max(1, ...stored);
     return (
       <>
         <BackButton to={`/staff/${current.key}`} className="mb-4">
           {current.title}
         </BackButton>
         <PageHeader title={teacher?.displayName ?? ''} />
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => navigate(`/staff/${current.key}/${teacherId}/finance`)}
+            className="flex min-h-[8.5rem] flex-col rounded-card border-[1.5px] p-4 text-left transition hover:-translate-y-0.5 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40"
+            style={{ backgroundColor: mix('success', 12), borderColor: mix('success', 32) }}
+          >
+            <span className="flex items-center gap-2 text-title font-bold" style={{ color: toneColor('success') }}>
+              <Wallet className="h-5 w-5" aria-hidden="true" /> Финансы
+            </span>
+            <span className="text-caption text-muted">Зарплата и условия работы</span>
+            <span className="mt-auto flex h-7 items-end gap-1" aria-hidden="true">
+              {stored.map((v, i) => (
+                <i key={i} className="block flex-1 rounded-t-badge" style={{ height: `${Math.max(12, Math.round((v / max) * 100))}%`, backgroundColor: toneColor('success') }} />
+              ))}
+            </span>
+          </button>
+        </div>
       </>
     );
   }
