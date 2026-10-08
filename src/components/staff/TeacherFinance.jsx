@@ -506,8 +506,8 @@ export function TeacherFinance({ teacher }) {
         )}
       </Modal>
 
-      <div>
-        <p className="mb-2 text-body font-bold text-text">Прошлые месяцы</p>
+      <div className="rounded-card border border-border-strong bg-card p-5">
+        <p className="mb-3 text-small font-bold text-text">Прошлые месяцы · зарплата</p>
         {(() => {
           // От старого месяца к новому; длина полосы — доля от самой большой зарплаты, лучший месяц залит тёмным.
           const rows = [...past].reverse().map((p) => ({ period: p, amount: payroll[p.key]?.amount ?? null }));
