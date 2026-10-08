@@ -288,7 +288,6 @@ export function TeacherFinance({ teacher }) {
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-x-2 border-t border-border pt-3 text-small text-muted">
           Период выплаты: <b className="text-text">{fmtRange(cur)}</b>
-          {pp.from === 1 && pp.to === 31 ? ' (весь месяц, до последнего числа)' : ` (с ${pp.from}-го по ${pp.to === 31 ? 'последнее' : `${pp.to}-е`} число каждого месяца)`}
           <button type="button" onClick={() => setEditingPeriod((v) => !v)} className="font-bold text-link hover:underline">
             {editingPeriod ? 'Скрыть настройку' : 'Изменить'}
           </button>
