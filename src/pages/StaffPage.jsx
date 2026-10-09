@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { ArrowRight, Building2, GraduationCap, Users, Wallet } from 'lucide-react';
+import { ArrowRight, BarChart3, Building2, GraduationCap, Star, Users, Wallet } from 'lucide-react';
 import { doc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useDoc } from '../hooks/useDoc.js';
@@ -8,6 +8,7 @@ import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { TeacherCards } from '../components/staff/TeacherCards.jsx';
 import { TeacherFinance } from '../components/staff/TeacherFinance.jsx';
 import { BackButton } from '../components/ui/BackButton.jsx';
+import { EmptyState } from '../components/ui/EmptyState.jsx';
 
 /**
  * Отделы компании. tone — токен цвета (danger/success/navy), от него считается пастельная
@@ -17,6 +18,12 @@ const DEPARTMENTS = [
   { key: 'academic', title: 'Учебный отдел', icon: GraduationCap, tone: 'danger' },
   { key: 'administration', title: 'Администрация', icon: Building2, tone: 'success' },
   { key: 'hr', title: 'HR отдел', icon: Users, tone: 'navy' },
+];
+
+/** Общие разделы над отделами — графитовая лента из двух половин; страницы пока заготовки. */
+const OVERVIEW = [
+  { key: 'stats', title: 'Общая статистика', note: 'Выручка, ученики, конверсия', icon: BarChart3 },
+  { key: 'rating', title: 'Оценка сотрудников', note: 'Рейтинг и эффективность', icon: Star },
 ];
 
 const toneColor = (tone) => `rgb(var(--color-${tone}))`;
@@ -32,10 +39,22 @@ export function StaffPage() {
   const navigate = useNavigate();
   const { dept, teacherId, section } = useParams();
   const current = DEPARTMENTS.find((d) => d.key === dept);
+  const overview = OVERVIEW.find((o) => o.key === dept);
   // Карточка под курсором/фокусом: подъём на 2 px и тень цвета отдела.
   const [active, setActive] = useState(null);
   const teacherRef = useMemo(() => (db && teacherId ? doc(db, 'teachers', teacherId) : null), [teacherId]);
   const { data: teacher } = useDoc(teacherRef);
+
+  if (overview) {
+    return (
+      <>
+        <BackButton to="/staff" className="mb-4">
+          Все отделы
+        </BackButton>
+        <EmptyState icon={overview.icon} title={overview.title} subtitle="Раздел в разработке." />
+      </>
+    );
+  }
 
   if (dept && !current) return <PageHeader title="Отдел не найден" actions={<Link to="/staff" className="text-control text-link">К отделам</Link>} />;
 
@@ -100,6 +119,26 @@ export function StaffPage() {
 
   return (
     <>
+      <div className="mb-4 grid grid-cols-1 overflow-hidden rounded-card bg-orange text-surface sm:grid-cols-2">
+        {OVERVIEW.map((o, i) => {
+          const Icon = o.icon;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => navigate(`/staff/${o.key}`)}
+              className={`flex items-center gap-4 px-6 py-5 text-left transition hover:bg-surface/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-surface/60 ${i ? 'border-t border-surface/25 sm:border-l sm:border-t-0' : ''}`}
+            >
+              <Icon className="h-7 w-7 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-title font-bold">{o.title}</span>
+                <span className="block text-small opacity-75">{o.note}</span>
+              </span>
+              <ArrowRight className="h-5 w-5 shrink-0 opacity-75" aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {DEPARTMENTS.map((d) => {
           const Icon = d.icon;
