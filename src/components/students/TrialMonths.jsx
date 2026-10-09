@@ -16,7 +16,6 @@ import { Skeleton } from '../ui/Skeleton.jsx';
 export const TRIAL_MONTHS = 6;
 
 const ROW_GRID = 'grid grid-cols-[1.6fr_1.3fr_0.8fr_1fr_0.9fr_1.3fr] items-center gap-3';
-const NO_TEACHER = 'Без учителя';
 const STATUS_CLASS = {
   paid: 'bg-success-bg text-success',
   left: 'bg-danger/10 text-danger',
@@ -97,10 +96,12 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
       const date = s.trialDate.toDate();
       if (date > now) continue;
       if (needle && !(s.fullName ?? '').toLowerCase().includes(needle) && !(s.phone ?? '').includes(needle)) continue;
+      // Пробным считаем только того, кого записали к учителю: лид, отвалившийся до записи в группу, — не пробный.
       const enr = pickEnrollment(enrollmentsByStudent.get(s.id));
+      if (!enr?.teacherName) continue;
       const key = format(date, 'yyyy-MM');
       if (!byMonth.has(key)) byMonth.set(key, []);
-      byMonth.get(key).push({ student: s, date, enr, teacher: enr?.teacherName || NO_TEACHER, outcome: trialOutcome(s, now) });
+      byMonth.get(key).push({ student: s, date, enr, teacher: enr.teacherName, outcome: trialOutcome(s, now) });
     }
     return Array.from({ length: TRIAL_MONTHS }, (_, i) => {
       const d = subMonths(startOfMonth(now), i);
@@ -114,7 +115,7 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
       }
       const groups = [...teachers.entries()]
         .map(([name, list]) => [name, list.sort((a, b) => a.date - b.date)])
-        .sort((a, b) => (a[0] === NO_TEACHER) - (b[0] === NO_TEACHER) || a[0].localeCompare(b[0], 'ru'));
+        .sort((a, b) => a[0].localeCompare(b[0], 'ru'));
       const count = (k) => rows.filter((r) => r.outcome.key === k).length;
       return { key, label: label.charAt(0).toUpperCase() + label.slice(1), total: rows.length, paid: count('paid'), left: count('left'), wip: count('wip'), groups };
     });
@@ -205,7 +206,7 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
                           <span className="truncate font-bold">{r.student.fullName}</span>
                           <span className="truncate text-muted">{formatPhone(r.student.phone)}</span>
                           <span>{formatDate(r.student.trialDate)}</span>
-                          <span className="truncate text-muted">{r.teacher === NO_TEACHER ? '—' : r.teacher}</span>
+                          <span className="truncate text-muted">{r.teacher}</span>
                           <span>{r.enr?.groupCode ? <Badge variant="group-code">{r.enr.groupCode}</Badge> : '—'}</span>
                           <span>
                             <span className={`inline-block whitespace-nowrap rounded-badge px-2.5 py-0.5 text-caption font-bold ${STATUS_CLASS[r.outcome.key]}`}>
