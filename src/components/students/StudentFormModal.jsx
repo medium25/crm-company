@@ -269,6 +269,8 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           firstPaymentAt: null,
           lastPaymentAt: null,
           trialAt: serverTimestamp(),
+          // Дата пробного — по ней его видят дашборд и «На пробном уроке» (без неё пробный «пропадал» из списков).
+          trialDate: serverTimestamp(),
           leftAt: null,
           createdAt: serverTimestamp(),
           createdBy: user.uid,
