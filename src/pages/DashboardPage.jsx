@@ -503,6 +503,7 @@ export function DashboardPage() {
                     value={effectiveTrialMonth?.total ?? 0}
                     label={`пробные за ${currentMonthName}`}
                     tone="muted"
+                    onClick={() => navigate('/students?section=trial')}
                     detailsOpen={details.trialMonth?.open}
                     onToggleDetails={() => toggleDetail('trialMonth', loadTrialMonthDetails, 'muted')}
                   />
