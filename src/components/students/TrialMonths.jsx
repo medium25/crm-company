@@ -7,7 +7,7 @@ import { CalendarDays, ChevronDown, GraduationCap } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
-import { hasTrialHappened } from '../../lib/stats.js';
+import { isTrialLeft } from '../../lib/stats.js';
 import { formatPhone, formatDate, pluralize } from '../../lib/format.js';
 import { Badge } from '../ui/Badge.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
@@ -23,12 +23,13 @@ const STATUS_CLASS = {
 };
 
 /**
- * Итог пробного: «Оплатил» — дошёл до оплаты, «Ушёл» — отказ или уже ушёл, иначе «Процесс» — решения ещё нет
- * (считаем дни с пробного). Те же признаки, что у «остались» на дашборде (countTrialMonthRetention).
+ * Итог пробного: «Оплатил» — дошёл до оплаты, «Ушёл» (isTrialLeft — те же признаки, что у «остались» на дашборде),
+ * иначе «Процесс» — решения ещё нет (считаем дни с пробного).
  */
 export function trialOutcome(student, now = new Date()) {
-  if (student.funnelStage === 'lost' || student.status === 'left') return { key: 'left', label: 'Ушёл' };
+  if (student.status === 'left') return { key: 'left', label: 'Ушёл' };
   if (student.funnelStage === 'won' || student.status === 'active') return { key: 'paid', label: 'Оплатил' };
+  if (isTrialLeft(student)) return { key: 'left', label: 'Ушёл' };
   const days = Math.max(0, differenceInCalendarDays(now, student.trialDate.toDate()));
   return { key: 'wip', label: days === 0 ? 'Процесс · сегодня' : `Процесс · ${days} дн.` };
 }
@@ -92,10 +93,10 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
     const needle = search.trim().toLowerCase();
     const byMonth = new Map();
     for (const s of students) {
-      if (!s.trialDate || !hasTrialHappened(s)) continue;
+      if (!s.trialDate) continue;
       const date = s.trialDate.toDate();
       if (needle && !(s.fullName ?? '').toLowerCase().includes(needle) && !(s.phone ?? '').includes(needle)) continue;
-      // Пробным считаем только того, кого записали к учителю: лид, отвалившийся до записи в группу, — не пробный.
+      // Правило: пробный — кого создали пробным и прикрепили учителя и группу (см. isTrialLeft в stats.js).
       const enr = pickEnrollment(enrollmentsByStudent.get(s.id));
       if (!enr?.teacherName) continue;
       const key = format(date, 'yyyy-MM');

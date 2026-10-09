@@ -266,20 +266,17 @@ export async function countTrialToday(db, branchId, today = new Date()) {
 }
 
 /**
- * Пробный реально состоялся: лид дошёл (сейчас или когда-либо по
- * stageHistory) хотя бы до 'trial_completed', ИЛИ отказ оформлен с причиной
- * `no_agreement` («Не смогли договориться» — выбирается вручную ПОСЛЕ
- * разговора о цене/условиях, то есть пробный уже был). Просто 'lost' без
- * этого не значит «пробный прошёл» — лид мог слиться ДО пробного (no_show,
- * no_answer после trial_scheduled, или бывшая массовая архивация с причиной
- * `archived_unpaid` — она вешается на любую нетерминальную стадию, включая
- * ещё не начавшийся пробный, так что сама по себе ничего не доказывает).
+ * ПРАВИЛО «ПРОБНЫЕ»: пробный — тот, кого создали пробным (из лида или кнопкой «Добавить пробного») и в процессе
+ * прикрепили учителя и группу. Само по себе «дошёл до пробного» или стадия воронки ничего не решает: лид, закрытый
+ * отказом, но всё ещё записанный к учителю в пробную группу, — тоже пробный. Критерии: есть trialDate (в нужном
+ * периоде) + запись (enrollment) у учителя — см. studentIdsWithTeacher.
+ *
+ * «Ушёл» из пробных: ушёл насовсем (status 'left') либо закрыт отказом и больше не числится на пробном.
+ * Закрытый отказом, но всё ещё status 'trial' — по-прежнему в процессе.
  */
-export function hasTrialHappened(student) {
-  if (['trial_completed', 'closing', 'won'].includes(student.funnelStage)) return true;
-  if (student.funnelStage !== 'lost') return false;
-  if (student.lostReason === 'no_agreement') return true;
-  return (student.stageHistory ?? []).some((h) => ['trial_completed', 'closing', 'won'].includes(h.stage));
+export function isTrialLeft(student) {
+  if (student.status === 'left') return true;
+  return student.funnelStage === 'lost' && student.status !== 'trial';
 }
 
 /**
@@ -300,15 +297,10 @@ export async function studentIdsWithTeacher(db, studentIds) {
 }
 
 /**
- * Пробные за месяц: сколько лидов с trialDate в текущем календарном месяце
- * РЕАЛЬНО дошли до пробного и записаны к учителю (см. hasTrialHappened — не просто «стадия уже не
- * trial_scheduled», лид мог слиться до пробного и всё равно оказаться
- * 'lost'), и какой у них % «остались» — не оказались в отказе (funnelStage
- * 'lost') и не ушли уже ПОСЛЕ оплаты (`status` 'left', отдельное поле от
- * funnelStage — общий статус студента, см. countLeftActiveGroup). Метрика
- * живая: студент, пробный которого был 20-го, а решение (пришёл на
- * следующий урок или нет) стало известно уже в следующем месяце — до этого
- * решения просто ещё висит в числителе «остались», как и должно быть.
+ * Пробные за месяц: сколько студентов с trialDate в текущем календарном месяце записаны к учителю
+ * (правило «пробные» — см. isTrialLeft выше), и какой у них % «остались» — не ушли (isTrialLeft).
+ * Метрика живая: решение (остался/ушёл) может стать известно уже в следующем месяце — до этого
+ * студент просто висит в числителе «остались».
  * @returns {Promise<{total: number, retainedPct: number}>}
  */
 export async function countTrialMonthRetention(db, branchId, monthDate = new Date()) {
@@ -322,15 +314,11 @@ export async function countTrialMonthRetention(db, branchId, monthDate = new Dat
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  const happenedAll = snap.docs.filter((d) => hasTrialHappened(d.data()));
-  const withTeacher = await studentIdsWithTeacher(db, happenedAll.map((d) => d.id));
-  const happened = happenedAll.filter((d) => withTeacher.has(d.id));
+  const withTeacher = await studentIdsWithTeacher(db, snap.docs.map((d) => d.id));
+  const happened = snap.docs.filter((d) => withTeacher.has(d.id));
   const total = happened.length;
   if (total === 0) return { total: 0, retainedPct: 0 };
-  const retained = happened.filter((d) => {
-    const s = d.data();
-    return s.funnelStage !== 'lost' && s.status !== 'left';
-  }).length;
+  const retained = happened.filter((d) => !isTrialLeft(d.data())).length;
   return { total, retainedPct: Math.round((retained / total) * 100) };
 }
 
@@ -399,9 +387,8 @@ export async function countPaymentSources(db, branchId, periodStart, periodEnd, 
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  const trialHappened = trialSnap.docs.filter((d) => hasTrialHappened(d.data()));
-  const trialWithTeacher = await studentIdsWithTeacher(db, trialHappened.map((d) => d.id));
-  for (const d of trialHappened) {
+  const trialWithTeacher = await studentIdsWithTeacher(db, trialSnap.docs.map((d) => d.id));
+  for (const d of trialSnap.docs) {
     if (!trialWithTeacher.has(d.id)) continue;
     const s = d.data();
     const key = s.source || 'none';

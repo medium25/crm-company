@@ -235,6 +235,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           firstPaymentAt: null,
           lastPaymentAt: null,
           trialAt: serverTimestamp(),
+          trialDate: serverTimestamp(),
           leftAt: null,
           createdAt: serverTimestamp(),
           createdBy: user.uid,

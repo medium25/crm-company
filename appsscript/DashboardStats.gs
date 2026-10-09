@@ -166,23 +166,13 @@ function computeTrialToday_(branchId, now) {
 }
 
 /**
- * Пробный реально состоялся — копия hasTrialHappened из stats.js. 'lost' сам
- * по себе не значит «пробный прошёл»: лид мог слиться ДО пробного (no_show,
- * no_answer после trial_scheduled, или массовая архивация archived_unpaid —
- * она вешается на любую нетерминальную стадию) и всё равно оказаться
- * funnelStage 'lost'. Считаем состоявшимся, если по stageHistory когда-либо
- * дошёл до trial_completed/closing/won, ИЛИ причина отказа no_agreement
- * («Не смогли договориться» — выбирается вручную после пробного).
+ * ПРАВИЛО «ПРОБНЫЕ» (копия isTrialLeft из stats.js): пробный — тот, кого создали пробным и в процессе прикрепили
+ * учителя и группу (trialDate в периоде + запись у учителя). Стадия воронки пробный не определяет.
+ * «Ушёл» — status 'left' либо отказ, если студент больше не на пробном (status 'trial').
  */
-function hasTrialHappened_(s) {
-  if (['trial_completed', 'closing', 'won'].indexOf(s.funnelStage) !== -1) return true;
-  if (s.funnelStage !== 'lost') return false;
-  if (s.lostReason === 'no_agreement') return true;
-  const history = s.stageHistory || [];
-  for (let i = 0; i < history.length; i++) {
-    if (['trial_completed', 'closing', 'won'].indexOf(history[i].stage) !== -1) return true;
-  }
-  return false;
+function isTrialLeft_(s) {
+  if (s.status === 'left') return true;
+  return s.funnelStage === 'lost' && s.status !== 'trial';
 }
 
 /**
@@ -208,12 +198,11 @@ function computeTrialMonth_(branchId, now) {
     { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
     { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
   ]);
-  const happenedAll = docs.filter(hasTrialHappened_);
-  const withTeacher = studentIdsWithTeacher_(happenedAll.map((s) => s.id));
-  const happened = happenedAll.filter((s) => withTeacher[s.id]);
+  const withTeacher = studentIdsWithTeacher_(docs.map((s) => s.id));
+  const happened = docs.filter((s) => withTeacher[s.id]);
   const total = happened.length;
   if (total === 0) return { total: 0, retainedPct: 0 };
-  const retained = happened.filter((s) => s.funnelStage !== 'lost' && s.status !== 'left').length;
+  const retained = happened.filter((s) => !isTrialLeft_(s)).length;
   return { total: total, retainedPct: Math.round((retained / total) * 100) };
 }
 
@@ -310,9 +299,8 @@ function computePaymentSources_(branchId, start, end, payments, now) {
     { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
     { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
   ]);
-  const trialHappened = trialDocs.filter(hasTrialHappened_);
-  const trialWithTeacher = studentIdsWithTeacher_(trialHappened.map((s) => s.id));
-  trialHappened.filter((s) => trialWithTeacher[s.id]).forEach((s) => {
+  const trialWithTeacher = studentIdsWithTeacher_(trialDocs.map((s) => s.id));
+  trialDocs.filter((s) => trialWithTeacher[s.id]).forEach((s) => {
     const key = s.source || 'none';
     if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
     map[key].trialCount += 1;

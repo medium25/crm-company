@@ -1,7 +1,7 @@
 import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, addMonths, startOfMonth, getDaysInMonth } from 'date-fns';
 import { stageDeadline } from './leadFunnel.js';
-import { hasTrialHappened, studentIdsWithTeacher } from './stats.js';
+import { isTrialLeft, studentIdsWithTeacher } from './stats.js';
 
 function chunk(arr, size) {
   const out = [];
@@ -424,7 +424,7 @@ export async function trialMonthBreakdown(db, branchId, monthDate = new Date()) 
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  const happenedAll = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(hasTrialHappened);
+  const happenedAll = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const withTeacher = await studentIdsWithTeacher(db, happenedAll.map((s) => s.id));
   const happened = happenedAll.filter((s) => withTeacher.has(s.id));
   // По дням месяца — для графика (те же документы, без лишних чтений). Дни после
@@ -464,7 +464,7 @@ export async function trialMonthByTeacher(db, branchId, monthDate = new Date()) 
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  const happenedAll = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(hasTrialHappened);
+  const happenedAll = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   if (happenedAll.length === 0) return [];
 
   const enrollments = [];
@@ -487,7 +487,7 @@ export async function trialMonthByTeacher(db, branchId, monthDate = new Date()) 
     if (!byTeacher.has(teacherName)) byTeacher.set(teacherName, { total: 0, retained: 0 });
     const bucket = byTeacher.get(teacherName);
     bucket.total += 1;
-    if (s.funnelStage !== 'lost' && s.status !== 'left') bucket.retained += 1;
+    if (!isTrialLeft(s)) bucket.retained += 1;
   }
   return [...byTeacher.entries()]
     .map(([teacherName, { total, retained }]) => ({ teacherName, total, retained, retainedPct: total > 0 ? Math.round((retained / total) * 100) : 0 }))

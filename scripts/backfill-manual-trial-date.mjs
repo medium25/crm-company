@@ -1,7 +1,7 @@
 /**
- * «Добавить пробного» (StudentFormModal, createMode 'trial_completed') раньше писал только trialAt, без trialDate —
- * из-за этого такие пробные не попадали ни в «Пробные за месяц» на дашборде, ни в «На пробном уроке» (оба строятся по trialDate).
- * Скрипт проставляет trialDate = trialAt тем, у кого пробный проведён (trial_completed/closing/won), trialAt есть, а trialDate нет.
+ * Правило «пробные»: создан пробным (trialAt) и прикреплён учитель+группа. Списки и дашборд строятся по trialDate, а
+ * «Добавить пробного»/«Добавить ученика» (StudentFormModal) раньше писали только trialAt — такие пробные выпадали из «На пробном уроке»
+ * и «Пробные за месяц». Скрипт ставит trialDate = trialAt студентам, у которых trialAt есть, trialDate нет и есть запись у учителя.
  * Больше ничего не меняет.
  *
  *   node --env-file=.env scripts/backfill-manual-trial-date.mjs           # dry-run
@@ -24,14 +24,16 @@ const app = initializeApp({
 const db = getFirestore(app);
 await signInWithEmailAndPassword(getAuth(app), process.env.SEED_ADMIN_EMAIL, process.env.SEED_ADMIN_PASSWORD);
 
-const snap = await getDocs(
-  query(collection(db, 'students'), where('branchId', '==', BRANCH), where('funnelStage', 'in', ['trial_completed', 'closing', 'won'])),
-);
-const todo = snap.docs.filter((d) => d.data().trialAt && !d.data().trialDate);
-console.log(`Проведённых пробных: ${snap.size}, без trialDate: ${todo.length}`);
+const [snap, enrSnap] = await Promise.all([
+  getDocs(query(collection(db, 'students'), where('branchId', '==', BRANCH))),
+  getDocs(query(collection(db, 'enrollments'), where('branchId', '==', BRANCH))),
+]);
+const withTeacher = new Set(enrSnap.docs.map((d) => d.data()).filter((e) => e.teacherName).map((e) => e.studentId));
+const todo = snap.docs.filter((d) => d.data().trialAt && !d.data().trialDate && withTeacher.has(d.id));
+console.log(`Студентов: ${snap.size}, без trialDate при trialAt и учителе: ${todo.length}`);
 for (const d of todo) {
   const s = d.data();
-  console.log(`${APPLY ? 'FIX ' : 'would fix '}${d.id}  ${s.fullName}  ${s.phone}  trialAt=${s.trialAt.toDate().toISOString()}  stage=${s.funnelStage}`);
+  console.log(`${APPLY ? 'FIX ' : 'would fix '}${d.id}  ${s.fullName}  ${s.phone}  trialAt=${s.trialAt.toDate().toISOString()}  stage=${s.funnelStage} status=${s.status}`);
   if (APPLY) await updateDoc(doc(db, 'students', d.id), { trialDate: s.trialAt });
 }
 console.log(APPLY ? 'Готово.' : 'Dry-run: ничего не записано. Добавь --apply.');
