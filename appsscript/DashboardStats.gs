@@ -185,6 +185,20 @@ function hasTrialHappened_(s) {
   return false;
 }
 
+/**
+ * studentId → true для студентов из `studentIds`, у которых есть запись (enrollment) у учителя.
+ * Пробным считается только записанный к учителю — копия studentIdsWithTeacher из stats.js.
+ */
+function studentIdsWithTeacher_(studentIds) {
+  const result = {};
+  for (let i = 0; i < studentIds.length; i += 30) {
+    runQuery_('enrollments', [{ field: 'studentId', op: 'IN', value: studentIds.slice(i, i + 30) }]).forEach((e) => {
+      if (e.teacherName) result[e.studentId] = true;
+    });
+  }
+  return result;
+}
+
 /** «Пробные за месяц» (было/остались %) — копия countTrialMonthRetention из stats.js. */
 function computeTrialMonth_(branchId, now) {
   const monthStart = startOfMonth_(now);
@@ -194,7 +208,9 @@ function computeTrialMonth_(branchId, now) {
     { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
     { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
   ]);
-  const happened = docs.filter(hasTrialHappened_);
+  const happenedAll = docs.filter(hasTrialHappened_);
+  const withTeacher = studentIdsWithTeacher_(happenedAll.map((s) => s.id));
+  const happened = happenedAll.filter((s) => withTeacher[s.id]);
   const total = happened.length;
   if (total === 0) return { total: 0, retainedPct: 0 };
   const retained = happened.filter((s) => s.funnelStage !== 'lost' && s.status !== 'left').length;
@@ -294,7 +310,9 @@ function computePaymentSources_(branchId, start, end, payments, now) {
     { field: 'trialDate', op: 'GREATER_THAN_OR_EQUAL', value: monthStart },
     { field: 'trialDate', op: 'LESS_THAN_OR_EQUAL', value: monthEnd },
   ]);
-  trialDocs.filter(hasTrialHappened_).forEach((s) => {
+  const trialHappened = trialDocs.filter(hasTrialHappened_);
+  const trialWithTeacher = studentIdsWithTeacher_(trialHappened.map((s) => s.id));
+  trialHappened.filter((s) => trialWithTeacher[s.id]).forEach((s) => {
     const key = s.source || 'none';
     if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
     map[key].trialCount += 1;

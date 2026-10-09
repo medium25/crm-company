@@ -94,7 +94,6 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
     for (const s of students) {
       if (!s.trialDate || !hasTrialHappened(s)) continue;
       const date = s.trialDate.toDate();
-      if (date > now) continue;
       if (needle && !(s.fullName ?? '').toLowerCase().includes(needle) && !(s.phone ?? '').includes(needle)) continue;
       // Пробным считаем только того, кого записали к учителю: лид, отвалившийся до записи в группу, — не пробный.
       const enr = pickEnrollment(enrollmentsByStudent.get(s.id));

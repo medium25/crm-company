@@ -283,8 +283,25 @@ export function hasTrialHappened(student) {
 }
 
 /**
+ * Студенты из `studentIds`, у которых есть запись (enrollment) у учителя. Пробным считается только тот, кого
+ * записали к учителю: лид, отвалившийся до записи в группу, — не пробный (так же в «На пробном уроке»).
+ * @returns {Promise<Set<string>>}
+ */
+export async function studentIdsWithTeacher(db, studentIds) {
+  const result = new Set();
+  for (let i = 0; i < studentIds.length; i += 30) {
+    const snap = await getDocs(query(collection(db, 'enrollments'), where('studentId', 'in', studentIds.slice(i, i + 30))));
+    for (const d of snap.docs) {
+      const e = d.data();
+      if (e.teacherName) result.add(e.studentId);
+    }
+  }
+  return result;
+}
+
+/**
  * Пробные за месяц: сколько лидов с trialDate в текущем календарном месяце
- * РЕАЛЬНО дошли до пробного (см. hasTrialHappened — не просто «стадия уже не
+ * РЕАЛЬНО дошли до пробного и записаны к учителю (см. hasTrialHappened — не просто «стадия уже не
  * trial_scheduled», лид мог слиться до пробного и всё равно оказаться
  * 'lost'), и какой у них % «остались» — не оказались в отказе (funnelStage
  * 'lost') и не ушли уже ПОСЛЕ оплаты (`status` 'left', отдельное поле от
@@ -305,7 +322,9 @@ export async function countTrialMonthRetention(db, branchId, monthDate = new Dat
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  const happened = snap.docs.filter((d) => hasTrialHappened(d.data()));
+  const happenedAll = snap.docs.filter((d) => hasTrialHappened(d.data()));
+  const withTeacher = await studentIdsWithTeacher(db, happenedAll.map((d) => d.id));
+  const happened = happenedAll.filter((d) => withTeacher.has(d.id));
   const total = happened.length;
   if (total === 0) return { total: 0, retainedPct: 0 };
   const retained = happened.filter((d) => {
@@ -380,9 +399,11 @@ export async function countPaymentSources(db, branchId, periodStart, periodEnd, 
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  for (const d of trialSnap.docs) {
+  const trialHappened = trialSnap.docs.filter((d) => hasTrialHappened(d.data()));
+  const trialWithTeacher = await studentIdsWithTeacher(db, trialHappened.map((d) => d.id));
+  for (const d of trialHappened) {
+    if (!trialWithTeacher.has(d.id)) continue;
     const s = d.data();
-    if (!hasTrialHappened(s)) continue;
     const key = s.source || 'none';
     const cur = map.get(key) ?? { key, count: 0, amount: 0, trialCount: 0 };
     cur.trialCount += 1;

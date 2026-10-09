@@ -1,7 +1,7 @@
 import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, addMonths, startOfMonth, getDaysInMonth } from 'date-fns';
 import { stageDeadline } from './leadFunnel.js';
-import { hasTrialHappened } from './stats.js';
+import { hasTrialHappened, studentIdsWithTeacher } from './stats.js';
 
 function chunk(arr, size) {
   const out = [];
@@ -424,7 +424,9 @@ export async function trialMonthBreakdown(db, branchId, monthDate = new Date()) 
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  const happened = snap.docs.map((d) => d.data()).filter(hasTrialHappened);
+  const happenedAll = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(hasTrialHappened);
+  const withTeacher = await studentIdsWithTeacher(db, happenedAll.map((s) => s.id));
+  const happened = happenedAll.filter((s) => withTeacher.has(s.id));
   // По дням месяца — для графика (те же документы, без лишних чтений). Дни после
   // сегодняшнего — null: пробных там ещё не было, линия на них не рисуется.
   const perDay = {};
@@ -447,7 +449,7 @@ export async function trialMonthBreakdown(db, branchId, monthDate = new Date()) 
  * Разбивка карточки «Пробные за месяц» по учителю: количество и % «остались»
  * на каждого учителя. Учитель у пробного — не поле лида, а `teacherName`
  * записи-enrollment (StudentFormModal при назначении группы под пробный);
- * если пробному так и не назначили группу — «Без учителя». Предпочитаем
+ * без записи к учителю пробного нет — такие лиды пропускаются. Предпочитаем
  * запись, которая дошла до активации, если их несколько (перевод из
  * пробной группы в другую пробную и т.п.).
  */
@@ -462,11 +464,11 @@ export async function trialMonthByTeacher(db, branchId, monthDate = new Date()) 
       where('trialDate', '<=', Timestamp.fromDate(monthEnd)),
     ),
   );
-  const happened = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(hasTrialHappened);
-  if (happened.length === 0) return [];
+  const happenedAll = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(hasTrialHappened);
+  if (happenedAll.length === 0) return [];
 
   const enrollments = [];
-  for (const ids of chunk(happened.map((s) => s.id), 30)) {
+  for (const ids of chunk(happenedAll.map((s) => s.id), 30)) {
     const esnap = await getDocs(query(collection(db, 'enrollments'), where('studentId', 'in', ids)));
     enrollments.push(...esnap.docs.map((d) => d.data()));
   }
@@ -478,12 +480,10 @@ export async function trialMonthByTeacher(db, branchId, monthDate = new Date()) 
   }
 
   const byTeacher = new Map();
-  for (const s of happened) {
-    // Приоритет — реальная запись в группу (enrollments.teacherName): она точнее,
-    // т.к. ставится при фактическом зачислении. `trialTeacherName` — то, что
-    // указал оператор в «Отказе» сразу после пробного (DeclineLeadModal),
-    // для лидов, так и не дошедших до записи в группу.
-    const teacherName = teacherByStudent.get(s.id)?.teacherName || s.trialTeacherName || 'Без учителя';
+  for (const s of happenedAll) {
+    // Пробный без записи к учителю (лид отвалился до группы) — не пробный, в разбивку не берём.
+    const teacherName = teacherByStudent.get(s.id)?.teacherName;
+    if (!teacherName) continue;
     if (!byTeacher.has(teacherName)) byTeacher.set(teacherName, { total: 0, retained: 0 });
     const bucket = byTeacher.get(teacherName);
     bucket.total += 1;
