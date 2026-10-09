@@ -16,6 +16,7 @@ import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Modal } from '../components/ui/Modal.jsx';
 import { LeftMonthCards } from '../components/students/LeftMonthCards.jsx';
+import { TrialMonths } from '../components/students/TrialMonths.jsx';
 import { Select } from '../components/ui/Select.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { DatePicker } from '../components/ui/DatePicker.jsx';
@@ -138,7 +139,7 @@ export function StudentsPage() {
     if (effectiveStatus !== 'all' && effectiveStatus !== 'archived') clauses.push(where('status', '==', effectiveStatus));
     return query(collection(db, 'students'), ...clauses, orderBy('fullName'));
   }, [activeBranchId, effectiveStatus, section]);
-  const showTable = section === 'all' || (section === 'left' && leftView) || section === 'paused' || section === 'trial';
+  const showTable = section === 'all' || (section === 'left' && leftView) || section === 'paused';
   const { data: statusStudents, loading: statusLoading, error } = useCollection(section === 'left' ? null : (showTable ? studentsQuery : null));
 
   const enrollmentsQuery = useMemo(
@@ -270,8 +271,7 @@ export function StudentsPage() {
     return statusStudents.filter(
       (st) =>
         st.status !== 'lead' &&
-        !(effectiveStatus === 'all' && st.status === 'paused') &&
-        !(section === 'trial' && !studentIdsWithTeacher.has(st.id)),
+        !(effectiveStatus === 'all' && st.status === 'paused'),
     );
   }, [section, leftStudents, statusStudents, effectiveStatus, studentIdsWithTeacher]);
   const loading = section === 'left' ? leftEnrollmentsLoading || allStudentsLoading : statusLoading;
@@ -414,20 +414,6 @@ export function StudentsPage() {
     if (effectiveOnlyDebtors) list = list.filter((st) => st.balance < 0);
     return list;
   }, [rawStudents, search, effectiveOnlyDebtors]);
-
-  // «На пробном уроке» — не таблица, а список по учителям (обычно 1-2
-  // пробных на учителя, пагинация тут не нужна).
-  const trialByTeacher = useMemo(() => {
-    if (section !== 'trial') return [];
-    const map = new Map();
-    for (const st of filtered) {
-      const teacherNames = [...new Set((enrollmentsByStudent.get(st.id) ?? []).map((e) => e.teacherName))];
-      const key = teacherNames[0] || 'Без учителя';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(st);
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [section, filtered, enrollmentsByStudent]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages);
@@ -637,7 +623,6 @@ export function StudentsPage() {
       render: (st) => <span className={st.balance > 0 ? 'text-success' : 'text-danger'}>{formatMoney(st.balance)}</span>,
     },
   ];
-  const trialColumns = columns.filter((c) => c.key !== 'teachers');
 
   // «Замороженные» — своя урезанная раскладка: группы и учителя в одной
   // колонке, вместо дат добавления/срока обучения — обратный отсчёт до
@@ -777,7 +762,7 @@ export function StudentsPage() {
     );
   }
 
-  const hideHeaderExtras = section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' || (section === 'left' && !leftView);
+  const hideHeaderExtras = section === 'trial' || section === 'attendance' || section === 'debtors' || section === 'noChargeHistory' || (section === 'left' && !leftView);
 
   return (
     <>
@@ -818,6 +803,13 @@ export function StudentsPage() {
         <DebtorsByTeacher onDrillChange={setDrilled} />
       ) : section === 'noChargeHistory' ? (
         <NoChargeHistoryList />
+      ) : section === 'trial' ? (
+        <>
+          <FilterBar onReset={resetFilters}>
+            <Input size="sm" placeholder="Поиск по имени или телефону" value={search} onChange={(e) => setFilter({ q: e.target.value })} className="w-64" />
+          </FilterBar>
+          <TrialMonths search={search} enrollments={enrollments} onDrillChange={setDrilled} />
+        </>
       ) : section === 'left' && !leftView ? (
         <div className="flex flex-col gap-3">
           {[
@@ -917,28 +909,16 @@ export function StudentsPage() {
 
           {!loading && !error && !showMonthCards && filtered.length === 0 && (
             <EmptyState
-              icon={section === 'paused' ? Snowflake : section === 'trial' ? GraduationCap : CircleUserRound}
+              icon={section === 'paused' ? Snowflake : CircleUserRound}
               title={
                 section === 'left' ? (leftDate ? 'В этот день никто не уходил' : 'Никто не уходил') :
                 section === 'paused' ? 'Замороженных нет' :
-                section === 'trial' ? 'Никого нет на пробном' :
                 'Пока нет ни одного студента'
               }
             />
           )}
 
-          {!loading && !error && filtered.length > 0 && section === 'trial' && (
-            <div className="flex flex-col gap-6">
-              {trialByTeacher.map(([teacherName, students]) => (
-                <Card key={teacherName}>
-                  <h3 className="mb-4 text-title font-bold text-text">{teacherName}</h3>
-                  <Table columns={trialColumns} rows={students} onRowClick={(st) => navigate(`/students/${st.id}`)} />
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {!loading && !error && !showMonthCards && filtered.length > 0 && section !== 'trial' && (
+          {!loading && !error && !showMonthCards && filtered.length > 0 && (
             <>
               <Table
                 columns={section === 'paused' ? pausedColumns : columns}
