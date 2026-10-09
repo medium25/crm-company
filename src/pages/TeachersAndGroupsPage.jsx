@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { collection, query, where, orderBy, doc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore';
-import { Plus, UploadCloud, CheckCircle2, X, GraduationCap } from 'lucide-react';
+import { Plus, UploadCloud, GraduationCap } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useRole } from '../hooks/useRole.js';
@@ -22,7 +22,6 @@ import { TeacherGroupsList } from '../components/students/TeacherGroupsList.jsx'
 import { formatPhone, pluralize } from '../lib/format.js';
 import { BackButton } from '../components/ui/BackButton.jsx';
 
-const BANNER_KEY = 'icon-crm:teachers-banner-dismissed';
 
 /**
  * «Учителя и группы» — объединённый раздел (были два отдельных пункта в
@@ -78,17 +77,12 @@ export function TeachersAndGroupsPage() {
     [teachers, studentsCountByTeacher],
   );
 
-  const [bannerDismissed, setBannerDismissed] = useState(() => localStorage.getItem(BANNER_KEY) === '1');
   const [modalTeacher, setModalTeacher] = useState(null);
   const [modalGroup, setModalGroup] = useState(null);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [archiving, setArchiving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
-  const dismissBanner = () => {
-    localStorage.setItem(BANNER_KEY, '1');
-    setBannerDismissed(true);
-  };
 
   const openTeacher = (id) => setSearchParams(id ? { teacher: id } : {});
 
@@ -161,17 +155,6 @@ export function TeachersAndGroupsPage() {
         <TeacherGroupsList teacherId={teacherId} branchId={activeBranchId} todayOnly={isTeacher} />
       ) : (
         <>
-          {!bannerDismissed && (
-            <div className="mb-6 flex items-start gap-3 rounded-card bg-success-bg p-4">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
-              <div className="flex-1">
-                <p className="text-control text-success">CEO профилями можно связать учителя с другим филиалом.</p>
-              </div>
-              <button type="button" onClick={dismissBanner} className="text-success" aria-label="Закрыть">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
 
           {loading && (
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">

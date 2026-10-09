@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, doc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore';
-import { Plus, UploadCloud, CheckCircle2, X, GraduationCap } from 'lucide-react';
+import { Plus, UploadCloud, GraduationCap } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useBranch } from '../hooks/useBranch.js';
@@ -18,7 +18,6 @@ import { TeacherFormModal } from '../components/teachers/TeacherFormModal.jsx';
 import { ImportTeachersModal } from '../components/teachers/ImportTeachersModal.jsx';
 import { formatPhone, pluralize } from '../lib/format.js';
 
-const BANNER_KEY = 'icon-crm:teachers-banner-dismissed';
 
 export function TeachersPage() {
   const { user } = useAuth();
@@ -55,16 +54,11 @@ export function TeachersPage() {
     return counts;
   }, [enrollments]);
 
-  const [bannerDismissed, setBannerDismissed] = useState(() => localStorage.getItem(BANNER_KEY) === '1');
   const [modalTeacher, setModalTeacher] = useState(null);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [archiving, setArchiving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
-  const dismissBanner = () => {
-    localStorage.setItem(BANNER_KEY, '1');
-    setBannerDismissed(true);
-  };
 
   const requestArchive = async (teacher) => {
     const usedByGroups = await getDocs(
@@ -113,19 +107,6 @@ export function TeachersPage() {
         }
       />
 
-      {!bannerDismissed && (
-        <div className="mb-6 flex items-start gap-3 rounded-card bg-success-bg p-4">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
-          <div className="flex-1">
-            <p className="text-control text-success">
-              CEO профилями можно связать учителя с другим филиалом.
-            </p>
-          </div>
-          <button type="button" onClick={dismissBanner} className="text-success" aria-label="Закрыть">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       {loading && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
