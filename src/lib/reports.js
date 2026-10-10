@@ -1,7 +1,7 @@
 import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { differenceInCalendarDays, addMonths, startOfMonth, getDaysInMonth } from 'date-fns';
 import { stageDeadline } from './leadFunnel.js';
-import { isTrialLeft, studentIdsWithTeacher } from './stats.js';
+import { isTrialPaid, studentIdsWithTeacher } from './stats.js';
 
 function chunk(arr, size) {
   const out = [];
@@ -487,7 +487,7 @@ export async function trialMonthByTeacher(db, branchId, monthDate = new Date()) 
     if (!byTeacher.has(teacherName)) byTeacher.set(teacherName, { total: 0, retained: 0 });
     const bucket = byTeacher.get(teacherName);
     bucket.total += 1;
-    if (!isTrialLeft(s)) bucket.retained += 1;
+    if (isTrialPaid(s)) bucket.retained += 1;
   }
   return [...byTeacher.entries()]
     .map(([teacherName, { total, retained }]) => ({ teacherName, total, retained, retainedPct: total > 0 ? Math.round((retained / total) * 100) : 0 }))

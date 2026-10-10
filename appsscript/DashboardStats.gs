@@ -189,6 +189,11 @@ function studentIdsWithTeacher_(studentIds) {
   return result;
 }
 
+/** «Остался» — строго оплатил, копия isTrialPaid из stats.js. «В процессе» в числитель не входит. */
+function isTrialPaid_(s) {
+  return s.funnelStage === 'won' || s.status === 'active';
+}
+
 /** «Пробные за месяц» (было/остались %) — копия countTrialMonthRetention из stats.js. */
 function computeTrialMonth_(branchId, now) {
   const monthStart = startOfMonth_(now);
@@ -202,7 +207,7 @@ function computeTrialMonth_(branchId, now) {
   const happened = docs.filter((s) => withTeacher[s.id]);
   const total = happened.length;
   if (total === 0) return { total: 0, retainedPct: 0 };
-  const retained = happened.filter((s) => !isTrialLeft_(s)).length;
+  const retained = happened.filter(isTrialPaid_).length;
   return { total: total, retainedPct: Math.round((retained / total) * 100) };
 }
 

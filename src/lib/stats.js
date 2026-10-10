@@ -297,10 +297,21 @@ export async function studentIdsWithTeacher(db, studentIds) {
 }
 
 /**
+ * «Остался» для % в «Пробные за месяц» — строго оплатил (funnelStage 'won'
+ * либо status 'active'), та же проверка, что даёт бейдж «Оплатил» в
+ * TrialMonths.jsx (trialOutcome). «В процессе» (ещё не оплатил, но и не
+ * ушёл — isTrialLeft тут false) в числитель НЕ попадает: раньше попадал
+ * (висел как «пока не решил, считаем остался»), это запутывало процент —
+ * висящие в процессе задирали retainedPct, хотя реальной оплаты не было.
+ */
+export function isTrialPaid(student) {
+  return student.funnelStage === 'won' || student.status === 'active';
+}
+
+/**
  * Пробные за месяц: сколько студентов с trialDate в текущем календарном месяце записаны к учителю
- * (правило «пробные» — см. isTrialLeft выше), и какой у них % «остались» — не ушли (isTrialLeft).
- * Метрика живая: решение (остался/ушёл) может стать известно уже в следующем месяце — до этого
- * студент просто висит в числителе «остались».
+ * (правило «пробные» — см. isTrialLeft выше), и какой у них % «остались» — реально дошли до оплаты
+ * (isTrialPaid). «В процессе» и «ушёл» в числитель не входят — только «Оплатил».
  * @returns {Promise<{total: number, retainedPct: number}>}
  */
 export async function countTrialMonthRetention(db, branchId, monthDate = new Date()) {
@@ -318,7 +329,7 @@ export async function countTrialMonthRetention(db, branchId, monthDate = new Dat
   const happened = snap.docs.filter((d) => withTeacher.has(d.id));
   const total = happened.length;
   if (total === 0) return { total: 0, retainedPct: 0 };
-  const retained = happened.filter((d) => !isTrialLeft(d.data())).length;
+  const retained = happened.filter((d) => isTrialPaid(d.data())).length;
   return { total, retainedPct: Math.round((retained / total) * 100) };
 }
 
