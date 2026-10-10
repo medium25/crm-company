@@ -131,6 +131,16 @@ export function AddStaffModal({ member, onClose }) {
             createdAt: serverTimestamp(),
             createdBy: user.uid,
           });
+          // Обратная ссылка на teachers.staffUid — без неё учитель привязан
+          // к логину только с одной стороны (staff.teacherId), а карточка
+          // учителя не знает о своём логине (см. MS OSUDA, 2026-10-08).
+          if (role === 'teacher' && teacherId) {
+            await updateDoc(doc(db, 'teachers', teacherId), {
+              staffUid: newUser.uid,
+              updatedAt: serverTimestamp(),
+              updatedBy: user.uid,
+            });
+          }
         } catch (docErr) {
           // Auth-аккаунт создан, а staff-документ — нет: без отката сотрудник
           // залогинится в аккаунт без доступа ("Доступ не выдан"). Убираем сирота-аккаунт.
@@ -230,7 +240,17 @@ export function AddStaffModal({ member, onClose }) {
             label="Учитель (карточка)"
             options={[{ value: '', label: 'Не привязывать' }, ...teachers.map((t) => ({ value: t.id, label: t.displayName }))]}
             value={teacherId}
-            onChange={(e) => setTeacherId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setTeacherId(id);
+              // Автоподставляем имя/телефон существующей карточки учителя —
+              // чтобы логин не завести с другим именем/номером по ошибке.
+              const picked = teachers.find((t) => t.id === id);
+              if (picked && !isEdit) {
+                if (!fullName) setFullName(picked.fullName || picked.displayName);
+                if (!phone && picked.phone) handlePhoneChange(localPhone(picked.phone));
+              }
+            }}
           />
         )}
 

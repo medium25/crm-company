@@ -107,6 +107,16 @@ export function TeachersAndGroupsPage() {
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       });
+      // Учитель, заведённый через createTeacherWithStaffAccount, связан с
+      // логином в staff (staffUid) — архивация отсюда должна лишать доступа
+      // и там же, а не оставлять рабочий логин у «архивного» учителя.
+      if (archiveTarget.staffUid) {
+        await updateDoc(doc(db, 'staff', archiveTarget.staffUid), {
+          isActive: false,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        }).catch(() => {});
+      }
       showToast('Учитель перенесён в архив.');
       setArchiveTarget(null);
     } catch {

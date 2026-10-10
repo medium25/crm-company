@@ -77,6 +77,19 @@ export function StaffSettingsTab() {
     setDeleting(true);
     try {
       await deleteDoc(doc(db, 'staff', deleteTarget.id));
+      // Сотрудник-учитель связан с профилем в teachers (teacherId) — удаление
+      // логина без этого оставляло бы «висячий» активный профиль учителя,
+      // который продолжает числиться доступным для групп. teachers не удаляют
+      // насовсем нигде в приложении (группы ссылаются на teacherId) — тут тоже
+      // архивируем, не удаляем.
+      if (deleteTarget.role === 'teacher' && deleteTarget.teacherId) {
+        await updateDoc(doc(db, 'teachers', deleteTarget.teacherId), {
+          isArchived: true,
+          archivedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        }).catch(() => {});
+      }
       showToast('Сотрудник удалён.');
       setDeleteTarget(null);
     } catch {
