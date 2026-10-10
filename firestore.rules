@@ -109,9 +109,13 @@ service cloud.firestore {
       // для дробления списания при переводе студента посреди месяца
       // (TransferGroupModal, billing.chargeAmountForLessons). method —
       // updateTransactionMethod, отдельная лёгкая правка способа оплаты,
-      // не затрагивающая сумму/баланс.
+      // не затрагивающая сумму/баланс. teacherId/teacherName — ручная
+      // коррекция, когда смена учителя у группы (GroupFormModal) не
+      // докаскадилась до уже записанных платежей (см. 2026-10-08, group
+      // teacherId меняется, enrollments/transactions остаются со старым
+      // снимком teacherName).
       allow update: if isAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'comment', 'date', 'month', 'lessonsCount', 'method', 'updatedAt', 'updatedBy']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'comment', 'date', 'month', 'lessonsCount', 'method', 'teacherId', 'teacherName', 'updatedAt', 'updatedBy']);
     }
 
     match /enrollments/{id} {
