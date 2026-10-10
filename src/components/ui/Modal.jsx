@@ -30,7 +30,7 @@ export function Modal({ open, onClose, title, width = 'form', footer, children }
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-text/45 p-4">
       <div
-        className={`w-full ${WIDTH_CLASSES[width]} rounded-card bg-surface shadow-modal`}
+        className={`flex w-full ${WIDTH_CLASSES[width]} max-h-[90vh] flex-col rounded-card bg-surface shadow-modal`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -46,7 +46,7 @@ export function Modal({ open, onClose, title, width = 'form', footer, children }
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
         {footer && <div className="flex justify-end gap-3 border-t border-border p-6">{footer}</div>}
       </div>
     </div>,

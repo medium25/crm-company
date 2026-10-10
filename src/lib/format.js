@@ -290,6 +290,17 @@ export function formatOverdueBy(deadline) {
 }
 
 /**
+ * «MS KRISTINA» → «Ms Kristina» — часть учителей/сотрудников исторически
+ * заведена капсом (displayName учителя), остальные — как ввёл человек.
+ * Единый вид в списках, где они показаны вперемешку (StaffEvaluationList).
+ * @param {string} name
+ * @returns {string}
+ */
+export function formatName(name) {
+  return (name ?? '').trim().toLowerCase().replace(/(^|[\s'-])\p{L}/gu, (m) => m.toUpperCase());
+}
+
+/**
  * @param {number} n
  * @param {[string, string, string]} forms [1 месяц, 2 месяца, 5 месяцев]
  * @returns {string}

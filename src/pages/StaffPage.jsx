@@ -7,6 +7,7 @@ import { useDoc } from '../hooks/useDoc.js';
 import { PageHeader } from '../components/layout/PageHeader.jsx';
 import { TeacherCards } from '../components/staff/TeacherCards.jsx';
 import { TeacherFinance } from '../components/staff/TeacherFinance.jsx';
+import { StaffEvaluationList } from '../components/staff/StaffEvaluationList.jsx';
 import { BackButton } from '../components/ui/BackButton.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 
@@ -51,7 +52,11 @@ export function StaffPage() {
         <BackButton to="/staff" className="mb-4">
           Все отделы
         </BackButton>
-        <EmptyState icon={overview.icon} title={overview.title} subtitle="Раздел в разработке." />
+        {overview.key === 'rating' ? (
+          <StaffEvaluationList />
+        ) : (
+          <EmptyState icon={overview.icon} title={overview.title} subtitle="Раздел в разработке." />
+        )}
       </>
     );
   }
