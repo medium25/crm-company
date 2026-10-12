@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Trash2, Users } from 'lucide-react';
+import { deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebase.js';
+import { useToast } from '../ui/Toast.jsx';
+import { Modal } from '../ui/Modal.jsx';
 import { formatDateTimeShort, formatName, pluralize } from '../../lib/format.js';
 import { Button } from '../ui/Button.jsx';
+import { QUESTIONS, SCALE_VALUES, ZONE_CLASSES, zoneOf as scaleZone } from './StaffEvaluationModal.jsx';
 
 const RATER_LABEL = { client: 'Клиент', colleague: 'Коллега' };
 
@@ -77,9 +82,45 @@ function MemberCard({ member, summary, selected, onSelect }) {
   );
 }
 
-function EvaluationRow({ ev, evaluator }) {
+/** Ответы целиком: каждый вопрос полностью и вся шкала 0–10 с отмеченным выбором оценившего (только просмотр). */
+function AnswersView({ ev }) {
+  const questions = QUESTIONS[ev.raterRole] ?? [];
+  const ratings = ev.ratings ?? {};
+  return (
+    <div className="mt-3 flex flex-col gap-4">
+      {Object.keys(ratings)
+        .sort((a, b) => Number(a) - Number(b))
+        .map((i) => {
+          const value = Number(ratings[i]);
+          return (
+            <div key={i}>
+              <p className="mb-1.5 text-control text-text">
+                {Number(i) + 1}. {questions[Number(i)] ?? `Вопрос ${Number(i) + 1}`}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {SCALE_VALUES.map((n) => {
+                  const zone = ZONE_CLASSES[scaleZone(n)];
+                  const chosen = n === value;
+                  return (
+                    <span
+                      key={n}
+                      aria-current={chosen ? 'true' : undefined}
+                      className={`flex h-8 w-8 items-center justify-center rounded-field border-[1.5px] text-small font-bold ${chosen ? zone.on : 'border-transparent bg-chip text-muted'}`}
+                    >
+                      {n}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
+function EvaluationRow({ ev, evaluator, onDelete }) {
   const [open, setOpen] = useState(false);
-  const entries = Object.entries(ev.ratings ?? {}).sort(([a], [b]) => Number(a) - Number(b));
   return (
     <div className="border-t border-border py-3">
       <div className="flex items-start gap-3">
@@ -90,29 +131,33 @@ function EvaluationRow({ ev, evaluator }) {
           </p>
           <p className="text-caption text-muted">{ev.createdAt ? formatDateTimeShort(ev.createdAt) : 'сохраняется…'}</p>
           {ev.comment && <p className="mt-1 text-small text-text">«{ev.comment}»</p>}
-          {open && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {entries.map(([i, v]) => (
-                <span key={i} className={`rounded-row px-2 py-0.5 text-caption font-bold ${ZONE[zoneOf(Number(v))].badge}`}>
-                  {Number(i) + 1}: {v}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
         <ScoreBadge value={evaluationAverage(ev)} />
         <Button variant="secondary" size="sm" onClick={() => setOpen((o) => !o)}>
           {open ? 'Скрыть' : 'Баллы'}
         </Button>
+        <button
+          type="button"
+          onClick={() => onDelete(ev)}
+          aria-label="Удалить оценку"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-field text-muted transition hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
+      {open && (
+        <div className="ml-5">
+          <AnswersView ev={ev} />
+        </div>
+      )}
     </div>
   );
 }
 
 /**
  * «Оценка сотрудников»: карточки сотрудников с общим баллом (среднее из средних баллов всех оценок) и числом
- * оценивших; по клику внизу — лента оценок: кто, когда и какой средний балл поставил, «Баллы» показывают
- * ответы на все вопросы.
+ * оценивших; по клику внизу — лента оценок: кто, когда и какой средний балл поставил; «Баллы» раскрывают
+ * все вопросы целиком и выбор оценившего на шкале; корзина удаляет оценку.
  * @param {Object} props
  * @param {Object[]} props.members сотрудники (id, fullName, roleForEval)
  * @param {Object[]} props.evaluations документы staffEvaluations
@@ -120,7 +165,10 @@ function EvaluationRow({ ev, evaluator }) {
  * @param {(member: Object) => void} props.onEvaluate открыть анкету
  */
 export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvaluate }) {
+  const { showToast } = useToast();
   const [selectedId, setSelectedId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const byStaff = useMemo(() => {
     const map = new Map();
     for (const ev of evaluations) {
@@ -129,6 +177,20 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
     }
     return map;
   }, [evaluations]);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'staffEvaluations', deleteTarget.id));
+      showToast('Оценка удалена.');
+      setDeleteTarget(null);
+    } catch {
+      showToast('Не удалось удалить оценку.', { type: 'error' });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const selected = members.find((m) => m.id === selectedId) ?? null;
   const selectedEvals = selected ? (byStaff.get(selected.id) ?? []) : [];
@@ -166,10 +228,31 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
           {selectedEvals.length === 0 ? (
             <p className="py-6 text-center text-control text-muted">Оценок пока нет.</p>
           ) : (
-            selectedEvals.map((ev) => <EvaluationRow key={ev.id} ev={ev} evaluator={nameByUid.get(ev.createdBy)} />)
+            selectedEvals.map((ev) => <EvaluationRow key={ev.id} ev={ev} evaluator={nameByUid.get(ev.createdBy)} onDelete={setDeleteTarget} />)
           )}
         </section>
       )}
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title="Удалить оценку?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Отмена
+            </Button>
+            <Button variant="danger" onClick={confirmDelete} loading={deleting}>
+              Удалить
+            </Button>
+          </>
+        }
+      >
+        <p className="text-control text-text">
+          Оценка {deleteTarget ? `${fmt(evaluationAverage(deleteTarget))} от ${nameByUid.get(deleteTarget.createdBy) ? formatName(nameByUid.get(deleteTarget.createdBy)) : 'неизвестного'}` : ''} будет удалена
+          безвозвратно, общий балл пересчитается.
+        </p>
+      </Modal>
     </>
   );
 }

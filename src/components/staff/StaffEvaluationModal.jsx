@@ -15,7 +15,7 @@ const RATER_ROLES = [
 
 // Текст вопросов — бриф заказчика (узбекский), не переводим. Все вопросы сформулированы так, чтобы 10 = отлично:
 // вопрос «нужно ли что-то менять» (инвертированная логика) заменён на «насколько удобно/эффективно»; пожелания — в комментарии.
-const QUESTIONS = {
+export const QUESTIONS = {
   client: [
     'Xodim sizga hurmat bilan murojaat qildimi?',
     "Xodim sizga kerakli yordamni ko'rsata oldimi?",
@@ -36,17 +36,17 @@ const QUESTIONS = {
 
 const SCALE_HINT = "Baholash shkalasi: 0 — juda yomon, 10 — a'lo darajada.";
 // Шкала 0–10 без 7 (так задал заказчик).
-const SCALE_VALUES = Array.from({ length: 11 }, (_, i) => i).filter((n) => n !== 7);
+export const SCALE_VALUES = Array.from({ length: 11 }, (_, i) => i).filter((n) => n !== 7);
 
 // Статичные классы — Tailwind JIT не умеет собирать `bg-${tone}` на лету.
-const ZONE_CLASSES = {
+export const ZONE_CLASSES = {
   danger: { off: 'border-transparent bg-danger/10 text-danger hover:bg-danger/20', on: 'border-danger bg-danger text-white' },
   warning: { off: 'border-transparent bg-warning/10 text-warning hover:bg-warning/20', on: 'border-warning bg-warning text-white' },
   success: { off: 'border-transparent bg-success/10 text-success hover:bg-success/20', on: 'border-success bg-success text-white' },
   // 10 — графитовый акцент интерфейса (токен orange), не зелёный.
   graphite: { off: 'border-transparent bg-orange/10 text-orange hover:bg-orange/20', on: 'border-orange bg-orange text-surface' },
 };
-const zoneOf = (n) => (n <= 3 ? 'danger' : n <= 6 ? 'warning' : n === 10 ? 'graphite' : 'success');
+export const zoneOf = (n) => (n <= 3 ? 'danger' : n <= 6 ? 'warning' : n === 10 ? 'graphite' : 'success');
 
 function RatingRow({ label, value, onChange }) {
   return (

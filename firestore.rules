@@ -169,12 +169,14 @@ service cloud.firestore {
 
     // Оценка сотрудников (раздел «Сотрудники → Оценка сотрудников»): CEO/
     // менеджер оценивает сотрудника как клиент или как коллега, фиксированный
-    // набор вопросов (StaffEvaluationModal). Запись истории — не правится и
-    // не удаляется, как activityLog.
+    // набор вопросов (StaffEvaluationModal). Запись истории не правится
+    // (как activityLog), удалить можно только целиком.
     match /staffEvaluations/{id} {
       allow read:   if isAdmin();
       allow create: if isAdmin();
-      allow update, delete: if false;
+      // Удалить ошибочную оценку может только CEO/менеджер (не admin/test); править — нельзя.
+      allow delete: if isAdmin() && !isCapped();
+      allow update: if false;
     }
 
     // Люди без логина в CRM, добавленные только для «Оценка сотрудников»
