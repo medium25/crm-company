@@ -102,6 +102,7 @@ function AnswersView({ ev }) {
 }
 
 function EvaluationRow({ ev, evaluator, onDelete }) {
+  // Демо-оценки макета не удаляются (их нет в базе).
   const [open, setOpen] = useState(false);
   return (
     <div className="border-t border-border py-3">
@@ -118,14 +119,18 @@ function EvaluationRow({ ev, evaluator, onDelete }) {
         <Button variant="secondary" size="sm" onClick={() => setOpen((o) => !o)}>
           {open ? 'Скрыть' : 'Баллы'}
         </Button>
-        <button
-          type="button"
-          onClick={() => onDelete(ev)}
-          aria-label="Удалить оценку"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-field text-muted transition hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
-        >
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
-        </button>
+        {ev.demo ? (
+          <span className="h-8 w-8 shrink-0" aria-hidden="true" />
+        ) : (
+          <button
+            type="button"
+            onClick={() => onDelete(ev)}
+            aria-label="Удалить оценку"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-field text-muted transition hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
       </div>
       {open && (
         <div className="ml-5">
@@ -238,7 +243,7 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
           {evals.length === 0 ? (
             <p className="py-6 text-center text-control text-muted">Оценок пока нет.</p>
           ) : (
-            evals.map((ev) => <EvaluationRow key={ev.id} ev={ev} evaluator={nameByUid.get(ev.createdBy)} onDelete={setDeleteTarget} />)
+            evals.map((ev) => <EvaluationRow key={ev.id} ev={ev} evaluator={ev.demoEvaluator ?? nameByUid.get(ev.createdBy)} onDelete={setDeleteTarget} />)
           )}
         </section>
         {deleteDialog}

@@ -8,6 +8,7 @@ import { EmptyState } from '../ui/EmptyState.jsx';
 import { Button } from '../ui/Button.jsx';
 import { ROLE_OPTIONS } from '../../lib/roles.js';
 import { formatName } from '../../lib/format.js';
+import { withDemoEvaluations } from '../../lib/staffEvaluationDemo.js';
 import { StaffEvaluationModal } from './StaffEvaluationModal.jsx';
 import { StaffEvaluationCards } from './StaffEvaluationCards.jsx';
 import { AddEvaluationPersonModal } from './AddEvaluationPersonModal.jsx';
@@ -48,6 +49,9 @@ export function StaffEvaluationList({ onDrillChange }) {
   // uid оценившего → имя: оценивают CEO/менеджеры, которых в списке сотрудников нет, но они есть в staff.
   const nameByUid = useMemo(() => new Map(staff.map((m) => [m.id, m.fullName])), [staff]);
 
+  // Макет: демо-оценки (см. staffEvaluationDemo.js, флаг DEMO_RESULTS) добавляются к настоящим.
+  const allEvaluations = useMemo(() => withDemoEvaluations(evaluations, combined), [evaluations, combined]);
+
   const addButton = (
     <div className="mb-3 flex justify-end">
       <Button size="sm" onClick={() => setAdding(true)}>
@@ -76,7 +80,7 @@ export function StaffEvaluationList({ onDrillChange }) {
       {combined.length === 0 ? (
         <EmptyState icon={Star} title="Сотрудников пока нет" />
       ) : (
-        <StaffEvaluationCards members={combined} evaluations={evaluations} nameByUid={nameByUid} onEvaluate={setTarget} onDrillChange={onDrillChange} />
+        <StaffEvaluationCards members={combined} evaluations={allEvaluations} nameByUid={nameByUid} onEvaluate={setTarget} onDrillChange={onDrillChange} />
       )}
       <StaffEvaluationModal member={target} onClose={() => setTarget(null)} />
       <AddEvaluationPersonModal open={adding} onClose={() => setAdding(false)} />
