@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { User, Users } from 'lucide-react';
+import { ArrowLeft, User, Users } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../ui/Toast.jsx';
 import { Modal } from '../ui/Modal.jsx';
-import { Button } from '../ui/Button.jsx';
 import { formatName } from '../../lib/format.js';
 
 const RATER_ROLES = [
@@ -34,46 +33,40 @@ export const QUESTIONS = {
   ],
 };
 
-const SCALE_HINT = "Baholash shkalasi: 0 — juda yomon, 10 — a'lo darajada.";
-// Шкала 0–10 без 7 (так задал заказчик).
 export const SCALE_VALUES = Array.from({ length: 11 }, (_, i) => i).filter((n) => n !== 7);
 
-// Статичные классы — Tailwind JIT не умеет собирать `bg-${tone}` на лету.
-export const ZONE_CLASSES = {
-  danger: { off: 'border-transparent bg-danger/10 text-danger hover:bg-danger/20', on: 'border-danger bg-danger text-white' },
-  warning: { off: 'border-transparent bg-warning/10 text-warning hover:bg-warning/20', on: 'border-warning bg-warning text-white' },
-  success: { off: 'border-transparent bg-success/10 text-success hover:bg-success/20', on: 'border-success bg-success text-white' },
-  // 10 — графитовый акцент интерфейса (токен orange), не зелёный.
-  graphite: { off: 'border-transparent bg-orange/10 text-orange hover:bg-orange/20', on: 'border-orange bg-orange text-surface' },
-};
-export const zoneOf = (n) => (n <= 3 ? 'danger' : n <= 6 ? 'warning' : n === 10 ? 'graphite' : 'success');
+// Жёлтый акцент (токен trial) — как выбранная оценка в опросах Яндекса; текст на нём всегда тёмный.
+export const PICK_ON = 'bg-trial text-black';
+export const PICK_OFF = 'bg-chip text-text hover:bg-border';
 
-function RatingRow({ label, value, onChange }) {
+function ScaleButtons({ value, onChange }) {
   return (
-    <div className="mb-5">
-      <p className="mb-2 text-control text-text">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {SCALE_VALUES.map((n) => {
-          const zone = ZONE_CLASSES[zoneOf(n)];
-          return (
-            <button
-              key={n}
-              type="button"
-              onClick={() => onChange(n)}
-              className={`flex h-8 w-8 items-center justify-center rounded-field border-[1.5px] text-small font-bold transition-colors ${value === n ? zone.on : zone.off}`}
-            >
-              {n}
-            </button>
-          );
-        })}
+    <>
+      <div className="grid grid-cols-5 gap-2">
+        {SCALE_VALUES.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            aria-pressed={value === n}
+            className={`h-12 rounded-row text-title font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40 ${value === n ? PICK_ON : PICK_OFF}`}
+          >
+            {n}
+          </button>
+        ))}
       </div>
-    </div>
+      <div className="mt-2 flex justify-between text-caption text-muted">
+        <span>0 — juda yomon</span>
+        <span>10 — a'lo</span>
+      </div>
+    </>
   );
 }
 
 /**
- * Оценка сотрудника: сперва выбор роли оценивающего (Mijoz/Hamkasb — у
- * каждой свой набор вопросов), затем сама анкета 0–10 + комментарий.
+ * Оценка сотрудника по одному вопросу на экран (как в опросах Яндекса): выбор роли оценивающего
+ * (Mijoz/Hamkasb — у каждой свой набор вопросов), затем вопросы 0–10 с полосками прогресса, в конце —
+ * комментарий и отправка.
  * @param {Object} props
  * @param {Object|null} props.member staff-документ или null (закрыто)
  * @param {() => void} props.onClose
@@ -81,8 +74,9 @@ function RatingRow({ label, value, onChange }) {
 export function StaffEvaluationModal({ member, onClose }) {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [step, setStep] = useState('role');
   const [raterRole, setRaterRole] = useState(null);
+  // step: 'role' | номер вопроса | 'comment'
+  const [step, setStep] = useState('role');
   const [ratings, setRatings] = useState({});
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
@@ -95,23 +89,27 @@ export function StaffEvaluationModal({ member, onClose }) {
     setComment('');
   }, [member]);
 
+  const questions = raterRole ? QUESTIONS[raterRole] : [];
+  const roleLabel = RATER_ROLES.find((r) => r.value === raterRole)?.label;
+
   const pickRole = (value) => {
     setRaterRole(value);
-    setStep('form');
+    setStep(0);
   };
 
-  const handleBack = () => {
-    setStep('role');
-    setRaterRole(null);
-    setRatings({});
+  const goBack = () => {
+    if (step === 'comment') setStep(questions.length - 1);
+    else if (step === 0) {
+      setStep('role');
+      setRaterRole(null);
+      setRatings({});
+    } else setStep(step - 1);
   };
 
-  const questions = raterRole ? QUESTIONS[raterRole] : [];
-  const allAnswered = raterRole && questions.every((_, i) => ratings[i] !== undefined);
+  const goNext = () => setStep(step === questions.length - 1 ? 'comment' : step + 1);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!allAnswered) return;
+  const handleSubmit = async () => {
+    if (!questions.every((_, i) => ratings[i] !== undefined)) return;
     setSaving(true);
     try {
       await addDoc(collection(db, 'staffEvaluations'), {
@@ -133,20 +131,12 @@ export function StaffEvaluationModal({ member, onClose }) {
     }
   };
 
-  const footer =
-    step === 'form' ? (
-      <>
-        <Button variant="secondary" onClick={onClose}>
-          Отмена
-        </Button>
-        <Button onClick={handleSubmit} loading={saving} disabled={!allAnswered}>
-          Yuborish
-        </Button>
-      </>
-    ) : undefined;
+  const yellowButton = 'mt-6 h-14 w-full rounded-card bg-trial text-control font-bold text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-40';
+  const segments = questions.length + 1;
+  const position = step === 'comment' ? questions.length : step;
 
   return (
-    <Modal open={Boolean(member)} onClose={onClose} title={formatName(member?.fullName)} footer={footer}>
+    <Modal open={Boolean(member)} onClose={onClose} title={formatName(member?.fullName)}>
       {step === 'role' && (
         <div>
           <p className="mb-4 text-control text-muted">Siz xodimni qaysi sifatda baholaysiz?</p>
@@ -169,24 +159,50 @@ export function StaffEvaluationModal({ member, onClose }) {
         </div>
       )}
 
-      {step === 'form' && raterRole && (
-        <form onSubmit={handleSubmit}>
-          <button type="button" onClick={handleBack} className="mb-4 text-small font-bold text-navy hover:underline">
-            ← {RATER_ROLES.find((r) => r.value === raterRole)?.label}, orqaga
-          </button>
-          <p className="mb-5 text-caption text-muted">{SCALE_HINT}</p>
-          {questions.map((q, i) => (
-            <RatingRow key={i} label={`${i + 1}. ${q}`} value={ratings[i]} onChange={(n) => setRatings((r) => ({ ...r, [i]: n }))} />
-          ))}
-          <label className="block">
-            <span className="mb-1 block text-control text-text">Qo'shimcha fikr-mulohazangiz bo'lsa, yozib qoldiring. (ixtiyoriy)</span>
-            <textarea
-              className="min-h-20 w-full rounded-field border border-border-strong p-3 text-control focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-          </label>
-        </form>
+      {step !== 'role' && raterRole && (
+        <div>
+          <div className="mb-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={goBack}
+              aria-label="Назад"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text hover:bg-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40"
+            >
+              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <div className="flex flex-1 gap-1" aria-hidden="true">
+              {Array.from({ length: segments }, (_, k) => (
+                <i key={k} className={`block h-1 flex-1 rounded-badge ${k <= position ? 'bg-trial' : 'bg-chip'}`} />
+              ))}
+            </div>
+            <span className="text-small text-muted">
+              {Math.min(position + 1, questions.length)} / {questions.length}
+            </span>
+          </div>
+          <p className="text-caption text-muted">{roleLabel} sifatida</p>
+
+          {step === 'comment' ? (
+            <>
+              <p className="mb-4 mt-2 text-title font-bold text-text">Qo'shimcha fikr-mulohazangiz bo'lsa, yozib qoldiring. (ixtiyoriy)</p>
+              <textarea
+                className="min-h-28 w-full rounded-card bg-chip p-4 text-control text-text focus:outline-none focus:ring-2 focus:ring-trial"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+              />
+              <button type="button" onClick={handleSubmit} disabled={saving} className={yellowButton}>
+                {saving ? 'Yuborilmoqda…' : 'Yuborish'}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="mb-5 mt-2 text-title font-bold text-text">{questions[step]}</p>
+              <ScaleButtons value={ratings[step]} onChange={(n) => setRatings((r) => ({ ...r, [step]: n }))} />
+              <button type="button" onClick={goNext} disabled={ratings[step] === undefined} className={yellowButton}>
+                Keyingisi
+              </button>
+            </>
+          )}
+        </div>
       )}
     </Modal>
   );

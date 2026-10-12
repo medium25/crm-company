@@ -43,17 +43,21 @@ export function StaffPage() {
   const overview = OVERVIEW.find((o) => o.key === dept);
   // Карточка под курсором/фокусом: подъём на 2 px и тень цвета отдела.
   const [active, setActive] = useState(null);
+  // «Оценка сотрудников»: когда открыт конкретный сотрудник, у списка своя «назад» — общую «Все отделы» прячем.
+  const [ratingDrilled, setRatingDrilled] = useState(false);
   const teacherRef = useMemo(() => (db && teacherId ? doc(db, 'teachers', teacherId) : null), [teacherId]);
   const { data: teacher } = useDoc(teacherRef);
 
   if (overview) {
     return (
       <>
-        <BackButton to="/staff" className="mb-4">
-          Все отделы
-        </BackButton>
+        {!(overview.key === 'rating' && ratingDrilled) && (
+          <BackButton to="/staff" className="mb-4">
+            Все отделы
+          </BackButton>
+        )}
         {overview.key === 'rating' ? (
-          <StaffEvaluationList />
+          <StaffEvaluationList onDrillChange={setRatingDrilled} />
         ) : (
           <EmptyState icon={overview.icon} title={overview.title} subtitle="Раздел в разработке." />
         )}

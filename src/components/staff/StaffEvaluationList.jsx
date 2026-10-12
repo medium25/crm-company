@@ -25,7 +25,7 @@ const roleLabel = (role) => ROLE_OPTIONS.find((o) => o.value === role)?.label ??
  * свободный текст, см. AddEvaluationPersonModal). Клик открывает
  * StaffEvaluationModal (кнопка «Оценить» в ленте выбранного сотрудника).
  */
-export function StaffEvaluationList() {
+export function StaffEvaluationList({ onDrillChange }) {
   const { data: staff, loading: loadingStaff, error: errorStaff } = useCollection(staffQuery);
   const { data: manual, loading: loadingManual, error: errorManual } = useCollection(manualQuery);
   const { data: evaluations } = useCollection(evaluationsQuery);
@@ -76,7 +76,7 @@ export function StaffEvaluationList() {
       {combined.length === 0 ? (
         <EmptyState icon={Star} title="Сотрудников пока нет" />
       ) : (
-        <StaffEvaluationCards members={combined} evaluations={evaluations} nameByUid={nameByUid} onEvaluate={setTarget} />
+        <StaffEvaluationCards members={combined} evaluations={evaluations} nameByUid={nameByUid} onEvaluate={setTarget} onDrillChange={onDrillChange} />
       )}
       <StaffEvaluationModal member={target} onClose={() => setTarget(null)} />
       <AddEvaluationPersonModal open={adding} onClose={() => setAdding(false)} />
