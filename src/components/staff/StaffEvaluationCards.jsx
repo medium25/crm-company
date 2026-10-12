@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Plus, Star, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Star, Trash2 } from 'lucide-react';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useToast } from '../ui/Toast.jsx';
@@ -131,10 +131,16 @@ function EvaluationRow({ ev, evaluator, onDelete }) {
           </span>
           {ev.comment && <p className="mt-1 text-small text-text">«{ev.comment}»</p>}
         </div>
-        <ScoreBadge value={evaluationAverage(ev)} className="!py-1 !text-control" />
-        <Button variant="secondary" size="sm" onClick={() => setOpen((o) => !o)}>
+        <span className="min-w-[2.75rem] text-right text-title font-bold tabular-nums text-text">{fmt(evaluationAverage(ev))}</span>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="inline-flex items-center gap-0.5 rounded-field px-1 py-1 text-small font-bold text-text hover:text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40"
+        >
           {open ? 'Скрыть' : 'Баллы'}
-        </Button>
+          <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+        </button>
         {ev.demo ? (
           <span className="h-8 w-8 shrink-0" aria-hidden="true" />
         ) : (
@@ -256,10 +262,17 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
                 </span>
               )}
             </div>
-            <ScoreBadge value={summary?.overall ?? null} />
-            <Button size="sm" onClick={() => onEvaluate(selected)}>
-              <Plus className="h-4 w-4" /> Оценить
-            </Button>
+            <span className="text-kpi font-bold text-text">
+              {summary ? fmt(summary.overall) : '—'}
+              <span className="ml-1 text-control font-bold text-muted">/ 10</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onEvaluate(selected)}
+              className="inline-flex h-11 items-center gap-1.5 rounded-card bg-trial px-5 text-control font-bold text-black transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" /> Оценить
+            </button>
           </div>
           {evals.length === 0 ? (
             <p className="py-6 text-center text-control text-muted">Оценок пока нет.</p>
