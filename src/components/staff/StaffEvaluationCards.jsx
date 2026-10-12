@@ -8,7 +8,6 @@ import { Button } from '../ui/Button.jsx';
 import { BackButton } from '../ui/BackButton.jsx';
 import { formatDateTimeShort, formatName, pluralize } from '../../lib/format.js';
 import { operatorInitials } from '../leads/LeadCard.jsx';
-import { EVALUATION_PALETTE } from '../../lib/colors.js';
 import { PICK_OFF, PICK_ON, QUESTIONS, SCALE_VALUES } from './StaffEvaluationModal.jsx';
 
 const RATER_LABEL = { client: 'Клиент', colleague: 'Коллега' };
@@ -37,13 +36,10 @@ function ScoreBadge({ value, className = '' }) {
   );
 }
 
-/** Цвет сотрудника (staff.color / evaluationStaff.color); пока не задан — устойчивый цвет из палитры по id, чтобы люди различались с одного взгляда. */
-function colorOf(member) {
-  if (member.color) return member.color;
-  let h = 0;
-  for (const ch of String(member.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return EVALUATION_PALETTE[h % EVALUATION_PALETTE.length];
-}
+const DEFAULT_COLOR = '#8B94A3'; // design-ok: тот же серый по умолчанию, что у бейджа оператора в «Заявках» (цвет сотрудника — данные)
+
+/** Цвет сотрудника (staff.color / evaluationStaff.color); не задан — серый, как у операторов в «Заявках». */
+const colorOf = (member) => member.color || DEFAULT_COLOR;
 
 /** Пять звёзд, как у Яндекса: балл 0–10 → закраска до value/2 звёзд (дробная часть — частично закрашенная звезда). */
 function Stars({ value, size = 'h-4 w-4' }) {
@@ -58,10 +54,11 @@ function Stars({ value, size = 'h-4 w-4' }) {
   );
 }
 
-/** Цветной квадрат с инициалами (как у операторов в «Заявках»), цвет сотрудника. */
+/** Квадратный бейдж с инициалами, как у операторов в «Заявках»: полупрозрачный фон и текст цвета сотрудника. */
 function Avatar({ member, size = 'h-11 w-11 text-control', radius = 'rounded-row' }) {
+  const color = colorOf(member);
   return (
-    <span className={`flex ${size} shrink-0 items-center justify-center ${radius} font-bold text-white`} style={{ backgroundColor: colorOf(member) }}>
+    <span className={`flex ${size} shrink-0 items-center justify-center ${radius} font-bold`} style={{ backgroundColor: `${color}26`, color }}>
       {operatorInitials(member.fullName) || '?'}
     </span>
   );
