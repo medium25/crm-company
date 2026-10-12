@@ -13,14 +13,15 @@ const RATER_ROLES = [
   { value: 'colleague', label: 'Hamkasb', icon: Users },
 ];
 
-// Текст вопросов — фиксированный бриф заказчика (узбекский), не переводим.
+// Текст вопросов — бриф заказчика (узбекский), не переводим. Все вопросы сформулированы так, чтобы 10 = отлично:
+// вопрос «нужно ли что-то менять» (инвертированная логика) заменён на «насколько удобно/эффективно»; пожелания — в комментарии.
 const QUESTIONS = {
   client: [
     'Xodim sizga hurmat bilan murojaat qildimi?',
     "Xodim sizga kerakli yordamni ko'rsata oldimi?",
     'Xodimning professionallik darajasini qanday baholaysiz?',
     "Xodim ko'rsatgan xizmat sifatidan qanchalik mamnunsiz?",
-    "Xizmat ko'rsatish jarayonida biror narsani o'zgartirish yoki yaxshilash kerak deb hisoblaysizmi?",
+    "Xizmat ko'rsatish jarayoni sizga qanchalik qulay va tushunarli bo'ldi?",
     'Xodimni inson sifatida (xushmuomalalik, samimiylik, odob) qanday baholaysiz?',
   ],
   colleague: [
@@ -28,7 +29,7 @@ const QUESTIONS = {
     "Xodim ish jarayonida kerak bo'lganda sizga yordam beradimi va qo'llab-quvvatlaydimi?",
     "Xodimning kasbiy tayyorgarligi va o'z vazifasini bajarish darajasini qanday baholaysiz?",
     'Xodim bilan hamkorlik va birgalikda ishlash sifatidan qanchalik mamnunsiz?',
-    "Xodimning ish uslubi yoki jamoa bilan ishlash tarzida o'zgartirish yoki yaxshilash kerak deb hisoblaysizmi?",
+    "Xodimning ish uslubi va jamoada ishlash tarzi qanchalik samarali?",
     'Xodimni inson sifatida (xushmuomalalik, samimiylik, odob) qanday baholaysiz?',
   ],
 };
