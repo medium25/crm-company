@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, Plus, Star, Trash2 } from 'lucide-react';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useToast } from '../ui/Toast.jsx';
@@ -39,6 +39,19 @@ function ScoreBadge({ value, className = '' }) {
 const DEFAULT_COLOR = '#8B94A3'; // design-ok: тот же серый по умолчанию, что у бейджа оператора в «Заявках» (цвет сотрудника — данные)
 
 /** Квадратный бейдж с инициалами, как у операторов в «Заявках»: полупрозрачный фон и текст цвета сотрудника (staff.color). */
+/** Пять звёзд, как у Яндекса: балл 0–10 → закраска до value/2 звёзд (дробная часть — частично закрашенная звезда). */
+function Stars({ value, size = 'h-4 w-4' }) {
+  const row = (cls) => [0, 1, 2, 3, 4].map((i) => <Star key={i} className={`${size} shrink-0 ${cls}`} strokeWidth={1.5} aria-hidden="true" />);
+  return (
+    <span className="relative inline-flex" role="img" aria-label={`${fmt(value)} из 10`}>
+      <span className="inline-flex gap-0.5">{row('fill-chip text-chip')}</span>
+      <span className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${Math.max(0, Math.min(100, value * 10))}%` }}>
+        <span className="inline-flex w-max gap-0.5">{row('fill-trial text-trial')}</span>
+      </span>
+    </span>
+  );
+}
+
 function Avatar({ member, size = 'h-11 w-11 text-control' }) {
   const color = member.color || DEFAULT_COLOR;
   return (
@@ -113,6 +126,9 @@ function EvaluationRow({ ev, evaluator, onDelete }) {
             {evaluator ? formatName(evaluator) : 'Неизвестно'} <span className="text-caption text-muted">· {RATER_LABEL[ev.raterRole] ?? ev.raterRole}</span>
           </p>
           <p className="text-caption text-muted">{ev.createdAt ? formatDateTimeShort(ev.createdAt) : 'сохраняется…'}</p>
+          <span className="mt-1 block">
+            <Stars value={evaluationAverage(ev)} />
+          </span>
           {ev.comment && <p className="mt-1 text-small text-text">«{ev.comment}»</p>}
         </div>
         <ScoreBadge value={evaluationAverage(ev)} className="!py-1 !text-control" />
@@ -234,6 +250,11 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
               <p className="text-small text-muted">
                 {selected.roleForEval || '—'} · {summary ? `оценили: ${peopleLabel(summary.people)}` : 'пока никто не оценил'}
               </p>
+              {summary && (
+                <span className="mt-1 block">
+                  <Stars value={summary.overall} size="h-5 w-5" />
+                </span>
+              )}
             </div>
             <ScoreBadge value={summary?.overall ?? null} />
             <Button size="sm" onClick={() => onEvaluate(selected)}>
