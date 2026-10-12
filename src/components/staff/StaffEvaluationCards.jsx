@@ -8,6 +8,7 @@ import { Button } from '../ui/Button.jsx';
 import { BackButton } from '../ui/BackButton.jsx';
 import { formatDateTimeShort, formatName, pluralize } from '../../lib/format.js';
 import { operatorInitials } from '../leads/LeadCard.jsx';
+import { EVALUATION_PALETTE } from '../../lib/colors.js';
 import { PICK_OFF, PICK_ON, QUESTIONS, SCALE_VALUES } from './StaffEvaluationModal.jsx';
 
 const RATER_LABEL = { client: 'Клиент', colleague: 'Коллега' };
@@ -36,9 +37,14 @@ function ScoreBadge({ value, className = '' }) {
   );
 }
 
-const DEFAULT_COLOR = '#8B94A3'; // design-ok: тот же серый по умолчанию, что у бейджа оператора в «Заявках» (цвет сотрудника — данные)
+/** Цвет сотрудника (staff.color / evaluationStaff.color); пока не задан — устойчивый цвет из палитры по id, чтобы люди различались с одного взгляда. */
+function colorOf(member) {
+  if (member.color) return member.color;
+  let h = 0;
+  for (const ch of String(member.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return EVALUATION_PALETTE[h % EVALUATION_PALETTE.length];
+}
 
-/** Квадратный бейдж с инициалами, как у операторов в «Заявках»: полупрозрачный фон и текст цвета сотрудника (staff.color). */
 /** Пять звёзд, как у Яндекса: балл 0–10 → закраска до value/2 звёзд (дробная часть — частично закрашенная звезда). */
 function Stars({ value, size = 'h-4 w-4' }) {
   const row = (cls) => [0, 1, 2, 3, 4].map((i) => <Star key={i} className={`${size} shrink-0 ${cls}`} strokeWidth={1.5} aria-hidden="true" />);
@@ -52,22 +58,55 @@ function Stars({ value, size = 'h-4 w-4' }) {
   );
 }
 
-function Avatar({ member, size = 'h-11 w-11 text-control' }) {
-  const color = member.color || DEFAULT_COLOR;
+/** Цветной квадрат с инициалами (как у операторов в «Заявках»), цвет сотрудника. */
+function Avatar({ member, size = 'h-11 w-11 text-control', radius = 'rounded-row' }) {
   return (
-    <span className={`flex ${size} shrink-0 items-center justify-center rounded-row font-bold`} style={{ backgroundColor: `${color}26`, color }}>
+    <span className={`flex ${size} shrink-0 items-center justify-center ${radius} font-bold text-white`} style={{ backgroundColor: colorOf(member) }}>
       {operatorInitials(member.fullName) || '?'}
     </span>
   );
 }
 
-function MemberRow({ member, summary, onSelect }) {
+/** Метка должности в цвет сотрудника. */
+function RoleChip({ member }) {
+  const color = colorOf(member);
+  return (
+    <span className="inline-block rounded-badge px-2.5 py-0.5 text-caption font-bold" style={{ backgroundColor: `${color}22`, color }}>
+      {member.roleForEval || '—'}
+    </span>
+  );
+}
+
+/** Карточка тройки лидеров: место, цветной аватар, имя, должность, балл и звёзды. */
+function PodiumCard({ member, summary, place, onSelect }) {
+  const first = place === 1;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`relative flex flex-col items-center gap-1.5 rounded-card border bg-card px-3 text-center transition hover:-translate-y-0.5 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40 ${
+        first ? 'border-2 border-trial py-6 sm:order-2' : 'border-border-strong py-4'
+      } ${place === 2 ? 'sm:order-1' : ''} ${place === 3 ? 'sm:order-3' : ''}`}
+    >
+      <span className="absolute left-3 top-2 text-small font-bold text-muted">{place}</span>
+      <Avatar member={member} size={first ? 'h-20 w-20 text-page' : 'h-16 w-16 text-title'} radius="rounded-card" />
+      <span className="text-title font-bold leading-tight text-text">{formatName(member.fullName)}</span>
+      <RoleChip member={member} />
+      <span className="text-kpi font-bold leading-none text-text">{fmt(summary.overall)}</span>
+      <Stars value={summary.overall} size={first ? 'h-5 w-5' : 'h-4 w-4'} />
+      <span className="text-caption text-muted">оценили: {peopleLabel(summary.people)}</span>
+    </button>
+  );
+}
+
+function MemberRow({ member, summary, rank, onSelect }) {
   return (
     <button
       type="button"
       onClick={onSelect}
       className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-navy/30"
     >
+      {rank && <span className="w-5 shrink-0 text-center text-control font-bold text-muted">{rank}</span>}
       <Avatar member={member} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-control font-bold text-text">{formatName(member.fullName)}</span>
@@ -291,6 +330,10 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
     .filter(active.match)
     .map((m) => ({ m, summary: summarize(byStaff.get(m.id) ?? []) }))
     .sort((a, b) => (b.summary?.overall ?? -1) - (a.summary?.overall ?? -1));
+  // Тройка лидеров — первые три сотрудника с оценками; остальные — списком (без оценок — в конце, без места).
+  const ranked = visible.filter((v) => v.summary);
+  const podium = ranked.length >= 3 ? ranked.slice(0, 3) : [];
+  const rest = visible.slice(podium.length);
   const filters = FILTERS.filter((f) => f.key === 'all' || members.some(f.match));
   return (
     <>
@@ -307,11 +350,20 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
           </button>
         ))}
       </div>
-      <div className="overflow-hidden rounded-card border border-border">
-        {visible.map(({ m, summary }) => (
-          <MemberRow key={m.id} member={m} summary={summary} onSelect={() => setSelectedId(m.id)} />
-        ))}
-      </div>
+      {podium.length === 3 && (
+        <div className="mb-4 grid grid-cols-1 items-end gap-3 sm:grid-cols-3">
+          {podium.map(({ m, summary }, i) => (
+            <PodiumCard key={m.id} member={m} summary={summary} place={i + 1} onSelect={() => setSelectedId(m.id)} />
+          ))}
+        </div>
+      )}
+      {rest.length > 0 && (
+        <div className="overflow-hidden rounded-card border border-border">
+          {rest.map(({ m, summary }, i) => (
+            <MemberRow key={m.id} member={m} summary={summary} rank={summary ? podium.length + i + 1 : undefined} onSelect={() => setSelectedId(m.id)} />
+          ))}
+        </div>
+      )}
       {deleteDialog}
     </>
   );
