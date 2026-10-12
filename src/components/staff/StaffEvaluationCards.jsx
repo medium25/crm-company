@@ -260,7 +260,6 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
   const filters = FILTERS.filter((f) => f.key === 'all' || members.some(f.match));
   return (
     <>
-      <p className="mb-3 text-small text-muted">Общий балл — среднее из средних баллов всех, кто оценил сотрудника.</p>
       <div className="mb-3 flex flex-wrap gap-2">
         {filters.map((f) => (
           <button
