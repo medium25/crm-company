@@ -7,16 +7,10 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { BackButton } from '../ui/BackButton.jsx';
 import { formatDateTimeShort, formatName, pluralize } from '../../lib/format.js';
+import { operatorInitials } from '../leads/LeadCard.jsx';
 import { PICK_OFF, PICK_ON, QUESTIONS, SCALE_VALUES } from './StaffEvaluationModal.jsx';
 
 const RATER_LABEL = { client: 'Клиент', colleague: 'Коллега' };
-
-const AVATAR_BG = ['bg-navy', 'bg-success', 'bg-warning', 'bg-danger'];
-const toneOf = (id) => {
-  let h = 0;
-  for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return AVATAR_BG[h % AVATAR_BG.length];
-};
 
 const average = (nums) => nums.reduce((s, n) => s + n, 0) / nums.length;
 const fmt = (v) => v.toFixed(1).replace('.', ',');
@@ -42,9 +36,16 @@ function ScoreBadge({ value, className = '' }) {
   );
 }
 
-function Avatar({ member, size = 'h-11 w-11' }) {
-  const initial = (member.fullName ?? '?').trim().charAt(0).toUpperCase() || '?';
-  return <span className={`flex ${size} shrink-0 items-center justify-center rounded-full text-control font-bold text-white ${toneOf(member.id)}`}>{initial}</span>;
+const DEFAULT_COLOR = '#8B94A3'; // design-ok: тот же серый по умолчанию, что у бейджа оператора в «Заявках» (цвет сотрудника — данные)
+
+/** Квадратный бейдж с инициалами, как у операторов в «Заявках»: полупрозрачный фон и текст цвета сотрудника (staff.color). */
+function Avatar({ member, size = 'h-11 w-11 text-control' }) {
+  const color = member.color || DEFAULT_COLOR;
+  return (
+    <span className={`flex ${size} shrink-0 items-center justify-center rounded-row font-bold`} style={{ backgroundColor: `${color}26`, color }}>
+      {operatorInitials(member.fullName) || '?'}
+    </span>
+  );
 }
 
 function MemberRow({ member, summary, onSelect }) {
@@ -222,7 +223,7 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
         </BackButton>
         <section className="rounded-card border border-border-strong bg-card p-5">
           <div className="mb-3 flex flex-wrap items-center gap-3">
-            <Avatar member={selected} size="h-12 w-12" />
+            <Avatar member={selected} size="h-12 w-12 text-title" />
             <div className="min-w-0 flex-1">
               <h3 className="truncate text-title font-bold text-text">{formatName(selected.fullName)}</h3>
               <p className="text-small text-muted">
