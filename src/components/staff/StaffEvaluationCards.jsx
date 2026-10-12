@@ -252,7 +252,11 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
   }
 
   const active = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
-  const visible = members.filter(active.match);
+  // От большего общего балла к меньшему; без оценок — в конце (по имени, как пришли).
+  const visible = members
+    .filter(active.match)
+    .map((m) => ({ m, summary: summarize(byStaff.get(m.id) ?? []) }))
+    .sort((a, b) => (b.summary?.overall ?? -1) - (a.summary?.overall ?? -1));
   const filters = FILTERS.filter((f) => f.key === 'all' || members.some(f.match));
   return (
     <>
@@ -271,8 +275,8 @@ export function StaffEvaluationCards({ members, evaluations, nameByUid, onEvalua
         ))}
       </div>
       <div className="overflow-hidden rounded-card border border-border">
-        {visible.map((m) => (
-          <MemberRow key={m.id} member={m} summary={summarize(byStaff.get(m.id) ?? [])} onSelect={() => setSelectedId(m.id)} />
+        {visible.map(({ m, summary }) => (
+          <MemberRow key={m.id} member={m} summary={summary} onSelect={() => setSelectedId(m.id)} />
         ))}
       </div>
       {deleteDialog}
