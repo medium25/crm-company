@@ -265,12 +265,24 @@ function computePaymentsAndChart_(branchId, now) {
   return { paidThisMonth, comparison: { data, currentMonth, prevMonth }, allPayments: txs };
 }
 
+// 4 раздела «Анализ источников оплат» — зеркало PAYMENT_SOURCE_BUCKETS/paymentSourceBucket из
+// stats.js. 'target' синтетический ключ, не хранится в students.source.
+const PAYMENT_SOURCE_BUCKETS_ = ['returned', 'banner', 'target', 'word_of_mouth'];
+function paymentSourceBucket_(source) {
+  if (source === 'returned') return 'returned';
+  if (source === 'street' || source === 'banner') return 'banner';
+  if (source === 'meta_target' || source === 'target_manual' || source === 'instagram') return 'target';
+  return 'word_of_mouth';
+}
+
 /**
  * Разбивка «+N добавились» (computeNewStudents_ — funnelStage 'won', paidAt в периоде) по
  * источнику лида — копия countPaymentSources из stats.js: тот же период (`start`/`end`, тот же
  * churnPeriodRange_, что даёт число на плитке «добавились»), поэтому сумма счётчиков по
  * источникам всегда равна числу на этой плитке. Сумма денег — по платежам этих же студентов
- * среди уже загруженных (`payments`, текущий+прошлый месяц).
+ * среди уже загруженных (`payments`, текущий+прошлый месяц). Пробный не в этом календарном
+ * месяце — та же запись даёт +1 и count, и trialCount своему разделу (распределено по 4
+ * разделам, не отдельной строкой «Прошлый месяц»). Всегда ровно 4 строки.
  */
 function computePaymentSources_(branchId, start, end, payments, now) {
   const monthStart = startOfMonth_(now);
@@ -285,17 +297,15 @@ function computePaymentSources_(branchId, start, end, payments, now) {
   ]);
 
   const map = {};
+  PAYMENT_SOURCE_BUCKETS_.forEach((key) => { map[key] = { key: key, count: 0, amount: 0, trialCount: 0 }; });
   const sourceByStudent = {};
-  const prevBreakdown = {};
   docs.forEach((s) => {
-    const realSource = s.source || 'none';
-    const trialDate = s.trialDate ? new Date(s.trialDate) : null;
-    const cameThisMonth = Boolean(trialDate && trialDate >= monthStart && trialDate < nextMonthStart);
-    const key = cameThisMonth ? realSource : 'prev_month';
-    if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
+    const key = paymentSourceBucket_(s.source);
     map[key].count += 1;
     sourceByStudent[s.id] = key;
-    if (!cameThisMonth) prevBreakdown[realSource] = (prevBreakdown[realSource] || 0) + 1;
+    const trialDate = s.trialDate ? new Date(s.trialDate) : null;
+    const cameThisMonth = Boolean(trialDate && trialDate >= monthStart && trialDate < nextMonthStart);
+    if (!cameThisMonth) map[key].trialCount += 1;
   });
 
   // Пробные этого календарного месяца по источнику — та же выборка, что computeTrialMonth_.
@@ -306,17 +316,8 @@ function computePaymentSources_(branchId, start, end, payments, now) {
   ]);
   const trialWithTeacher = studentIdsWithTeacher_(trialDocs.map((s) => s.id));
   trialDocs.filter((s) => trialWithTeacher[s.id]).forEach((s) => {
-    const key = s.source || 'none';
-    if (!map[key]) map[key] = { key, count: 0, amount: 0, trialCount: 0 };
-    map[key].trialCount += 1;
+    map[paymentSourceBucket_(s.source)].trialCount += 1;
   });
-  if (Object.keys(map).length === 0) return [];
-
-  if (map.prev_month) {
-    map.prev_month.breakdown = Object.keys(prevBreakdown)
-      .map((key) => ({ key, count: prevBreakdown[key] }))
-      .sort((a, b) => b.count - a.count);
-  }
 
   payments.forEach((t) => {
     const key = sourceByStudent[t.studentId];
