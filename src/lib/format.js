@@ -28,14 +28,16 @@ export function formatMethod(method) {
  * Источники лида — из Sheets всегда meta_target («Таргет», см.
  * appsscript/SheetsSync.gs), вручную оператор выбирает между этими же
  * значениями через StudentFormModal.SOURCE_OPTIONS. Старые значения
- * (telegram/friends/outdoor) оставлены только для корректного отображения
- * уже существующих записей — в форме больше не выбираются.
+ * (telegram/friends/outdoor, а теперь и instagram/street/other — см.
+ * StudentFormModal) оставлены только для корректного отображения уже
+ * существующих записей — в форме больше не выбираются.
  */
 const SOURCE_LABELS = {
   meta_target: 'Таргет',
-  target_manual: 'Таргет (р)',
+  target_manual: 'Таргет / Инстаграм',
   instagram: 'Инстаграм',
   street: 'Улица',
+  banner: 'Баннер',
   word_of_mouth: 'Рекомендации',
   returned: 'Вернулся',
   other: 'Другое',

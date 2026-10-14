@@ -15,14 +15,16 @@ import { recomputeStudentAggregates } from '../../lib/students.js';
 // meta_target ставит только appsscript/SheetsSync.gs автоматически лидам
 // из гугл-таблицы — вручную не выбирается, для этого target_manual (тот
 // же таргет, но когда оператор заводит лида руками, не через синк).
+// target_manual теперь покрывает и Инстаграм — раньше была отдельной
+// опцией, 'instagram' как отдельное значение в форме больше не выбирается
+// (старые записи с ним по-прежнему показываются как «Инстаграм», см.
+// formatSource). 'street'/'other' убраны, вместо «Улицы» — «Баннер».
 const SOURCE_OPTIONS = [
   { value: '', label: 'Не указан' },
-  { value: 'target_manual', label: 'Таргет (р)' },
-  { value: 'instagram', label: 'Инстаграм' },
-  { value: 'street', label: 'Улица' },
+  { value: 'target_manual', label: 'Таргет / Инстаграм' },
+  { value: 'banner', label: 'Баннер' },
   { value: 'word_of_mouth', label: 'Рекомендации' },
   { value: 'returned', label: 'Вернулся' },
-  { value: 'other', label: 'Другое' },
 ];
 
 const EMPTY_FORM = { fullName: '', phone: '', phone2: '', source: '', assignedOperator: '' };
