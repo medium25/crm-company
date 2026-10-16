@@ -1004,6 +1004,16 @@ function previewDailyOperatorReports() {
   });
 }
 
+/**
+ * Проверка связи с Telegram — шлёт короткое сообщение в TELEGRAM_CHAT_ID
+ * (и в топик TELEGRAM_REPORTS_THREAD_ID, если задан). Запусти вручную; если
+ * ничего не пришло — причина в Execution log (нет свойств / ответ Telegram).
+ */
+function testTelegramSend() {
+  telegramSendMessage_('✅ Тест: бот на связи');
+  Logger.log('testTelegramSend: запрос отправлен, смотри группу и логи выше.');
+}
+
 // --- Редактирование шаблона отчёта прямо из Telegram ------------------------
 
 const TEMPLATE_PLACEHOLDER_HINT =
