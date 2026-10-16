@@ -135,17 +135,21 @@ function MetricArrow() {
  * неё — Helvetica/Arial).
  */
 const METRIC_FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
-function MetricGroup({ children, hue = 1 }) {
+function MetricGroup({ children, hue = 1, numberHue = hue }) {
   // hue: число 1…7 — цвет графиков; 'graphite' — графитовый акцент интерфейса (токен --color-orange, как иконки плиток)
-  const color = hue === 'graphite' ? 'rgb(var(--color-orange))' : `rgb(var(--color-chart-${hue}))`;
+  // numberHue — цвет чисел внутри плиток отдельно от подложки (по умолчанию тот же, что у подложки)
+  const toColor = (h) => (h === 'graphite' ? 'rgb(var(--color-orange))' : `rgb(var(--color-chart-${h}))`);
+  const color = toColor(hue);
+  // графит — почти белая светло-серая подложка с чёткой рамкой; цветные группы — пастельнее
+  const [bgPct, borderPct] = hue === 'graphite' ? [7.5, 27] : [14, 38];
   return (
     <div
       className="flex h-full items-stretch justify-center gap-2 rounded-card border-[1.5px] px-4 py-5 shadow-card"
       style={{
-        '--hue': color,
+        '--hue': toColor(numberHue),
         fontFamily: METRIC_FONT,
-        backgroundColor: `color-mix(in srgb, ${color} 14%, rgb(var(--color-surface)))`,
-        borderColor: `color-mix(in srgb, ${color} 38%, rgb(var(--color-surface)))`,
+        backgroundColor: `color-mix(in srgb, ${color} ${bgPct}%, rgb(var(--color-surface)))`,
+        borderColor: `color-mix(in srgb, ${color} ${borderPct}%, rgb(var(--color-surface)))`,
       }}
     >
       {children}
@@ -430,7 +434,7 @@ export function DashboardPage() {
         <>
           <div className="grid grid-cols-1 gap-4">
             <div className="flex flex-col gap-2">
-              <MetricGroup hue={1}>
+              <MetricGroup hue="graphite" numberHue={1}>
                 <MetricSegment
                   value={stats.activeStudents}
                   label="активные"
@@ -453,7 +457,7 @@ export function DashboardPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <MetricGroup hue={2}>
+              <MetricGroup hue="graphite" numberHue={2}>
                 <MetricSegment
                   value={`−${stats.leftActiveGroup}`}
                   label="ушли"
@@ -540,8 +544,6 @@ export function DashboardPage() {
         </>
       )}
 
-      <PaymentSourceAnalysis className="mt-6" sources={effectiveNewPaymentSources} periodLabel="добавились" />
-
       <Card className="mt-6">
         {stats?.comparison ? (
           <RevenueOverviewChart comparison={stats.comparison} monthly={monthly ?? []} />
@@ -553,6 +555,14 @@ export function DashboardPage() {
           <Skeleton className="h-64 w-full rounded-card" />
         )}
       </Card>
+
+      <PaymentSourceAnalysis
+        className="mt-6"
+        sources={effectiveNewPaymentSources}
+        periodLabel="добавились"
+        onOpenTrials={() => navigate('/students?section=trial')}
+        onOpenPayments={() => navigate('/payments')}
+      />
 
       <div className="mt-6">
         <RoomScheduleBoard branchId={activeBranchId} />
