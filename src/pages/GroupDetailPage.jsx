@@ -80,22 +80,30 @@ function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, on
         <>
           {/* balance >= 0 — зелёный: 0 не долг, красным должен гореть только реальный минус.
               students читают все авторизованные (см. firestore.rules) — учитель
-              видит настоящий цвет, но не сумму: title (точный баланс) только
-              не-учителю, кружок сам по себе суммы не раскрывает. Без student
+              видит настоящий цвет, но не сумму: превью с балансом при наведении
+              только не-учителю, кружок сам по себе суммы не раскрывает. Без student
               (сеть/гонка загрузки) кружок не рисуем вовсе — не гадаем цвет. */}
-          {student && (
-            <span
-              className={`h-2 w-2 shrink-0 rounded-full ${balance >= 0 ? 'bg-success' : 'bg-danger'}`}
-              title={isTeacher ? undefined : formatMoney(balance)}
-            />
-          )}
-          <button
-            type="button"
-            onClick={() => navigate(`/students/${enrollment.studentId}`)}
-            className="flex-1 truncate text-left hover:text-link"
-          >
-            {enrollment.studentName}
-          </button>
+          <span className="group/pv relative flex min-w-0 flex-1 items-center gap-2">
+            {student && (
+              <span className={`h-2 w-2 shrink-0 rounded-full ${balance >= 0 ? 'bg-success' : 'bg-danger'}`} />
+            )}
+            <button
+              type="button"
+              onClick={() => navigate(`/students/${enrollment.studentId}`)}
+              className="flex-1 truncate text-left hover:text-link"
+            >
+              {enrollment.studentName}
+            </button>
+            {student && !isTeacher && (
+              <span className="pointer-events-none absolute left-4 top-full z-20 mt-1 hidden whitespace-nowrap rounded-row border border-border-strong bg-surface px-2.5 py-1.5 shadow-soft group-hover/pv:block group-focus-within/pv:block">
+                <span className="block text-caption leading-tight text-muted">баланс</span>
+                <span className={`block text-small font-bold leading-snug ${balance >= 0 ? 'text-success' : 'text-danger'}`}>
+                  {balance > 0 ? '+' : ''}
+                  {formatMoney(balance)}
+                </span>
+              </span>
+            )}
+          </span>
         </>
       )}
       {student?.phone && (
@@ -166,15 +174,21 @@ export function GroupDetailPage() {
     if (!showArchivedStudents) clauses.push(where('status', '!=', 'archived'));
     return query(collection(db, 'enrollments'), ...clauses);
   }, [id, showArchivedStudents]);
-  const { data: enrollments } = useCollection(enrollmentsQuery);
+  const { data: rawEnrollments } = useCollection(enrollmentsQuery);
 
-  const studentIds = useMemo(() => enrollments.map((e) => e.studentId).slice(0, 30), [enrollments]);
+  const studentIds = useMemo(() => rawEnrollments.map((e) => e.studentId).slice(0, 30), [rawEnrollments]);
   const studentsQuery = useMemo(
     () => (db && studentIds.length > 0 ? query(collection(db, 'students'), where(documentId(), 'in', studentIds)) : null),
     [studentIds],
   );
   const { data: rosterStudents } = useCollection(studentsQuery);
   const studentsById = useMemo(() => new Map(rosterStudents.map((s) => [s.id, s])), [rosterStudents]);
+  // enrollments.studentName — копия имени на момент записи в группу: если фамилию дописали
+  // позже, копия остаётся короткой. Показываем актуальное имя из карточки студента.
+  const enrollments = useMemo(
+    () => rawEnrollments.map((e) => ({ ...e, studentName: studentsById.get(e.studentId)?.fullName ?? e.studentName })),
+    [rawEnrollments, studentsById],
+  );
 
   const sortedEnrollments = useMemo(() => {
     // Студент мог быть архивирован напрямую с его карточки — тогда его
@@ -253,7 +267,7 @@ export function GroupDetailPage() {
         {group.teacherName}
       </h1>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_auto_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_auto_minmax(0,1fr)]">
         <Card className="flex flex-col gap-2">
           <Field label="Курс" value={group.courseName} />
           <Field label="Учитель" value={group.teacherName} />
@@ -317,7 +331,7 @@ export function GroupDetailPage() {
           </Button>
         </div>
 
-        <Card>
+        <Card className="min-w-0">
           <Tabs tabs={TABS} activeKey={tab} onChange={setTab} />
           <div className="mt-6">
             {tab === 'attendance' ? (

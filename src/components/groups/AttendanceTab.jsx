@@ -125,19 +125,24 @@ export function AttendanceTab({ group }) {
     () => (db ? query(collection(db, 'enrollments'), where('groupId', '==', group.id), where('isArchived', '==', false)) : null),
     [group.id],
   );
-  const { data: enrollments, loading: enrollmentsLoading } = useCollection(enrollmentsQuery);
+  const { data: rawEnrollments, loading: enrollmentsLoading } = useCollection(enrollmentsQuery);
 
   // Студент мог быть архивирован напрямую с его карточки — тогда его
   // enrollment иногда остаётся неархивированным (см. тот же комментарий в
   // GroupDetailPage.sortedEnrollments). Без этой подстраховки такой студент
   // пропадал из состава группы, но оставался в сетке посещаемости.
-  const studentIds = useMemo(() => enrollments.map((e) => e.studentId).slice(0, 30), [enrollments]);
+  const studentIds = useMemo(() => rawEnrollments.map((e) => e.studentId).slice(0, 30), [rawEnrollments]);
   const studentsQuery = useMemo(
     () => (db && studentIds.length > 0 ? query(collection(db, 'students'), where(documentId(), 'in', studentIds)) : null),
     [studentIds],
   );
   const { data: rosterStudents } = useCollection(studentsQuery);
   const studentsById = useMemo(() => new Map(rosterStudents.map((s) => [s.id, s])), [rosterStudents]);
+  // enrollments.studentName — копия имени на момент записи в группу; показываем актуальное из карточки студента.
+  const enrollments = useMemo(
+    () => rawEnrollments.map((e) => ({ ...e, studentName: studentsById.get(e.studentId)?.fullName ?? e.studentName })),
+    [rawEnrollments, studentsById],
+  );
 
   // Группы, ОТКУДА кто-то из текущего состава был переведён — их прошлые
   // уроки/отметки подмешиваем в сетку этой группы (см. doc-комментарий
@@ -231,15 +236,11 @@ export function AttendanceTab({ group }) {
     for (const l of lessons) {
       map.set(l.dateKey, { dateKey: l.dateKey, date: startOfDay(l.date.toDate()), currentLesson: l, oldLessonsByGroup: new Map() });
     }
+    // Дни, в которые у ЭТОЙ группы нет урока, колонкой не показываем — уроки старой группы
+    // видны только в те дни, когда урок есть и у этой.
     for (const l of oldLessons) {
-      const entry = map.get(l.dateKey) ?? {
-        dateKey: l.dateKey,
-        date: startOfDay(l.date.toDate()),
-        currentLesson: null,
-        oldLessonsByGroup: new Map(),
-      };
-      entry.oldLessonsByGroup.set(l.groupId, l);
-      map.set(l.dateKey, entry);
+      const entry = map.get(l.dateKey);
+      if (entry) entry.oldLessonsByGroup.set(l.groupId, l);
     }
     return [...map.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
   }, [lessons, oldLessons]);
@@ -388,7 +389,7 @@ export function AttendanceTab({ group }) {
     return <EmptyState icon={Users} title="Пока нет студентов в группе" />;
   }
 
-  const gridTemplate = `repeat(${days.length}, 64px)`;
+  const gridTemplate = `repeat(${days.length}, 56px)`;
 
   return (
     <div>
@@ -450,7 +451,7 @@ export function AttendanceTab({ group }) {
                     type="button"
                     onClick={(e) => day.currentLesson && handleHeaderClick(day.currentLesson, e)}
                     title={day.currentLesson ? 'Ctrl/Cmd+клик — отметить всех присутствующими' : 'Уроки прежней группы'}
-                    className={`flex h-11 items-center justify-center px-1 text-small font-bold hover:bg-surface-alt ${
+                    className={`flex h-11 items-center justify-center px-0 text-small font-bold hover:bg-surface-alt ${
                       day.dateKey === todayKey ? 'bg-orange-soft/40 text-navy' : day.currentLesson ? 'text-text' : 'text-muted'
                     }`}
                   >
