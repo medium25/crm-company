@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, addDoc, updateDoc, doc, query, where, getDocs, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, query, where, getDocs, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -11,6 +11,8 @@ import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
 import { GroupOptions } from '../ui/GroupOptions.jsx';
 import { recomputeStudentAggregates } from '../../lib/students.js';
+import { joinName, nameParts } from '../../lib/personName.js';
+import { NameFields } from '../shared/NameFields.jsx';
 
 // meta_target ставит только appsscript/SheetsSync.gs автоматически лидам
 // из гугл-таблицы — вручную не выбирается, для этого target_manual (тот
@@ -27,7 +29,7 @@ const SOURCE_OPTIONS = [
   { value: 'returned', label: 'Вернулся' },
 ];
 
-const EMPTY_FORM = { fullName: '', phone: '', phone2: '', source: '', assignedOperator: '' };
+const EMPTY_FORM = { firstName: '', lastName: '', phone: '', phone2: '', source: '', assignedOperator: '' };
 
 /**
  * Создание/редактирование студента (он же лид — одна коллекция). `student` =
@@ -56,7 +58,7 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
     setDuplicateName('');
     if (student.id) {
       setForm({
-        fullName: student.fullName ?? '',
+        ...nameParts(student),
         phone: student.phone ?? '',
         phone2: student.phone2 ?? '',
         source: student.source ?? '',
@@ -137,7 +139,9 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
     setSaving(true);
     try {
       const payload = {
-        fullName: form.fullName.trim(),
+        fullName: joinName(form.firstName, form.lastName),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
         phone: form.phone.replace(/\D/g, ''),
         phone2: form.phone2 ? form.phone2.replace(/\D/g, '') : null,
         source: form.source || null,
@@ -155,6 +159,16 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
       }
       if (student?.id) {
         await updateDoc(doc(db, 'students', student.id), payload);
+
+        // enrollments хранят копию имени — без синхронизации после переименования в группе остаётся старое.
+        if (student.fullName !== payload.fullName) {
+          const enrollSnap = await getDocs(query(collection(db, 'enrollments'), where('studentId', '==', student.id)));
+          if (!enrollSnap.empty) {
+            const renameBatch = writeBatch(db);
+            enrollSnap.docs.forEach((d) => renameBatch.update(d.ref, { studentName: payload.fullName }));
+            await renameBatch.commit();
+          }
+        }
 
         if (isTrialStatus && form.groupId && form.groupId !== (currentEnrollment?.groupId ?? '')) {
           const group = groups.find((g) => g.id === form.groupId);
@@ -331,18 +345,17 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit} loading={saving} disabled={missingSecondPhone || !form.fullName.trim() || !form.phone.trim()}>
+          <Button onClick={handleSubmit} loading={saving} disabled={missingSecondPhone || !form.firstName.trim() || !form.phone.trim()}>
             Сохранить
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input
-          label="Имя"
-          required
-          value={form.fullName}
-          onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+        <NameFields
+          firstName={form.firstName}
+          lastName={form.lastName}
+          onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
         />
         <Input
           label="Телефон"

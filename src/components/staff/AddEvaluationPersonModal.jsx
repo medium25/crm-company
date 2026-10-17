@@ -8,6 +8,8 @@ import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { EVALUATION_PALETTE } from '../../lib/colors.js';
 import { operatorInitials } from '../leads/LeadCard.jsx';
+import { joinName } from '../../lib/personName.js';
+import { NameFields } from '../shared/NameFields.jsx';
 
 /**
  * Добавление человека в «Оценка сотрудников» без логина в CRM — для тех,
@@ -19,13 +21,16 @@ import { operatorInitials } from '../leads/LeadCard.jsx';
 export function AddEvaluationPersonModal({ open, onClose }) {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const fullName = joinName(firstName, lastName);
   const [title, setTitle] = useState('');
   const [color, setColor] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
-    setFullName('');
+    setFirstName('');
+    setLastName('');
     setTitle('');
     setColor(null);
   };
@@ -41,7 +46,9 @@ export function AddEvaluationPersonModal({ open, onClose }) {
     setSaving(true);
     try {
       await addDoc(collection(db, 'evaluationStaff'), {
-        fullName: fullName.trim(),
+        fullName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         title: title.trim(),
         color,
         isActive: true,
@@ -74,7 +81,14 @@ export function AddEvaluationPersonModal({ open, onClose }) {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input label="Имя" placeholder="Shahnoza Yusupova" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        <NameFields
+          firstName={firstName}
+          lastName={lastName}
+          onChange={(patch) => {
+            if (patch.firstName !== undefined) setFirstName(patch.firstName);
+            if (patch.lastName !== undefined) setLastName(patch.lastName);
+          }}
+        />
         <Input label="Звание" placeholder="Маркетолог" required value={title} onChange={(e) => setTitle(e.target.value)} />
         <div>
           <p className="mb-2 text-small text-muted">Цвет</p>

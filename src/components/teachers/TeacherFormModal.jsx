@@ -8,8 +8,10 @@ import { cascadeTeacherName, createTeacherWithStaffAccount } from '../../lib/tea
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
+import { joinName, nameParts } from '../../lib/personName.js';
+import { NameFields } from '../shared/NameFields.jsx';
 
-const EMPTY_FORM = { displayName: '', fullName: '', phone: '', password: '' };
+const EMPTY_FORM = { displayName: '', firstName: '', lastName: '', phone: '', password: '' };
 
 /**
  * Модалка добавления/редактирования учителя. `teacher` = null (закрыто),
@@ -31,7 +33,7 @@ export function TeacherFormModal({ teacher, onClose }) {
     if (!teacher) return;
     setForm({
       displayName: teacher.displayName ?? '',
-      fullName: teacher.fullName ?? '',
+      ...nameParts(teacher),
       phone: teacher.phone ?? '',
       password: '',
     });
@@ -47,12 +49,16 @@ export function TeacherFormModal({ teacher, onClose }) {
     setSaving(true);
     try {
       const displayName = form.displayName.trim();
-      const fullName = form.fullName.trim();
+      const firstName = form.firstName.trim();
+      const lastName = form.lastName.trim();
+      const fullName = joinName(firstName, lastName);
       const phone = form.phone.replace(/\D/g, '');
       if (isEdit) {
         await updateDoc(doc(db, 'teachers', teacher.id), {
           displayName,
           fullName,
+          firstName,
+          lastName,
           phone,
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
@@ -66,7 +72,7 @@ export function TeacherFormModal({ teacher, onClose }) {
         // профиль учителя (группы/расписание), и логин в CRM (роль 'teacher'),
         // связанные staffUid/teacherId. Иначе учитель, заведённый отсюда, не
         // попадает в «Сотрудники» и не может зайти (см. MS OSUDA, 2026-10-08).
-        await createTeacherWithStaffAccount(db, { displayName, fullName, phone, password: form.password, activeBranchId }, user);
+        await createTeacherWithStaffAccount(db, { displayName, fullName, firstName, lastName, phone, password: form.password, activeBranchId }, user);
         showToast('Учитель добавлен — и профиль, и логин в CRM.');
       }
       onClose();
@@ -102,11 +108,11 @@ export function TeacherFormModal({ teacher, onClose }) {
           value={form.displayName}
           onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
         />
-        <Input
-          label="Полное имя"
-          placeholder="Sanjar Karimov"
-          value={form.fullName}
-          onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+        <NameFields
+          firstName={form.firstName}
+          lastName={form.lastName}
+          firstNameRequired={false}
+          onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
         />
         <Input
           label="Телефон"

@@ -52,7 +52,7 @@ export async function cascadeTeacherName(db, teacherId, displayName) {
  * @param {{uid: string}} user
  * @returns {Promise<{teacherId: string, staffUid: string}>}
  */
-export async function createTeacherWithStaffAccount(db, { displayName, fullName, phone, password, activeBranchId }, user) {
+export async function createTeacherWithStaffAccount(db, { displayName, fullName, firstName = '', lastName = '', phone, password, activeBranchId }, user) {
   const authEmail = phoneToAuthEmail(phone);
   const tempApp = initializeApp(firebaseConfig, `teacher-create-${Date.now()}`);
   try {
@@ -64,6 +64,8 @@ export async function createTeacherWithStaffAccount(db, { displayName, fullName,
       teacherRef = await addDoc(collection(db, 'teachers'), {
         displayName,
         fullName,
+        firstName,
+        lastName,
         phone,
         branchId: activeBranchId,
         branchIds: [activeBranchId],
@@ -76,6 +78,8 @@ export async function createTeacherWithStaffAccount(db, { displayName, fullName,
       });
       await setDoc(doc(db, 'staff', newUser.uid), {
         fullName,
+        firstName,
+        lastName,
         phone,
         email: '',
         role: 'teacher',

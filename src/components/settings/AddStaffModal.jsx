@@ -14,6 +14,8 @@ import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
 import { ROLE_OPTIONS, TEST_SECTION_OPTIONS, assignableRoleOptions } from '../../lib/roles.js';
+import { joinName, nameParts } from '../../lib/personName.js';
+import { NameFields } from '../shared/NameFields.jsx';
 
 const teachersQuery = db ? query(collection(db, 'teachers'), where('isArchived', '==', false), orderBy('displayName')) : null;
 
@@ -42,7 +44,9 @@ export function AddStaffModal({ member, onClose }) {
   const { role: callerRole } = useRole();
   const { showToast } = useToast();
   const { data: teachers } = useCollection(teachersQuery);
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const fullName = joinName(firstName, lastName);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [passwordEdited, setPasswordEdited] = useState(false);
@@ -59,7 +63,9 @@ export function AddStaffModal({ member, onClose }) {
 
   useEffect(() => {
     if (!member) return;
-    setFullName(member.fullName ?? '');
+    const parts = nameParts(member);
+    setFirstName(parts.firstName);
+    setLastName(parts.lastName);
     setPhone(localPhone(member.phone));
     setPassword('');
     setPasswordEdited(false);
@@ -69,7 +75,8 @@ export function AddStaffModal({ member, onClose }) {
   }, [member]);
 
   const reset = () => {
-    setFullName('');
+    setFirstName('');
+    setLastName('');
     setPhone('');
     setPassword('');
     setPasswordEdited(false);
@@ -100,6 +107,8 @@ export function AddStaffModal({ member, onClose }) {
       if (isEdit) {
         await updateDoc(doc(db, 'staff', member.id), {
           fullName,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           role,
           teacherId: role === 'teacher' ? teacherId || null : null,
           allowedSections: role === 'test' ? allowedSections : [],
@@ -121,6 +130,8 @@ export function AddStaffModal({ member, onClose }) {
         try {
           await setDoc(doc(db, 'staff', newUser.uid), {
             fullName,
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
             phone: fullPhone,
             email: '',
             role,
@@ -190,7 +201,15 @@ export function AddStaffModal({ member, onClose }) {
         </p>
       )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input label="Имя" required disabled={roleLocked} value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        <NameFields
+          firstName={firstName}
+          lastName={lastName}
+          disabled={roleLocked}
+          onChange={(patch) => {
+            if (patch.firstName !== undefined) setFirstName(patch.firstName);
+            if (patch.lastName !== undefined) setLastName(patch.lastName);
+          }}
+        />
         <Select
           label="Должность"
           options={roleLocked ? ROLE_OPTIONS : roleOptions}
@@ -247,7 +266,11 @@ export function AddStaffModal({ member, onClose }) {
               // чтобы логин не завести с другим именем/номером по ошибке.
               const picked = teachers.find((t) => t.id === id);
               if (picked && !isEdit) {
-                if (!fullName) setFullName(picked.fullName || picked.displayName);
+                if (!fullName) {
+                  const parts = nameParts({ fullName: picked.fullName || picked.displayName });
+                  setFirstName(parts.firstName);
+                  setLastName(parts.lastName);
+                }
                 if (!phone && picked.phone) handlePhoneChange(localPhone(picked.phone));
               }
             }}
