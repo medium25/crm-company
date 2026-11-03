@@ -18,7 +18,7 @@ export function BranchProvider({ children }) {
 
   const branchesQuery = useMemo(() => {
     if (!db || !staff) return null;
-    if (staff.role === 'ceo' || staff.role === 'manager' || staff.role === 'admin') {
+    if (staff.role === 'ceo' || staff.role === 'manager' || staff.role === 'admin' || staff.role === 'operator') {
       return query(collection(db, 'branches'), where('isArchived', '==', false));
     }
     if (!staff.branchIds?.length) return null;

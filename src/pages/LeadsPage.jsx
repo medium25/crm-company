@@ -338,10 +338,10 @@ export function LeadsPage() {
   }, [staffList]);
 
   // Операторы для выпадающего списка «Оператор» (см. панель фильтра ниже) —
-  // роль 'admin' в этом кодовой базе и есть call-center оператор (см.
+  // роли 'admin' и 'operator' в этой кодовой базе — call-center операторы (см.
   // src/lib/roles.js), ceo/manager сами лиды не ведут.
   const operatorOptions = useMemo(
-    () => staffList.filter((s) => s.role === 'admin').sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    () => staffList.filter((s) => s.role === 'admin' || s.role === 'operator').sort((a, b) => a.fullName.localeCompare(b.fullName)),
     [staffList],
   );
 

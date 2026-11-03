@@ -13,7 +13,7 @@ import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Input } from '../ui/Input.jsx';
 import { Select } from '../ui/Select.jsx';
-import { ROLE_OPTIONS, TEST_SECTION_OPTIONS, assignableRoleOptions } from '../../lib/roles.js';
+import { ROLE_OPTIONS, SECTION_OPTIONS, CUSTOM_SECTION_ROLES, DEFAULT_SECTIONS, assignableRoleOptions } from '../../lib/roles.js';
 import { joinName, nameParts } from '../../lib/personName.js';
 import { NameFields } from '../shared/NameFields.jsx';
 
@@ -58,7 +58,7 @@ export function AddStaffModal({ member, onClose }) {
   const isEdit = Boolean(member?.id);
   // admin не может назначать роли выше «Учитель» — ни новым, ни уже
   // заведённым не-учителям (бэкенд это же требует в firestore.rules).
-  const roleLocked = callerRole === 'admin' && isEdit && member.role !== 'teacher';
+  const roleLocked = (callerRole === 'admin' || callerRole === 'operator') && isEdit && member.role !== 'teacher';
   const roleOptions = assignableRoleOptions(callerRole);
 
   useEffect(() => {
@@ -85,8 +85,20 @@ export function AddStaffModal({ member, onClose }) {
     setAllowedSections([]);
   };
 
+  // Ручной выбор разделов меню — у manager/admin/operator/test. Пока у manager/admin/operator список не выбран,
+  // в форме отмечен набор по умолчанию для роли; если выбор совпал с ним, хранится пустой список (= «по роли»).
+  const hasCustomSections = CUSTOM_SECTION_ROLES.includes(role);
+  const defaultSections = DEFAULT_SECTIONS[role] ?? [];
+  const selectedSections = role === 'test' || allowedSections.length > 0 ? allowedSections : defaultSections;
+  const sectionsToSave = () => {
+    if (!hasCustomSections) return [];
+    if (role === 'test') return allowedSections;
+    const sameAsDefault = selectedSections.length === defaultSections.length && selectedSections.every((k) => defaultSections.includes(k));
+    return sameAsDefault ? [] : selectedSections;
+  };
+
   const toggleSection = (key) => {
-    setAllowedSections((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+    setAllowedSections(selectedSections.includes(key) ? selectedSections.filter((k) => k !== key) : [...selectedSections, key]);
   };
 
   const handleClose = () => {
@@ -111,7 +123,7 @@ export function AddStaffModal({ member, onClose }) {
           lastName: lastName.trim(),
           role,
           teacherId: role === 'teacher' ? teacherId || null : null,
-          allowedSections: role === 'test' ? allowedSections : [],
+          allowedSections: sectionsToSave(),
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
         });
@@ -137,7 +149,7 @@ export function AddStaffModal({ member, onClose }) {
             role,
             branchIds: activeBranchId ? [activeBranchId] : [],
             teacherId: role === 'teacher' ? teacherId || null : null,
-            allowedSections: role === 'test' ? allowedSections : [],
+            allowedSections: sectionsToSave(),
             isActive: true,
             createdAt: serverTimestamp(),
             createdBy: user.uid,
@@ -277,23 +289,27 @@ export function AddStaffModal({ member, onClose }) {
           />
         )}
 
-        {role === 'test' && (
+        {hasCustomSections && (
           <div>
-            <span className="mb-1 block text-[13px] text-muted">Доступные разделы</span>
-            <div className="flex flex-col gap-1.5 rounded-field border border-border-strong p-3">
-              {TEST_SECTION_OPTIONS.map((opt) => (
+            <span className="mb-1 block text-[13px] text-muted">Разделы в боковой панели</span>
+            <div className="grid grid-cols-1 gap-1.5 rounded-field border border-border-strong p-3 sm:grid-cols-2">
+              {SECTION_OPTIONS.map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 text-[14px] text-text">
                   <input
                     type="checkbox"
-                    checked={allowedSections.includes(opt.value)}
+                    checked={selectedSections.includes(opt.value)}
+                    disabled={roleLocked}
                     onChange={() => toggleSection(opt.value)}
                   />
                   {opt.label}
                 </label>
               ))}
             </div>
-            {allowedSections.length === 0 && (
+            {role === 'test' && selectedSections.length === 0 && (
               <p className="mt-1 text-[12px] text-danger">Не выбрано ни одного раздела — сотрудник не увидит меню совсем.</p>
+            )}
+            {role !== 'test' && (
+              <p className="mt-1 text-[12px] text-muted">Скрывает пункты меню и прямой вход по ссылке. Доступ к данным определяется должностью.</p>
             )}
           </div>
         )}

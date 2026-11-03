@@ -1,4 +1,5 @@
 import { useAuth } from './useAuth.js';
+import { visibleSectionKeys } from '../lib/roles.js';
 
 /**
  * Права читаются и здесь (UI), и в Firestore Rules — UI-проверка не защита,
@@ -11,6 +12,7 @@ import { useAuth } from './useAuth.js';
  *   isTeacher: boolean,
  *   isTest: boolean,
  *   allowedSections: string[],
+ *   sectionKeys: string[],
  *   hasRole: (...roles: import('../types.js').Role[]) => boolean,
  * }}
  */
@@ -22,13 +24,14 @@ export function useRole() {
   return {
     role,
     branchIds,
-    isAdmin: role === 'ceo' || role === 'manager' || role === 'admin',
+    isAdmin: role === 'ceo' || role === 'manager' || role === 'admin' || role === 'operator',
     isTeacher: role === 'teacher',
     isTest: role === 'test',
-    // Только для role === 'test' — какие разделы меню ему вручную открыли
-    // (см. AddStaffModal, Sidebar.ROLE_ITEM_KEYS). У остальных ролей пусто,
-    // у них список разделов фиксирован по роли, не по сотруднику.
+    // Вручную выбранные разделы меню (см. AddStaffModal): у test — единственный источник, у
+    // manager/admin/operator — переопределяет набор по умолчанию, если не пуст.
     allowedSections: staff?.allowedSections ?? [],
+    // Итоговый список разделов меню этого сотрудника (Sidebar, ProtectedRoute, HomeRoute).
+    sectionKeys: visibleSectionKeys(role, staff?.allowedSections ?? []),
     hasRole: (...roles) => roles.includes(role),
   };
 }

@@ -6,7 +6,7 @@ service cloud.firestore {
     function role()       { return staff().role; }
     function branches()   { return staff().branchIds; }
     function inBranch(b)  { return b in branches(); }
-    // ceo/manager/admin — равнозначные должности полного доступа. test —
+    // ceo/manager/admin — равнозначные должности полного доступа, operator (call-center) — как admin. test —
     // тестовый сотрудник (UI показывает ему только выбранные разделы,
     // staff.allowedSections), но на бэкенде по правам приравнен к admin —
     // это осознанный компромисс: без этого «Заявки»/«Студенты» физически
@@ -14,10 +14,10 @@ service cloud.firestore {
     // а точечное разграничение по разделам внутри одной коллекции students
     // (лиды и студенты — одна и та же коллекция) для правил не стоило
     // усложнения. Ограничен так же, как admin — см. match /staff ниже.
-    function isAdmin()    { return role() in ['ceo', 'manager', 'admin', 'test']; }
+    function isAdmin()    { return role() in ['ceo', 'manager', 'admin', 'operator', 'test']; }
     function isTeacher()  { return role() == 'teacher'; }
     // admin/test — не полноправные, ограничены ниже (staff/branches/courses и т.п.).
-    function isCapped()   { return role() in ['admin', 'test']; }
+    function isCapped()   { return role() in ['admin', 'operator', 'test']; }
     function teachesGroup(gid) {
       return isTeacher() &&
         get(/databases/$(db)/documents/groups/$(gid)).data.teacherId == staff().teacherId;

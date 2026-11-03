@@ -32,6 +32,9 @@ import { UiKitShowcasePage } from './pages/UiKitShowcasePage.jsx';
 // разрешённый экран (Sidebar.ITEMS держит то же самое для пунктов меню,
 // тут своя копия — секций мало и они не меняются часто).
 const SECTION_PATHS = {
+  dashboard: '/',
+  staff: '/staff',
+  settings: '/settings',
   leads: '/leads',
   trials: '/trials',
   tasks: '/tasks',
@@ -42,13 +45,13 @@ const SECTION_PATHS = {
 
 // Учитель в меню не видит «Дашборд» — прямой заход на '/' уводит его сразу
 // в «Учителя и группы», чтобы не показывать общий дашборд по URL в обход
-// меню. Тест — так же, на первый разрешённый ему раздел (staff.allowedSections);
-// если у него вообще нет разрешённых разделов — понятное сообщение, не пустой дашборд.
+// меню. Остальные — так же, если «Дашборда» нет в их списке разделов, на первый разрешённый;
+// если разрешённых разделов вообще нет — понятное сообщение, не пустой дашборд.
 function HomeRoute() {
-  const { isTeacher, isTest, allowedSections } = useRole();
+  const { isTeacher, sectionKeys } = useRole();
   if (isTeacher) return <Navigate to="/teachers-groups" replace />;
-  if (isTest) {
-    const firstPath = allowedSections.map((key) => SECTION_PATHS[key]).find(Boolean);
+  if (!sectionKeys.includes('dashboard')) {
+    const firstPath = sectionKeys.map((key) => SECTION_PATHS[key]).find((p) => p && p !== '/');
     if (firstPath) return <Navigate to={firstPath} replace />;
     return (
       <div className="flex h-full items-center justify-center p-10 text-center text-[15px] text-muted">
@@ -159,7 +162,7 @@ function App() {
                 <Route
                   path="courses"
                   element={
-                    <ProtectedRoute allow={['ceo', 'manager', 'admin']}>
+                    <ProtectedRoute allow={['ceo', 'manager', 'admin', 'operator']}>
                       <CoursesPage />
                     </ProtectedRoute>
                   }
@@ -167,7 +170,7 @@ function App() {
                 <Route
                   path="rooms"
                   element={
-                    <ProtectedRoute allow={['ceo', 'manager', 'admin']}>
+                    <ProtectedRoute allow={['ceo', 'manager', 'admin', 'operator']}>
                       <RoomsPage />
                     </ProtectedRoute>
                   }
@@ -215,7 +218,7 @@ function App() {
                 <Route
                   path="staff"
                   element={
-                    <ProtectedRoute allow={['ceo', 'manager']}>
+                    <ProtectedRoute allow={['ceo', 'manager']} section="staff">
                       <StaffPage />
                     </ProtectedRoute>
                   }
@@ -223,7 +226,7 @@ function App() {
                 <Route
                   path="staff/:dept"
                   element={
-                    <ProtectedRoute allow={['ceo', 'manager']}>
+                    <ProtectedRoute allow={['ceo', 'manager']} section="staff">
                       <StaffPage />
                     </ProtectedRoute>
                   }
@@ -231,7 +234,7 @@ function App() {
                 <Route
                   path="staff/:dept/:teacherId"
                   element={
-                    <ProtectedRoute allow={['ceo', 'manager']}>
+                    <ProtectedRoute allow={['ceo', 'manager']} section="staff">
                       <StaffPage />
                     </ProtectedRoute>
                   }
@@ -239,7 +242,7 @@ function App() {
                 <Route
                   path="staff/:dept/:teacherId/:section"
                   element={
-                    <ProtectedRoute allow={['ceo', 'manager']}>
+                    <ProtectedRoute allow={['ceo', 'manager']} section="staff">
                       <StaffPage />
                     </ProtectedRoute>
                   }
@@ -247,7 +250,7 @@ function App() {
                 <Route
                   path="settings"
                   element={
-                    <ProtectedRoute allow={['ceo', 'manager', 'admin']}>
+                    <ProtectedRoute allow={['ceo', 'manager', 'admin', 'operator']} section="settings">
                       <SettingsPage />
                     </ProtectedRoute>
                   }

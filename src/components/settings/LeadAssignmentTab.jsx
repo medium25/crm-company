@@ -15,6 +15,7 @@ import { DropdownMenu } from '../ui/DropdownMenu.jsx';
 import { OperatorScheduleModal } from './OperatorScheduleModal.jsx';
 import { OperatorLeadsPanel } from './OperatorLeadsPanel.jsx';
 import { TransferAllLeadsModal } from './TransferAllLeadsModal.jsx';
+import { OPERATOR_POOL_ROLES } from '../../lib/roles.js';
 
 /**
  * Кто получает новых лидов и с каким приоритетом — настройка вместо
@@ -34,7 +35,7 @@ export function LeadAssignmentTab() {
         ? query(
             collection(db, 'staff'),
             where('branchIds', 'array-contains', activeBranchId),
-            where('role', 'in', ['ceo', 'manager', 'admin']),
+            where('role', 'in', OPERATOR_POOL_ROLES),
             orderBy('fullName'),
           )
         : null,

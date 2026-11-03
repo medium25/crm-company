@@ -504,7 +504,7 @@ export function TasksPage() {
   );
   const { data: staffList } = useCollection(staffQuery);
   const operatorOptions = useMemo(
-    () => staffList.filter((s) => s.role === 'admin').sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    () => staffList.filter((s) => s.role === 'admin' || s.role === 'operator').sort((a, b) => a.fullName.localeCompare(b.fullName)),
     [staffList],
   );
 

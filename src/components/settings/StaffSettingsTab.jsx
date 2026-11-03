@@ -159,7 +159,7 @@ export function StaffSettingsTab() {
       render: (m) => {
         // Админ не назначает роли выше «Учитель» — ни новым, ни уже
         // заведённым не-учителям (см. lib/roles.js + firestore.rules).
-        const locked = callerRole === 'admin' && m.role !== 'teacher';
+        const locked = (callerRole === 'admin' || callerRole === 'operator') && m.role !== 'teacher';
         return (
           <Select
             options={locked ? ROLE_OPTIONS : assignableRoleOptions(callerRole)}
@@ -178,7 +178,7 @@ export function StaffSettingsTab() {
         // Тот же расклад прав, что у 'role'/'__actions' выше: admin не
         // может трогать документы не-учителей (firestore.rules — update на
         // staff требует role()!='admin' ИЛИ resource.role=='teacher').
-        const locked = callerRole === 'admin' && m.role !== 'teacher';
+        const locked = (callerRole === 'admin' || callerRole === 'operator') && m.role !== 'teacher';
         return (
           <div className="flex gap-1.5">
             {PALETTE.map((c) => (
@@ -223,7 +223,7 @@ export function StaffSettingsTab() {
       key: '__actions',
       label: '',
       render: (m) => {
-        const editLocked = callerRole === 'admin' && m.role !== 'teacher';
+        const editLocked = (callerRole === 'admin' || callerRole === 'operator') && m.role !== 'teacher';
         return (
           <DropdownMenu
             items={[
@@ -247,14 +247,12 @@ export function StaffSettingsTab() {
     },
   ];
 
-  // Визуальные папки по роли — ролей в базе пока 5 (ceo/manager/admin/teacher/
-  // test, см. lib/roles.js), «Администратор» и «Оператор» — одна и та же роль
-  // 'admin' (call-center в этой CRM ведут те же люди, что числятся
-  // администраторами), поэтому их папка объединена. «Маркетологи» — такой
+  // Визуальные папки по роли (см. lib/roles.js): «Администратор» (admin) и «Оператор» (operator) — в одной папке,
+  // call-center в этой CRM ведут и те, и другие. «Маркетологи» — такой
   // роли в системе ещё нет, папка стоит пустой заглушкой, пока не заведут.
   const STAFF_GROUPS = [
     { title: 'Менеджмент', match: (m) => m.role === 'ceo' || m.role === 'manager' },
-    { title: 'Администраторы / Операторы', match: (m) => m.role === 'admin' },
+    { title: 'Администраторы / Операторы', match: (m) => m.role === 'admin' || m.role === 'operator' },
     { title: 'Учителя', match: (m) => m.role === 'teacher' },
     { title: 'Маркетологи', match: () => false },
     { title: 'Тестовые', match: (m) => m.role === 'test' },

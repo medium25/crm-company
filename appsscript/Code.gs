@@ -525,7 +525,7 @@ function nextLeastLoadedOperator_(branchId, createdAt) {
       runQuery_(
         'staff',
         [
-          { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
+          { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin', 'operator'] },
           { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
         ],
         { limit: 30 },
@@ -933,7 +933,7 @@ function checkAndSendDailyOperatorReportsImpl_() {
       runQuery_(
         'staff',
         [
-          { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
+          { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin', 'operator'] },
           { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
         ],
         { limit: 30 },
@@ -991,7 +991,7 @@ function previewDailyOperatorReports() {
   const operators = runQuery_(
     'staff',
     [
-      { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin'] },
+      { field: 'role', op: 'IN', value: ['ceo', 'manager', 'admin', 'operator'] },
       { field: 'branchIds', op: 'ARRAY_CONTAINS', value: branchId },
     ],
     { limit: 30 },

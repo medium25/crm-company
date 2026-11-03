@@ -93,14 +93,14 @@ export function StudentFormModal({ student, onClose, onCreated, createMode = 'le
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEnrollment?.groupId, isTrialStatus, student?.id]);
   // Ответственного выбирает сам при любом ручном создании — только из
-  // реальных операторов (role='admin', тот же фильтр, что и в
+  // реальных операторов (role='admin'/'operator', тот же фильтр, что и в
   // src/components/settings/LeadAssignmentTab.jsx), без «безличного»
   // варианта — лид/студент не должен оставаться без ответственного.
   const needsOperatorPick = !isEdit;
   const staffQuery = useMemo(
     () =>
       db && activeBranchId && needsOperatorPick
-        ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId), where('role', '==', 'admin'))
+        ? query(collection(db, 'staff'), where('branchIds', 'array-contains', activeBranchId), where('role', 'in', ['admin', 'operator']))
         : null,
     [activeBranchId, needsOperatorPick],
   );

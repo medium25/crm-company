@@ -22,7 +22,7 @@ import iconWordmark from '../../../public/icon-wordmark.png';
 
 
 /**
- * Полный список пунктов меню. Видимость по роли — см. ROLE_ITEM_KEYS ниже.
+ * Полный список пунктов меню. Видимость — useRole().sectionKeys (роль по умолчанию или ручной выбор в AddStaffModal).
  * «Группы» и «Учителя» объединены в один пункт «Учителя и группы» —
  * список учителей, клик по учителю открывает его группы (TeachersAndGroupsPage).
  * Учитель — частный случай: видит только «Учителя и группы» (04 · Экраны, «Оболочка приложения»).
@@ -40,30 +40,16 @@ const ITEMS = [
 ];
 
 /**
- * ceo/manager/admin — полный доступ, teacher — только «Учителя и группы»
- * (те же группы, что раньше). test — набор не фиксирован тут, у каждого
- * сотрудника свой (см. staff.allowedSections, ручная настройка в
- * AddStaffModal) — см. использование ниже.
- */
-const ROLE_ITEM_KEYS = {
-  ceo: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'staff', 'settings'],
-  manager: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'staff', 'settings'],
-  admin: ['dashboard', 'leads', 'trials', 'tasks', 'students', 'teachersGroups', 'payments', 'settings'],
-  teacher: ['teachersGroups'],
-};
-
-/**
  * @param {Object} props
  * @param {number} [props.leadsCount] живой счётчик у пункта «Лиды»
  * @param {boolean} [props.mobileOpen] выдвижное меню открыто (< md, кнопка-гамбургер в Topbar)
  * @param {() => void} [props.onMobileClose]
  */
 export function Sidebar({ leadsCount, mobileOpen = false, onMobileClose }) {
-  const { role, isTest, allowedSections } = useRole();
+  const { sectionKeys } = useRole();
   const [collapsed, toggle] = useSidebarCollapsed();
 
-  const visibleKeys = isTest ? allowedSections : (ROLE_ITEM_KEYS[role] ?? []);
-  const items = ITEMS.filter((item) => visibleKeys.includes(item.key));
+  const items = ITEMS.filter((item) => sectionKeys.includes(item.key));
 
   return (
     <>

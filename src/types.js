@@ -4,9 +4,9 @@
  */
 
 /**
- * @typedef {'ceo' | 'manager' | 'admin' | 'teacher' | 'test'} Role ceo/manager/admin — равнозначный полный
- * доступ. test — тестовый сотрудник, видит только разделы из Staff.allowedSections (ручная настройка на
- * сотруднике, не фиксированный список как у остальных ролей); защита только на уровне UI (меню/роуты), не
+ * @typedef {'ceo' | 'manager' | 'admin' | 'operator' | 'teacher' | 'test'} Role ceo/manager/admin/operator — полный
+ * доступ. test — тестовый сотрудник, видит только разделы из Staff.allowedSections; у manager/admin/operator
+ * Staff.allowedSections — необязательная ручная настройка меню (пусто — набор по умолчанию для роли); защита только на уровне UI (меню/роуты), не
  * Firestore rules — см. useRole.js.
  */
 
@@ -31,7 +31,7 @@
  * @property {Role} role
  * @property {string[]} branchIds
  * @property {string|null} teacherId заполнен, если role === 'teacher'
- * @property {string[]} [allowedSections] заполнено, если role === 'test' — ключи из Sidebar.ITEMS
+ * @property {string[]} [allowedSections] ключи из Sidebar.ITEMS — для test обязательно, для manager/admin/operator необязательно
  * @property {boolean} isActive
  */
 

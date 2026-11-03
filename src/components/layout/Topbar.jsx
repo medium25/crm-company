@@ -3,17 +3,11 @@ import { ChevronDown, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useRole } from '../../hooks/useRole.js';
 import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed.js';
+import { ROLE_LABELS } from '../../lib/roles.js';
 import { GlobalSearch } from './GlobalSearch.jsx';
 import iconMark from '../../../public/icon-mark.png';
 import iconWordmark from '../../../public/icon-wordmark.png';
 
-const ROLE_LABELS = {
-  ceo: 'CEO',
-  manager: 'Менеджер',
-  admin: 'Администратор',
-  teacher: 'Учитель',
-  test: 'Тестовый сотрудник',
-};
 
 /**
  * @param {Object} props
