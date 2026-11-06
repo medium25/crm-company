@@ -3,7 +3,7 @@ import { Badge } from './Badge.jsx';
 /**
  * Ячейка сетки посещаемости, 05 · Дизайн-система.
  * Состояния: Был/Нет (бейдж), пусто-не-отмечено (кликабельно), будущий урок
- * (круг, disabled). Вне периода обучения студента — родитель просто не
+ * (пустая бледная клетка, disabled). Вне периода обучения студента — родитель просто не
  * рендерит ячейку вообще (return null на его стороне), сюда такое не передаём.
  * `muted` — день из ПРЕЖНЕЙ группы студента (см. AttendanceTab.jsx
  * resolveCell): та же Был/Нет-отметка, но серым и некликабельно — своя
@@ -42,7 +42,8 @@ export function AttendanceCell({ status, future = false, muted = false, onClick 
   }
 
   if (future) {
-    return <span className="mx-auto block h-8 w-8 rounded-full border border-border-strong" aria-hidden="true" />;
+    // Будущий урок — такая же пустая клетка, как неотмеченная, только некликабельная и бледнее.
+    return <span className="mx-auto block h-8 w-14 rounded-badge border border-border-strong opacity-50" aria-hidden="true" />;
   }
 
   if (muted) {

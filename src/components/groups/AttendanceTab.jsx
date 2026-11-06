@@ -24,7 +24,7 @@ import { useToast } from '../ui/Toast.jsx';
 import { AttendanceCell } from '../ui/AttendanceCell.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { Skeleton } from '../ui/Skeleton.jsx';
-import { generateLessonsForMonth } from '../../lib/schedule.js';
+import { generateLessonsForMonth, scheduleDatesInRange } from '../../lib/schedule.js';
 
 const todayStart = () => {
   const d = new Date();
@@ -199,15 +199,24 @@ export function AttendanceTab({ group }) {
     setOverrides(new Map());
   }, [attendanceDocs]);
 
+  // Уроки при создании группы пишутся скользящим окном на 3 месяца вперёд — дальше месяц оказывается
+  // заполнен частично (напр. только 2 и 4 ноября). Поэтому не ждём пустого месяца, а сверяем с расписанием
+  // и дописываем недостающие (идемпотентно, существующие уроки не трогаются). Раз на месяц за открытие вкладки.
   useEffect(() => {
-    if (lessonsLoading || lessons.length > 0 || attemptedMonths.current.has(monthStr)) return;
+    if (lessonsLoading || attemptedMonths.current.has(monthStr)) return;
+    const [year, month] = monthStr.split('-').map(Number);
+    const from = new Date(Math.max(group.startDate.toDate().getTime(), new Date(year, month - 1, 1).getTime()));
+    const to = new Date(Math.min(group.endDate.toDate().getTime(), new Date(year, month, 0).getTime()));
+    const existing = new Set(lessons.map((l) => l.dateKey));
+    const missing = scheduleDatesInRange(group.schedule, from, to).some((d) => !existing.has(format(d, 'yyyy-MM-dd')));
+    if (!missing) return;
     attemptedMonths.current.add(monthStr);
     generateLessonsForMonth(db, {
       ...group,
       startDate: group.startDate.toDate(),
       endDate: group.endDate.toDate(),
     }, monthStr).catch(() => showToast('Не удалось догенерировать уроки месяца.', { type: 'error' }));
-  }, [lessonsLoading, lessons.length, monthStr, group, showToast]);
+  }, [lessonsLoading, lessons, monthStr, group, showToast]);
 
   const attendanceMap = useMemo(() => {
     const map = new Map();
