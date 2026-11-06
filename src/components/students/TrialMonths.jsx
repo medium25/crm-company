@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, Timestamp } from 'firebase/firestore';
-import { differenceInCalendarDays, format, startOfMonth, subMonths } from 'date-fns';
+import { collection, doc, query, serverTimestamp, updateDoc, where, Timestamp } from 'firebase/firestore';
+import { addMonths, differenceInCalendarDays, endOfMonth, format, startOfMonth, subMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { CalendarDays, ChevronDown, GraduationCap } from 'lucide-react';
 import { db } from '../../firebase.js';
@@ -10,12 +10,16 @@ import { useCollection } from '../../hooks/useCollection.js';
 import { isTrialLeft } from '../../lib/stats.js';
 import { formatPhone, formatDate, pluralize } from '../../lib/format.js';
 import { Badge } from '../ui/Badge.jsx';
+import { useToast } from '../ui/Toast.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { Skeleton } from '../ui/Skeleton.jsx';
 
 export const TRIAL_MONTHS = 6;
 
+const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 const ROW_GRID = 'grid grid-cols-[1.6fr_1.3fr_0.8fr_1fr_0.9fr_1.3fr] items-center gap-3';
+// «Плоский» вид («Пробные»): без деления по учителям, дата первой колонкой.
+const ROW_GRID_FLAT = 'grid grid-cols-[0.8fr_1.6fr_1.3fr_1fr_0.9fr_1.3fr] items-center gap-3';
 const STATUS_CLASS = {
   paid: 'bg-success-bg text-success',
   left: 'bg-danger/10 text-danger',
@@ -34,6 +38,40 @@ export function trialOutcome(student, now = new Date()) {
   return { key: 'wip', label: days === 0 ? 'Процесс · сегодня' : `Процесс · ${days} дн.` };
 }
 
+/** Комментарий к пробному (students.trialComment): правится прямо в таблице, сохраняется при уходе из поля. */
+function TrialCommentCell({ student }) {
+  const { showToast } = useToast();
+  const saved = student.trialComment ?? '';
+  const [value, setValue] = useState(saved);
+
+  useEffect(() => {
+    setValue(saved);
+  }, [saved]);
+
+  const save = async () => {
+    const next = value.trim();
+    if (next === saved) return;
+    try {
+      await updateDoc(doc(db, 'students', student.id), { trialComment: next, updatedAt: serverTimestamp() });
+    } catch {
+      setValue(saved);
+      showToast('Не удалось сохранить комментарий.', { type: 'error' });
+    }
+  };
+
+  return (
+    <input
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      onClick={(e) => e.stopPropagation()}
+      placeholder="Добавить комментарий"
+      className="h-8 w-full min-w-40 rounded-field border border-transparent bg-transparent px-2 text-control text-text placeholder:text-muted hover:border-border focus:border-navy focus:bg-white focus:outline-none"
+    />
+  );
+}
+
 function pickEnrollment(list) {
   if (!list?.length) return null;
   const live = list.filter((e) => e.status !== 'left' && e.status !== 'archived');
@@ -47,9 +85,18 @@ function pickEnrollment(list) {
  * @param {Object} props
  * @param {string} props.search поиск по имени/телефону
  * @param {Object[]} props.enrollments действующие записи филиала (страница уже их грузит)
+ * @param {number} [props.monthOffset] сдвиг показываемого месяца от текущего (0 — текущий, -1 — прошлый); «Пробные» листают им
+ * @param {number} [props.monthsCount] сколько последних месяцев показывать (по умолчанию 6; «Пробные» — только текущий)
+ * @param {boolean} [props.hideConversion] без полоски и процента оплативших в шапке месяца; «Пробные» — так
+ * @param {boolean} [props.hideHeader] без шапки месяца (заголовок рисует страница); «Пробные» — так
+ * @param {boolean} [props.lightTable] лёгкая таблица (тонкие линии, статус точкой) вместо строк-карточек; всегда без деления по учителям; «Пробные» — так
+ * @param {import('react').ComponentType} [props.headerIcon] иконка в шапке месяца (по умолчанию календарь)
+ * @param {boolean} [props.flat] один список по дате вместо деления по учителям, дата — первая колонка; «Пробные» — так
+ * @param {boolean} [props.plain] без цветной подложки месяца (только рамка), «Пробные» — так
+ * @param {boolean} [props.compactHeader] в шапке месяца только название и конверсия, без строки «оплатили / ушли / в процессе»
  * @param {(drilled: boolean) => void} [props.onDrillChange]
  */
-export function TrialMonths({ search, enrollments, onDrillChange }) {
+export function TrialMonths({ search, enrollments, onDrillChange, monthsCount = TRIAL_MONTHS, monthOffset = 0, compactHeader = false, plain = false, flat = false, hideConversion = false, lightTable = false, hideHeader = false, headerIcon: HeaderIcon = CalendarDays }) {
   const navigate = useNavigate();
   const { activeBranchId } = useBranch();
   const [open, setOpen] = useState(() => new Set([format(new Date(), 'yyyy-MM')]));
@@ -58,14 +105,15 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
     onDrillChange?.(false);
   }, [onDrillChange]);
 
-  const windowStart = useMemo(() => startOfMonth(subMonths(new Date(), TRIAL_MONTHS - 1)), []);
+  const baseMonth = useMemo(() => addMonths(startOfMonth(new Date()), monthOffset), [monthOffset]);
+  const windowStart = useMemo(() => startOfMonth(subMonths(baseMonth, monthsCount - 1)), [baseMonth, monthsCount]);
 
   const studentsQuery = useMemo(
     () =>
       db && activeBranchId
-        ? query(collection(db, 'students'), where('branchId', '==', activeBranchId), where('trialDate', '>=', Timestamp.fromDate(windowStart)))
+        ? query(collection(db, 'students'), where('branchId', '==', activeBranchId), where('trialDate', '>=', Timestamp.fromDate(windowStart)), where('trialDate', '<=', Timestamp.fromDate(endOfMonth(baseMonth))))
         : null,
-    [activeBranchId, windowStart],
+    [activeBranchId, windowStart, baseMonth],
   );
   const { data: students, loading, error } = useCollection(studentsQuery);
 
@@ -103,8 +151,8 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
       if (!byMonth.has(key)) byMonth.set(key, []);
       byMonth.get(key).push({ student: s, date, enr, teacher: enr.teacherName, outcome: trialOutcome(s, now) });
     }
-    return Array.from({ length: TRIAL_MONTHS }, (_, i) => {
-      const d = subMonths(startOfMonth(now), i);
+    return Array.from({ length: monthsCount }, (_, i) => {
+      const d = subMonths(baseMonth, i);
       const key = format(d, 'yyyy-MM');
       const label = format(d, 'LLLL yyyy', { locale: ru });
       const rows = byMonth.get(key) ?? [];
@@ -113,13 +161,15 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
         if (!teachers.has(r.teacher)) teachers.set(r.teacher, []);
         teachers.get(r.teacher).push(r);
       }
-      const groups = [...teachers.entries()]
-        .map(([name, list]) => [name, list.sort((a, b) => a.date - b.date)])
-        .sort((a, b) => a[0].localeCompare(b[0], 'ru'));
+      const groups = flat || lightTable
+        ? [['', [...teachers.values()].flat().sort((a, b) => a.date - b.date)]]
+        : [...teachers.entries()]
+            .map(([name, list]) => [name, list.sort((a, b) => a.date - b.date)])
+            .sort((a, b) => a[0].localeCompare(b[0], 'ru'));
       const count = (k) => rows.filter((r) => r.outcome.key === k).length;
       return { key, label: label.charAt(0).toUpperCase() + label.slice(1), total: rows.length, paid: count('paid'), left: count('left'), wip: count('wip'), groups };
     });
-  }, [students, enrollmentsByStudent, search]);
+  }, [students, enrollmentsByStudent, search, monthsCount, flat, lightTable, baseMonth]);
 
   const toggle = (key) =>
     setOpen((prev) => {
@@ -139,7 +189,7 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
     );
   }
   if (months.every((m) => m.total === 0)) {
-    return <EmptyState icon={GraduationCap} title={search.trim() ? 'Ничего не найдено' : 'Пробных за последние 6 месяцев нет'} />;
+    return <EmptyState icon={GraduationCap} title={search.trim() ? 'Ничего не найдено' : monthsCount === 1 ? 'Пробных в этом месяце нет' : `Пробных за последние ${monthsCount} месяцев нет`} />;
   }
 
   return (
@@ -147,65 +197,137 @@ export function TrialMonths({ search, enrollments, onDrillChange }) {
       {months.map((m, i) => {
         const hue = `rgb(var(--color-chart-${(i % 7) + 1}))`;
         const mix = (pct) => `color-mix(in srgb, ${hue} ${pct}%, rgb(var(--color-surface)))`;
-        const isOpen = open.has(m.key) && m.total > 0;
+        // Лёгкая таблица («Пробные»): месяц всегда раскрыт, без отдельной рамки и без стрелки — таблица прямо в карточке страницы.
+        const isOpen = (lightTable || open.has(m.key)) && m.total > 0;
         const paidPct = m.total ? Math.round((m.paid / m.total) * 100) : 0;
         return (
-          <section key={m.key} className="rounded-card border-[1.5px] px-4 py-3.5" style={{ backgroundColor: mix(14), borderColor: mix(38) }}>
-            <button
-              type="button"
-              onClick={() => m.total > 0 && toggle(m.key)}
-              aria-expanded={isOpen}
-              className="flex w-full items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-row text-white" style={{ backgroundColor: hue }}>
-                <CalendarDays className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
-              </span>
-              <span className="flex-1">
-                <span className="block text-title font-bold" style={{ color: `color-mix(in srgb, ${hue} 60%, rgb(var(--color-text)))` }}>
-                  {m.label}
+          <section
+            key={m.key}
+            className={lightTable ? '' : `rounded-card border-[1.5px] px-4 py-3.5 ${plain ? 'border-border' : ''}`}
+            style={plain ? undefined : { backgroundColor: mix(14), borderColor: mix(38) }}
+          >
+            {!hideHeader && (
+              <button
+                type="button"
+                onClick={() => !lightTable && m.total > 0 && toggle(m.key)}
+                aria-expanded={isOpen}
+                className={`flex w-full items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40 ${lightTable ? 'cursor-default' : ''}`}
+              >
+                <span
+                  className={`flex shrink-0 items-center justify-center rounded-row text-white ${lightTable ? 'h-9 w-9' : 'h-10 w-10'}`}
+                  style={{ backgroundColor: hue }}
+                >
+                  <HeaderIcon className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
                 </span>
-                <span className="block text-small text-muted">
-                  {m.total} {pluralize(m.total, ['пробный', 'пробных', 'пробных'])}
-                  {m.total > 0 && ` · оплатили ${m.paid} · ушли ${m.left} · в процессе ${m.wip}`}
-                </span>
-              </span>
-              {m.total > 0 && (
-                <>
-                  <span className="hidden h-2 w-32 shrink-0 rounded-badge sm:block" style={{ backgroundColor: mix(22) }} aria-hidden="true">
-                    <span className="block h-full rounded-badge" style={{ width: `${paidPct}%`, backgroundColor: hue }} />
+                <span className="flex-1">
+                  <span className={`block font-bold ${lightTable ? 'text-body' : 'text-title'}`} style={{ color: `color-mix(in srgb, ${hue} 60%, rgb(var(--color-text)))` }}>
+                    {m.label}
                   </span>
-                  <span className="w-10 shrink-0 text-right text-small font-bold text-text">{paidPct}%</span>
-                  <ChevronDown className={`h-5 w-5 shrink-0 text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-                </>
-              )}
-            </button>
+                  {!compactHeader && (
+                    <span className="block text-small text-muted">
+                      {m.total} {pluralize(m.total, ['пробный', 'пробных', 'пробных'])}
+                      {m.total > 0 && ` · оплатили ${m.paid} · ушли ${m.left} · в процессе ${m.wip}`}
+                    </span>
+                  )}
+                </span>
+                {m.total > 0 && (
+                  <>
+                    {!hideConversion && (
+                      <>
+                        <span className="hidden h-2 w-32 shrink-0 rounded-badge sm:block" style={{ backgroundColor: mix(22) }} aria-hidden="true">
+                          <span className="block h-full rounded-badge" style={{ width: `${paidPct}%`, backgroundColor: hue }} />
+                        </span>
+                        <span className="w-10 shrink-0 text-right text-small font-bold text-text">{paidPct}%</span>
+                      </>
+                    )}
+                    {!lightTable && (
+                      <ChevronDown className={`h-5 w-5 shrink-0 text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    )}
+                  </>
+                )}
+              </button>
+            )}
 
-            {isOpen && (
+            {isOpen && lightTable && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[40rem] border-collapse text-control text-text">
+                  <thead>
+                    <tr className="bg-chip text-left text-caption uppercase tracking-wide text-muted">
+                      {['Дата', 'Имя', 'Телефон', 'Учитель', 'Группа', 'Комментарий'].map((h) => (
+                        <th key={h} className="px-2 py-2 font-bold first:rounded-l-row last:rounded-r-row">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.groups
+                      .flatMap(([, list]) => list)
+                      .map((r) => {
+                        // Оплатил, ушёл или в архиве — остаётся в списке, вся строка зачёркнута, в комментарии «Оплатил» / «Удалён».
+                        const done = r.outcome.key !== 'wip' || Boolean(r.student.isArchived);
+                        const doneLabel = r.outcome.key === 'paid' && !r.student.isArchived ? 'Оплатил' : 'Удалён';
+                        return (
+                        <tr
+                          key={r.student.id}
+                          onClick={() => navigate(`/students/${r.student.id}`)}
+                          className={`cursor-pointer border-b border-border last:border-0 hover:bg-surface-alt ${
+                            done ? '[&>td]:text-muted [&>td]:line-through' : ''
+                          }`}
+                        >
+                          <td className="whitespace-nowrap px-2 py-3">{`${r.date.getDate()} ${MONTHS_SHORT[r.date.getMonth()]}`}</td>
+                          <td className="px-2 py-3 font-bold">{r.student.fullName}</td>
+                          <td className="whitespace-nowrap px-2 py-3 text-muted">{formatPhone(r.student.phone)}</td>
+                          <td className="px-2 py-3">{r.teacher}</td>
+                          <td className="px-2 py-3">{r.enr?.groupCode ? <Badge variant="group-code">{r.enr.groupCode}</Badge> : '—'}</td>
+                          <td className="px-1 py-2">
+                            {done ? (
+                              <span className="block px-2 text-control">
+                                {doneLabel}
+                                {r.student.trialComment ? ` · ${r.student.trialComment}` : ''}
+                              </span>
+                            ) : (
+                              <TrialCommentCell student={r.student} />
+                            )}
+                          </td>
+                        </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {isOpen && !lightTable && (
               <div className="mt-3 overflow-x-auto">
                 <div className="min-w-[44rem]">
-                  <div className={`${ROW_GRID} px-3 pt-1 text-caption text-muted`}>
+                  <div className={`${flat ? ROW_GRID_FLAT : ROW_GRID} px-3 pt-1 text-caption text-muted`}>
+                    {flat && <span>Дата</span>}
                     <span>Имя</span>
                     <span>Телефон</span>
-                    <span>Дата</span>
+                    {!flat && <span>Дата</span>}
                     <span>Учитель</span>
                     <span>Группа</span>
                     <span>Статус</span>
                   </div>
                   {m.groups.map(([teacher, rows]) => (
                     <div key={teacher} className="mb-2 last:mb-0">
-                      <p className="mb-1.5 mt-2 px-1 text-small font-bold" style={{ color: `color-mix(in srgb, ${hue} 60%, rgb(var(--color-text)))` }}>
-                        {teacher} · {rows.length}
-                      </p>
+                      {!flat && (
+                        <p className="mb-1.5 mt-2 px-1 text-small font-bold" style={{ color: `color-mix(in srgb, ${hue} 60%, rgb(var(--color-text)))` }}>
+                          {teacher} · {rows.length}
+                        </p>
+                      )}
                       {rows.map((r) => (
                         <button
                           key={r.student.id}
                           type="button"
                           onClick={() => navigate(`/students/${r.student.id}`)}
-                          className={`mb-1.5 ${ROW_GRID} w-full rounded-row border border-border bg-card px-3 py-2.5 text-left text-control text-text transition hover:border-border-strong hover:shadow-card`}
+                          className={`mb-1.5 ${flat ? ROW_GRID_FLAT : ROW_GRID} w-full rounded-row border border-border bg-card px-3 py-2.5 text-left text-control text-text transition hover:border-border-strong hover:shadow-card`}
                         >
+                          {flat && <span>{formatDate(r.student.trialDate)}</span>}
                           <span className="truncate font-bold">{r.student.fullName}</span>
                           <span className="truncate text-muted">{formatPhone(r.student.phone)}</span>
-                          <span>{formatDate(r.student.trialDate)}</span>
+                          {!flat && <span>{formatDate(r.student.trialDate)}</span>}
                           <span className="truncate text-muted">{r.teacher}</span>
                           <span>{r.enr?.groupCode ? <Badge variant="group-code">{r.enr.groupCode}</Badge> : '—'}</span>
                           <span>
