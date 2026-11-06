@@ -63,6 +63,12 @@ export function AuthProvider({ children }) {
     );
   }, [user]);
 
+  // Заставка hello-splash.js (index.html) уходит, когда вход разобран: пользователь и его staff-документ получены
+  // (или стало ясно, что нужен экран входа) — дальше первая страница рисуется уже под заставкой.
+  useEffect(() => {
+    if (!loading && window.helloSplash) window.helloSplash.ready();
+  }, [loading]);
+
   const value = {
     user,
     staff,
