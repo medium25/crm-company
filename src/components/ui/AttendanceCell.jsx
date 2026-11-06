@@ -41,13 +41,22 @@ export function AttendanceCell({ status, future = false, muted = false, onClick 
     );
   }
 
+  // Пустые клетки (будущий урок, день прежней группы, неотмеченный) — тот же Badge с невидимым «Был»,
+  // чтобы размер совпадал с плашками Был/Нет.
   if (future) {
-    // Будущий урок — такая же пустая клетка, как неотмеченная, только некликабельная и бледнее.
-    return <span className="mx-auto block h-8 w-14 rounded-badge border border-border-strong opacity-50" aria-hidden="true" />;
+    return (
+      <span className="mx-auto flex h-8 w-14 items-center justify-center opacity-50" aria-hidden="true">
+        <Badge variant="attendance-empty">Был</Badge>
+      </span>
+    );
   }
 
   if (muted) {
-    return <span className="mx-auto block h-8 w-8 rounded-full border border-border-strong opacity-40" aria-hidden="true" />;
+    return (
+      <span className="mx-auto flex h-8 w-14 items-center justify-center opacity-40" aria-hidden="true">
+        <Badge variant="attendance-empty">Был</Badge>
+      </span>
+    );
   }
 
   return (
@@ -55,7 +64,9 @@ export function AttendanceCell({ status, future = false, muted = false, onClick 
       type="button"
       onClick={onClick}
       aria-label="Отметить посещаемость"
-      className="mx-auto block h-8 w-14 rounded-badge border border-border-strong bg-transparent hover:bg-surface-alt"
-    />
+      className="mx-auto flex h-8 w-14 items-center justify-center hover:opacity-70"
+    >
+      <Badge variant="attendance-empty">Был</Badge>
+    </button>
   );
 }

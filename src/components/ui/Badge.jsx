@@ -8,6 +8,8 @@ const VARIANT_CLASSES = {
   'attendance-absent': 'bg-absent text-white',
   'attendance-present-muted': 'bg-muted text-white',
   'attendance-absent-muted': 'bg-border-strong text-muted',
+  // Пустая клетка посещаемости: невидимый текст «Был» задаёт ровно тот же размер, что у плашки; рамка ring — не меняет размер.
+  'attendance-empty': 'bg-transparent text-transparent ring-1 ring-inset ring-border-strong',
 };
 
 /**
