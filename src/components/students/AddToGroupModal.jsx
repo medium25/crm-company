@@ -119,7 +119,7 @@ export function AddToGroupModal({ open, student, onClose }) {
       if (NON_TERMINAL_STAGES.includes(student.funnelStage)) {
         const hasPaid = Boolean(student.firstPaymentAt);
         const wasTrialScheduled = student.funnelStage === 'trial_scheduled';
-        const nextStage = hasPaid ? 'won' : wasTrialScheduled ? 'trial_completed' : 'closing';
+        const nextStage = hasPaid ? 'won' : 'trial_completed';
         if (nextStage !== student.funnelStage) {
           await updateDoc(doc(db, 'students', student.id), {
             funnelStage: nextStage,

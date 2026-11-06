@@ -200,6 +200,17 @@ export function LeadsPage() {
   // ниже вместо жёстко зашитого 5.
   const callMaxAttempts = resolvedColumns.find((c) => c.key === 'calling')?.maxTouches ?? 5;
   // «Дожим» и «Пробный назначен» — тоже регулируются через ⚙ (раньше 2 и 3 были зашиты в код).
+  // Учитель и группа «Был на пробном» — из записи студента в группу (на лиде их нет).
+  const enrollmentsQuery = useMemo(
+    () => (db && activeBranchId ? query(collection(db, 'enrollments'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    [activeBranchId],
+  );
+  const { data: branchEnrollments } = useCollection(enrollmentsQuery);
+  const trialInfoById = useMemo(() => {
+    const map = new Map();
+    for (const e of branchEnrollments) if (e.teacherName && !map.has(e.studentId)) map.set(e.studentId, { teacherName: e.teacherName, groupCode: e.groupCode });
+    return map;
+  }, [branchEnrollments]);
   const closingMaxTouches = resolvedColumns.find((c) => c.key === 'closing')?.maxTouches ?? 2;
   const trialMaxTouches = resolvedColumns.find((c) => c.key === 'trial_scheduled')?.maxTouches ?? 3;
   // Чек-лист первого разговора — список пунктов редактируемый (⚙ на панели
@@ -752,6 +763,7 @@ export function LeadsPage() {
             onAdd={column.key === 'new' ? openAddForm : undefined}
             onEditColumn={editStageColumn}
             columns={resolvedColumns}
+            trialInfoById={trialInfoById}
             checklistItems={resolvedChecklistItems}
             onDropLead={(leadId, columnKey) => {
               const lead = leadsById.get(leadId);

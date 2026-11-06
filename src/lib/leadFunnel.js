@@ -252,7 +252,7 @@ export function overdueReasonLabel(lead) {
     if (unreachableDue && (!trialDayDue || unreachableDue <= trialDayDue)) return 'Просрочен повторный звонок «не выходит на связь»';
     return 'Не отмечено напоминание звонком перед пробным';
   }
-  if (stage === 'trial_completed') return 'Пробный проведён — пора перевести в «Дожим»';
+  if (stage === 'trial_completed') return 'Был на пробном — ожидает оплаты или отказа';
   if (stage === 'closing') return 'Просрочено плановое касание в дожиме';
   return 'Просрочено плановое действие по лиду';
 }

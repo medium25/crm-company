@@ -302,7 +302,7 @@ function buildFullHistory(lead) {
 // Каждый узел — две строки: крупный текст (result) и под ним мелкая (насколько опоздали /
 // вовремя — task). Текст (result): «что произошло → следующий шаг», а если его нет — текст
 // задачи, что стояла (nextStep ПРЕДЫДУЩЕГО касания; у самого первого — стартовый SLA).
-function buildTimelineNodes(history, pendingDueAt, currentStage) {
+function buildTimelineNodes(history, pendingDueAt, currentStage, attended) {
   const fallbackAt = history[0]?.at; // момент создания лида — см. responseTiming
   const interactions = history.filter((item) => item.type === 'entry');
   // Номер на кружке — сквозной по всей ленте (1, 2, 3 …), при переходе между
@@ -341,6 +341,10 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
   if (pendingTask) {
     nodes.push({ type: 'pending', task: pendingTask, dueAt: pendingDue, step: interactions.length + 1 });
   }
+  // «Был на пробном» — продолжение той же ленты: последняя запись «посетил пробное занятие» с датой и учителем.
+  if (attended) {
+    nodes.push({ type: 'entry', result: 'Посетил пробное занятие', task: attended.detail, at: attended.at, step: nodes.length + 1 });
+  }
   return nodes;
 }
 
@@ -350,7 +354,7 @@ function buildTimelineNodes(history, pendingDueAt, currentStage) {
  * карточку числом записей). Рядом с ней (ниже, вне ленты) каждый трекер
  * рисует свой «следующий шаг» (CallAttemptDots/TouchDots/UnreachableBlock).
  */
-export function HistoryTimeline({ lead }) {
+export function HistoryTimeline({ lead, attendedInfo }) {
   // useState/useRef/useEffect ДО early return — иначе при первом же
   // появлении истории (0 записей → 1) хуки в этом инстансе компонента
   // перестанут совпадать между рендерами (React бросит "Rendered fewer
@@ -365,7 +369,14 @@ export function HistoryTimeline({ lead }) {
   const stage = lead.funnelStage ?? 'new';
   const pendingDueAt =
     stage === 'closing' ? lead.nextTouchAt : stage === 'trial_scheduled' ? lead.unreachableNextCallDueAt : lead.nextCallDueAt;
-  const nodes = buildTimelineNodes(buildFullHistory(lead), pendingDueAt, stage);
+  const attended =
+    stage === 'trial_completed' && lead.trialDate && (lead.attended === true || attendedInfo)
+      ? {
+          at: lead.trialDate,
+          detail: [formatDateTimeShort(lead.trialDate), attendedInfo?.teacherName, attendedInfo?.groupCode].filter(Boolean).join(' · '),
+        }
+      : null;
+  const nodes = buildTimelineNodes(buildFullHistory(lead), pendingDueAt, stage, attended);
 
   useEffect(() => {
     if (dateOpenAt === null) return undefined;
@@ -832,6 +843,7 @@ export function LeadCard({
   columns = COLUMNS,
   checklistItems = DEFAULT_CHECKLIST_ITEMS,
   highlightLeadId,
+  trialInfoById,
 }) {
   const highlighted = highlightLeadId === lead.id;
   const stage = lead.funnelStage ?? 'new';
@@ -1000,7 +1012,7 @@ export function LeadCard({
 
       {stage === 'trial_completed' && (
         <div className="flex min-h-0 flex-1 flex-col" onClick={(e) => e.stopPropagation()}>
-          <HistoryTimeline lead={lead} />
+          <HistoryTimeline lead={lead} attendedInfo={trialInfoById?.get(lead.id)} />
         </div>
       )}
 
