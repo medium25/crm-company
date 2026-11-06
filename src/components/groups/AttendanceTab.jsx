@@ -386,7 +386,8 @@ export function AttendanceTab({ group }) {
     .filter((en) => {
       if (studentsById.get(en.studentId)?.isArchived) return false;
       if (en.status === 'paused') return false;
-      if (en.status === 'left' && en.returnIntent === 'transfer') return false;
+      // Вышедший из группы (в т.ч. переведённый) пропадает из посещаемости целиком — его отметки остаются в базе.
+      if (en.status === 'left') return false;
       return days.some((day) => resolveCell(day, en) !== null);
     })
     // Тот же порядок, что состав группы (GroupDetailPage, сортировка «По
