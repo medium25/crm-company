@@ -479,12 +479,14 @@ export function AttendanceTab({ group, rosterActions, sort, onSortChange, showAr
             зависят от этого поведения.
           */}
           <div className="flex">
-            <div className="shrink-0 border-r border-border">
-              <div className="grid h-11 grid-cols-[190px_110px_90px_110px] items-center gap-2 bg-surface px-3 text-control font-bold text-text sm:grid-cols-[230px_120px_100px_120px]">
+            {/* Ровно половина ширины — данные студента, вторая половина — даты занятий (прокручиваются). */}
+            <div className="w-1/2 min-w-[26rem] shrink-0 border-r border-border">
+              <div className="grid h-11 grid-cols-[minmax(0,2.3fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.4fr)_2rem] items-center gap-2 bg-surface px-3 text-control font-bold text-text">
                 <span>Студент</span>
                 <span>Баланс</span>
                 <span>Учится</span>
                 <span>Телефон</span>
+                <span />
               </div>
               {visibleEnrollments.map((enrollment, i) => {
                 const student = studentsById.get(enrollment.studentId);
@@ -494,7 +496,7 @@ export function AttendanceTab({ group, rosterActions, sort, onSortChange, showAr
                 return (
                   <div
                     key={enrollment.id}
-                    className="grid h-11 grid-cols-[190px_110px_90px_110px] items-center gap-2 bg-surface px-3 sm:grid-cols-[230px_120px_100px_120px]"
+                    className="grid h-11 grid-cols-[minmax(0,2.3fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.4fr)_2rem] items-center gap-2 bg-surface px-3"
                   >
                     <RosterStudentCell index={i + 1} enrollment={enrollment} student={student} />
                     {/* Сумму баланса учителю не показываем (он видит только цвет кружка у имени). */}
@@ -503,6 +505,7 @@ export function AttendanceTab({ group, rosterActions, sort, onSortChange, showAr
                     </span>
                     <span className="truncate text-small text-text">{formatTenure(since)}</span>
                     <RosterPhone student={student} />
+                    <RosterMenuCell enrollment={enrollment} student={student} {...rosterActions} />
                   </div>
                 );
               })}
@@ -548,14 +551,6 @@ export function AttendanceTab({ group, rosterActions, sort, onSortChange, showAr
               </div>
             </div>
 
-            <div className="shrink-0 border-l border-border">
-              <div className="h-11 bg-surface" />
-              {visibleEnrollments.map((enrollment) => (
-                <div key={enrollment.id} className="flex h-11 items-center bg-surface pl-2 pr-1">
-                  <RosterMenuCell enrollment={enrollment} student={studentsById.get(enrollment.studentId)} {...rosterActions} />
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       )}
