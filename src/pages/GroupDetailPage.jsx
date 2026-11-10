@@ -1,19 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collection, doc, documentId, query, where, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
-import { Pencil, Archive, Mail, UserPlus, History, Download, Users } from 'lucide-react';
+import { Pencil, Archive, Mail, UserPlus, History, Users } from 'lucide-react';
 import { db } from '../firebase.js';
 import { useAuth } from '../hooks/useAuth.js';
-import { useRole } from '../hooks/useRole.js';
 import { useDoc } from '../hooks/useDoc.js';
 import { useCollection } from '../hooks/useCollection.js';
 import { useToast } from '../components/ui/Toast.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { Button } from '../components/ui/Button.jsx';
-import { Select } from '../components/ui/Select.jsx';
 import { Tabs } from '../components/ui/Tabs.jsx';
 import { Table } from '../components/ui/Table.jsx';
-import { DropdownMenu } from '../components/ui/DropdownMenu.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx';
@@ -28,9 +25,8 @@ import { FreezeEnrollmentModal } from '../components/students/FreezeEnrollmentMo
 import { LeaveGroupModal } from '../components/students/LeaveGroupModal.jsx';
 import { TransferGroupModal } from '../components/students/TransferGroupModal.jsx';
 import { ActivateEnrollmentModal } from '../components/groups/ActivateEnrollmentModal.jsx';
-import { formatDate, formatMoney, formatPhone, formatScheduleType } from '../lib/format.js';
+import { formatDate, formatMoney, formatScheduleType } from '../lib/format.js';
 import { toCsv, downloadCsv } from '../lib/csv.js';
-import { MIN_FREEZE_BALANCE, MAX_FREEZES_PER_STUDENT, canFreezeStudent } from '../lib/billing.js';
 import { BackButton } from '../components/ui/BackButton.jsx';
 
 const TABS = [
@@ -42,96 +38,6 @@ const TABS = [
   { key: 'history', label: 'История' },
   { key: 'comments', label: 'Комментарии' },
 ];
-
-const SORT_OPTIONS = [
-  { value: 'name', label: 'По А-Я' },
-  { value: 'balance', label: 'По балансу' },
-  { value: 'addedAt', label: 'По дате добавления' },
-];
-
-function RosterRow({ index, enrollment, student, navigate, onFreeze, onLeave, onActivate, onTransfer }) {
-  const { isTeacher } = useRole();
-  const balance = student?.balance ?? 0;
-  const isTrial = enrollment.status === 'trial';
-  const isPaused = enrollment.status === 'paused';
-  const canFreeze = canFreezeStudent(student);
-  const freezeDisabledTitle =
-    (student?.freezeCount ?? 0) >= MAX_FREEZES_PER_STUDENT
-      ? `Лимит заморозок за весь срок обучения исчерпан (${MAX_FREEZES_PER_STUDENT} из ${MAX_FREEZES_PER_STUDENT})`
-      : `Заморозка доступна при балансе от ${formatMoney(MIN_FREEZE_BALANCE)}`;
-
-  return (
-    <li className="flex items-center gap-2 text-control text-text">
-      <span className="w-5 shrink-0 text-right text-muted">{index}.</span>
-      {isTrial || isPaused ? (
-        <span className="flex-1 truncate">
-          <button
-            type="button"
-            onClick={() => navigate(`/students/${enrollment.studentId}`)}
-            className={`rounded-badge px-2 py-0.5 text-small font-bold hover:opacity-80 ${
-              isPaused ? 'bg-present/15 text-present' : 'bg-chip text-text'
-            }`}
-            title={isPaused ? 'Заморожен' : 'Пробный урок'}
-          >
-            {enrollment.studentName}
-          </button>
-        </span>
-      ) : (
-        <>
-          {/* balance >= 0 — зелёный: 0 не долг, красным должен гореть только реальный минус.
-              students читают все авторизованные (см. firestore.rules) — учитель
-              видит настоящий цвет, но не сумму: превью с балансом при наведении
-              только не-учителю, кружок сам по себе суммы не раскрывает. Без student
-              (сеть/гонка загрузки) кружок не рисуем вовсе — не гадаем цвет. */}
-          <span className="group/pv relative flex min-w-0 flex-1 items-center gap-2">
-            {student && (
-              <span className={`h-2 w-2 shrink-0 rounded-full ${balance >= 0 ? 'bg-success' : 'bg-danger'}`} />
-            )}
-            <button
-              type="button"
-              onClick={() => navigate(`/students/${enrollment.studentId}`)}
-              className="flex-1 truncate text-left hover:text-link"
-            >
-              {enrollment.studentName}
-            </button>
-            {student && !isTeacher && (
-              <span className="pointer-events-none absolute left-4 top-full z-20 mt-1 hidden whitespace-nowrap rounded-row border border-border-strong bg-surface px-2.5 py-1.5 shadow-soft group-hover/pv:block group-focus-within/pv:block">
-                <span className="block text-caption leading-tight text-muted">баланс</span>
-                <span className={`block text-small font-bold leading-snug ${balance >= 0 ? 'text-success' : 'text-danger'}`}>
-                  {balance > 0 ? '+' : ''}
-                  {formatMoney(balance)}
-                </span>
-              </span>
-            )}
-          </span>
-        </>
-      )}
-      {student?.phone && (
-        <a href={`tel:+${student.phone}`} onClick={(e) => e.stopPropagation()} className="shrink-0 text-link">
-          {formatPhone(student.phone)}
-        </a>
-      )}
-      <DropdownMenu
-        items={[
-          { label: 'Открыть карточку', onClick: () => navigate(`/students/${enrollment.studentId}`) },
-          ...(isTrial ? [{ label: 'Активировать', onClick: () => onActivate(enrollment) }] : []),
-          ...(isPaused
-            ? []
-            : [
-                {
-                  label: 'Заморозить',
-                  onClick: () => onFreeze(enrollment),
-                  disabled: !canFreeze,
-                  title: canFreeze ? undefined : freezeDisabledTitle,
-                },
-              ]),
-          { label: 'Перевести в другую группу', onClick: () => onTransfer(enrollment) },
-          { label: 'Убрать из группы', onClick: () => onLeave(enrollment), danger: true },
-        ]}
-      />
-    </li>
-  );
-}
 
 function pricingColumns(groupPrice) {
   return [
@@ -189,24 +95,6 @@ export function GroupDetailPage() {
     () => rawEnrollments.map((e) => ({ ...e, studentName: studentsById.get(e.studentId)?.fullName ?? e.studentName })),
     [rawEnrollments, studentsById],
   );
-
-  const sortedEnrollments = useMemo(() => {
-    // Студент мог быть архивирован напрямую с его карточки — тогда его
-    // enrollment иногда остаётся неархивированным (старые данные до фикса
-    // каскадной архивации). Подстраховка: не показываем в ростере тех, чей
-    // студент фактически архивен.
-    const list = enrollments.filter(
-      (e) => !studentsById.get(e.studentId)?.isArchived && (showArchivedStudents || e.status !== 'left'),
-    );
-    if (sort === 'balance') {
-      list.sort((a, b) => (studentsById.get(a.studentId)?.balance ?? 0) - (studentsById.get(b.studentId)?.balance ?? 0));
-    } else if (sort === 'addedAt') {
-      list.sort((a, b) => (a.addedAt?.toMillis() ?? 0) - (b.addedAt?.toMillis() ?? 0));
-    } else {
-      list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'ru'));
-    }
-    return list;
-  }, [enrollments, sort, studentsById, showArchivedStudents]);
 
   if (loading) {
     return (
@@ -267,75 +155,54 @@ export function GroupDetailPage() {
         {group.teacherName}
       </h1>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_auto_minmax(0,1fr)]">
-        <Card className="flex flex-col gap-2">
-          <Field label="Курс" value={group.courseName} />
-          <Field label="Учитель" value={group.teacherName} />
-          <Field label="Цена" value={formatMoney(group.price)} />
-          <Field label="Время" value={`${formatScheduleType(group.schedule.type)} · ${group.schedule.time}`} />
-          <Field label="Кабинеты" value={group.roomName || '—'} />
-          <Field label="Вместимость комнаты" value={room ? `${room.capacity}` : '—'} />
-          <Field label="Даты обучения" value={`${formatDate(group.startDate)} — ${formatDate(group.endDate)}`} />
-          <p className="text-small text-muted">(id: {group.publicId})</p>
-          <Field label="Филиалы" value={group.branchId} />
-
-          <div className="mt-2 flex items-center justify-between border-t border-border pt-4">
-            <Select size="sm" options={SORT_OPTIONS} value={sort} onChange={(e) => setSort(e.target.value)} className="w-48" />
+      {/* Один раздел: сверху данные группы и кнопки действий, ниже вкладки с таблицей на всю ширину. */}
+      <Card className="min-w-0">
+        <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="grid grid-cols-1 gap-x-8 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+            <Field label="Курс" value={group.courseName} />
+            <Field label="Учитель" value={group.teacherName} />
+            <Field label="Цена" value={formatMoney(group.price)} />
+            <Field label="Время" value={`${formatScheduleType(group.schedule.type)} · ${group.schedule.time}`} />
+            <Field label="Кабинеты" value={group.roomName || '—'} />
+            <Field label="Вместимость комнаты" value={room ? `${room.capacity}` : '—'} />
+            <Field label="Даты обучения" value={`${formatDate(group.startDate)} — ${formatDate(group.endDate)}`} />
+            <Field label="Филиалы" value={group.branchId} />
+            <p className="text-small text-muted">(id: {group.publicId})</p>
           </div>
 
-          {sortedEnrollments.length === 0 ? (
-            <EmptyState icon={Users} title="Пока нет студентов в группе" />
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {sortedEnrollments.map((e, i) => (
-                <RosterRow
-                  key={e.id}
-                  index={i + 1}
-                  enrollment={e}
-                  student={studentsById.get(e.studentId)}
-                  navigate={navigate}
-                  onFreeze={setFreezeTarget}
-                  onLeave={setLeaveTarget}
-                  onActivate={setActivateTarget}
-                  onTransfer={setTransferTarget}
-                />
-              ))}
-            </ul>
-          )}
-
-          <div className="mt-2 flex items-center justify-between">
-            <button type="button" onClick={() => setShowArchivedStudents((v) => !v)} className="text-small text-link">
-              {showArchivedStudents ? 'Скрыть архивных студентов' : 'Показать архивных студентов'}
-            </button>
-            <Button variant="icon-round" tone="navy" onClick={exportRoster} aria-label="Экспорт в CSV" disabled={enrollments.length === 0}>
-              <Download className="h-4 w-4" />
+          <div className="flex shrink-0 flex-row flex-wrap gap-2">
+            <Button variant="icon-round" tone="navy" onClick={() => setEditing(true)} aria-label="Редактировать">
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="icon-round" tone="danger" onClick={() => setConfirmArchiveOpen(true)} aria-label="Архивировать">
+              <Archive className="h-4 w-4" />
+            </Button>
+            <Button variant="icon-round" tone="warning" onClick={() => setSmsOpen(true)} aria-label="SMS группе">
+              <Mail className="h-4 w-4" />
+            </Button>
+            <Button variant="icon-round" tone="navy" onClick={() => showToast('Появится в фазе 3.')} aria-label="Добавить студента">
+              <UserPlus className="h-4 w-4" />
+            </Button>
+            <Button variant="icon-round" tone="warning" onClick={() => showToast('Появится в фазе 7.')} aria-label="История изменений">
+              <History className="h-4 w-4" />
             </Button>
           </div>
-        </Card>
-
-        <div className="flex flex-row gap-2 lg:flex-col">
-          <Button variant="icon-round" tone="navy" onClick={() => setEditing(true)} aria-label="Редактировать">
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="icon-round" tone="danger" onClick={() => setConfirmArchiveOpen(true)} aria-label="Архивировать">
-            <Archive className="h-4 w-4" />
-          </Button>
-          <Button variant="icon-round" tone="warning" onClick={() => setSmsOpen(true)} aria-label="SMS группе">
-            <Mail className="h-4 w-4" />
-          </Button>
-          <Button variant="icon-round" tone="navy" onClick={() => showToast('Появится в фазе 3.')} aria-label="Добавить студента">
-            <UserPlus className="h-4 w-4" />
-          </Button>
-          <Button variant="icon-round" tone="warning" onClick={() => showToast('Появится в фазе 7.')} aria-label="История изменений">
-            <History className="h-4 w-4" />
-          </Button>
         </div>
 
-        <Card className="min-w-0">
+        <div className="mt-4">
           <Tabs tabs={TABS} activeKey={tab} onChange={setTab} />
           <div className="mt-6">
             {tab === 'attendance' ? (
-              <AttendanceTab group={group} />
+              <AttendanceTab
+                group={group}
+                rosterActions={{ onFreeze: setFreezeTarget, onLeave: setLeaveTarget, onActivate: setActivateTarget, onTransfer: setTransferTarget }}
+                sort={sort}
+                onSortChange={setSort}
+                showArchived={showArchivedStudents}
+                onToggleArchived={() => setShowArchivedStudents((v) => !v)}
+                onExport={exportRoster}
+                exportDisabled={enrollments.length === 0}
+              />
             ) : tab === 'pricing' ? (
               enrollments.length === 0 ? (
                 <EmptyState icon={Users} title="Пока нет студентов со скидкой" />
@@ -354,8 +221,8 @@ export function GroupDetailPage() {
               <EmptyState icon={Users} title="Раздел появится позже" />
             )}
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
 
       <GroupFormModal group={editing ? group : null} onClose={() => setEditing(false)} />
       <FreezeEnrollmentModal

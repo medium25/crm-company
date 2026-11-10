@@ -13,9 +13,9 @@ import {
   orderBy,
   serverTimestamp,
 } from 'firebase/firestore';
-import { format, addMonths, subMonths, startOfMonth, startOfDay } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, startOfDay, differenceInMonths, differenceInCalendarDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, EyeOff, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Eye, EyeOff, Users } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useRole } from '../../hooks/useRole.js';
@@ -24,7 +24,20 @@ import { useToast } from '../ui/Toast.jsx';
 import { AttendanceCell } from '../ui/AttendanceCell.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { Skeleton } from '../ui/Skeleton.jsx';
+import { Button } from '../ui/Button.jsx';
+import { Select } from '../ui/Select.jsx';
+import { RosterStudentCell, RosterPhone, RosterMenuCell, SORT_OPTIONS } from './RosterCells.jsx';
+import { formatMoney } from '../../lib/format.js';
 import { generateLessonsForMonth, scheduleDatesInRange } from '../../lib/schedule.js';
+
+/** «2 мес. 5 дн.» — сколько прошло с даты `from` до сегодня; меньше месяца — только дни. */
+function formatTenure(from) {
+  if (!from) return '—';
+  const now = new Date();
+  const months = Math.max(0, differenceInMonths(now, from));
+  const days = Math.max(0, differenceInCalendarDays(now, addMonths(from, months)));
+  return [months > 0 ? `${months} мес.` : '', `${days} дн.`].filter(Boolean).join(' ');
+}
 
 const todayStart = () => {
   const d = new Date();
@@ -100,8 +113,18 @@ function useGroupMonthAttendance(groupId, monthStr) {
  * некликабельные (чужой lessonId, редактировать их отсюда нельзя).
  * @param {Object} props
  * @param {Object} props.group документ группы (Timestamp-поля как из Firestore)
+ * @param {{onFreeze: Function, onLeave: Function, onActivate: Function, onTransfer: Function}} props.rosterActions действия меню «⋮» студента
+ * @param {string} props.sort 'name' | 'balance' | 'addedAt'
+ * @param {(v: string) => void} props.onSortChange
+ * @param {boolean} props.showArchived показывать вышедших/архивных студентов
+ * @param {() => void} props.onToggleArchived
+ * @param {() => void} props.onExport выгрузка состава в CSV
+ * @param {boolean} [props.exportDisabled]
+ *
+ * Состав группы и посещаемость — одна таблица: слева номер, баланс, имя, телефон; справа даты занятий; в конце
+ * итог по месяцу и меню «⋮».
  */
-export function AttendanceTab({ group }) {
+export function AttendanceTab({ group, rosterActions, sort, onSortChange, showArchived, onToggleArchived, onExport, exportDisabled = false }) {
   const { user, staff } = useAuth();
   const { isAdmin, isTeacher } = useRole();
   const { showToast } = useToast();
@@ -122,8 +145,11 @@ export function AttendanceTab({ group }) {
   const { data: lessons, loading: lessonsLoading } = useCollection(lessonsQuery);
 
   const enrollmentsQuery = useMemo(
-    () => (db ? query(collection(db, 'enrollments'), where('groupId', '==', group.id), where('isArchived', '==', false)) : null),
-    [group.id],
+    () =>
+      db
+        ? query(collection(db, 'enrollments'), where('groupId', '==', group.id), ...(showArchived ? [] : [where('isArchived', '==', false)]))
+        : null,
+    [group.id, showArchived],
   );
   const { data: rawEnrollments, loading: enrollmentsLoading } = useCollection(enrollmentsQuery);
 
@@ -376,27 +402,39 @@ export function AttendanceTab({ group }) {
     return <Skeleton className="h-64 w-full" />;
   }
 
-  // Студент без ЕДИНОГО дня (ни своего, ни муted-истории старой группы) в
-  // этом месяце — строку не показываем вовсе, не только ячейки: иначе висит
-  // пустая строка с именем, которую невозможно отличить от «просто пока
-  // никто не отметил». Переведённый в другую группу (status=='left' &&
-  // returnIntent=='transfer') исключён безусловно — его история теперь
-  // видна только в НОВОЙ группе (см. doc-комментарий компонента).
+  // Строки — весь состав группы (как раньше в списке слева), а не только те, у кого есть дни в месяце: пробный или
+  // замороженный студент без отметок тоже виден. Вышедшие и архивные — только по «Показать архивных студентов».
   const visibleEnrollments = enrollments
     .filter((en) => {
-      if (studentsById.get(en.studentId)?.isArchived) return false;
-      if (en.status === 'paused') return false;
-      // Вышедший из группы (в т.ч. переведённый) пропадает из посещаемости целиком — его отметки остаются в базе.
-      if (en.status === 'left') return false;
-      return days.some((day) => resolveCell(day, en) !== null);
+      if (studentsById.get(en.studentId)?.isArchived && !showArchived) return false;
+      if (en.status === 'left' && !showArchived) return false;
+      return true;
     })
-    // Тот же порядок, что состав группы (GroupDetailPage, сортировка «По
-    // А-Я» по умолчанию) — иначе строки идут в порядке ответа Firestore,
-    // который не совпадает с тем, что видно в составе.
-    .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ru'));
+    .sort((a, b) => {
+      if (sort === 'balance') return (studentsById.get(a.studentId)?.balance ?? 0) - (studentsById.get(b.studentId)?.balance ?? 0);
+      if (sort === 'addedAt') return (a.addedAt?.toMillis?.() ?? 0) - (b.addedAt?.toMillis?.() ?? 0);
+      return a.studentName.localeCompare(b.studentName, 'ru');
+    });
+
+  // Кнопки под таблицей остаются всегда — и в пустом месяце, и при пустом составе (архивных ещё можно показать).
+  const footer = (
+    <div className="mt-3 flex items-center justify-between">
+      <button type="button" onClick={onToggleArchived} className="text-small text-link">
+        {showArchived ? 'Скрыть архивных студентов' : 'Показать архивных студентов'}
+      </button>
+      <Button variant="icon-round" tone="navy" onClick={onExport} aria-label="Экспорт в CSV" disabled={exportDisabled}>
+        <Download className="h-4 w-4" />
+      </Button>
+    </div>
+  );
 
   if (visibleEnrollments.length === 0) {
-    return <EmptyState icon={Users} title="Пока нет студентов в группе" />;
+    return (
+      <div>
+        <EmptyState icon={Users} title="Пока нет студентов в группе" />
+        {footer}
+      </div>
+    );
   }
 
   const gridTemplate = `repeat(${days.length}, 56px)`;
@@ -422,9 +460,10 @@ export function AttendanceTab({ group }) {
         <button type="button" onClick={() => setMonthDate((d) => addMonths(d, 12))} aria-label="+12 мес" className="hidden shrink-0 text-muted hover:text-text sm:block">
           <ChevronsRight className="h-4 w-4" />
         </button>
-        <button type="button" onClick={() => setHideAbsent((v) => !v)} aria-label="Скрыть/показать отсутствующих" className="ml-auto shrink-0 text-muted hover:text-text sm:ml-2">
+        <button type="button" onClick={() => setHideAbsent((v) => !v)} aria-label="Скрыть/показать отсутствующих" className="shrink-0 text-muted hover:text-text sm:ml-2">
           {hideAbsent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
+        <Select size="sm" options={SORT_OPTIONS} value={sort} onChange={(e) => onSortChange(e.target.value)} className="ml-auto w-44 shrink-0" />
       </div>
 
       {days.length === 0 ? (
@@ -440,16 +479,33 @@ export function AttendanceTab({ group }) {
             зависят от этого поведения.
           */}
           <div className="flex">
-            <div className="w-[160px] shrink-0 border-r border-border sm:w-[200px]">
-              <div className="flex h-11 items-center bg-surface px-3 text-control font-bold text-text">Имя</div>
-              {visibleEnrollments.map((enrollment) => (
-                <div key={enrollment.id} className="flex h-11 items-center gap-2 bg-surface px-3 text-control text-text">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-alt text-caption font-bold text-muted">
-                    {enrollment.studentName[0]}
-                  </span>
-                  <span className="truncate">{enrollment.studentName}</span>
-                </div>
-              ))}
+            <div className="shrink-0 border-r border-border">
+              <div className="grid h-11 grid-cols-[190px_110px_90px_110px] items-center gap-2 bg-surface px-3 text-control font-bold text-text sm:grid-cols-[230px_120px_100px_120px]">
+                <span>Студент</span>
+                <span>Баланс</span>
+                <span>Учится</span>
+                <span>Телефон</span>
+              </div>
+              {visibleEnrollments.map((enrollment, i) => {
+                const student = studentsById.get(enrollment.studentId);
+                const balance = student?.balance ?? 0;
+                // Учится у нас с даты активации (платный), если её нет — с первой оплаты, иначе с даты записи в группу.
+                const since = enrollment.activatedAt?.toDate?.() ?? student?.firstPaymentAt?.toDate?.() ?? enrollment.addedAt?.toDate?.() ?? null;
+                return (
+                  <div
+                    key={enrollment.id}
+                    className="grid h-11 grid-cols-[190px_110px_90px_110px] items-center gap-2 bg-surface px-3 sm:grid-cols-[230px_120px_100px_120px]"
+                  >
+                    <RosterStudentCell index={i + 1} enrollment={enrollment} student={student} />
+                    {/* Сумму баланса учителю не показываем (он видит только цвет кружка у имени). */}
+                    <span className={`truncate text-small font-bold ${isTeacher || !student ? 'text-muted' : balance >= 0 ? 'text-success' : 'text-danger'}`}>
+                      {isTeacher || !student ? '—' : `${balance > 0 ? '+' : ''}${formatMoney(balance)}`}
+                    </span>
+                    <span className="truncate text-small text-text">{formatTenure(since)}</span>
+                    <RosterPhone student={student} />
+                  </div>
+                );
+              })}
             </div>
 
             <div className="min-w-0 flex-1 overflow-x-auto">
@@ -491,27 +547,19 @@ export function AttendanceTab({ group }) {
                 )}
               </div>
             </div>
-          </div>
 
-          <div className="mt-4 flex flex-col gap-1">
-            {visibleEnrollments.map((enrollment) => {
-              // Знаменатель — все уроки группы в месяце (сколько всего будет),
-              // не только прошедшие/доступные студенту — по просьбе.
-              const presentCount = lessons.filter((l) => getStatus(l.id, enrollment.studentId) === 'present').length;
-              const total = lessons.length;
-              const pct = total > 0 ? Math.round((presentCount / total) * 100) : 0;
-              return (
-                <div key={enrollment.id} className="flex items-center justify-between text-small text-muted">
-                  <span>{enrollment.studentName}</span>
-                  <span>
-                    {presentCount}/{total} ({pct}%)
-                  </span>
+            <div className="shrink-0 border-l border-border">
+              <div className="h-11 bg-surface" />
+              {visibleEnrollments.map((enrollment) => (
+                <div key={enrollment.id} className="flex h-11 items-center bg-surface pl-2 pr-1">
+                  <RosterMenuCell enrollment={enrollment} student={studentsById.get(enrollment.studentId)} {...rosterActions} />
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
       )}
+      {footer}
     </div>
   );
 }
