@@ -41,6 +41,15 @@ export function AddToGroupModal({ open, student, onClose }) {
   );
   const { data: groups } = useCollection(groupsQuery);
 
+  // Пробный теперь записывается в группу уже при назначении (TrialFormModal) — здесь эту же запись переводим дальше,
+  // а не заводим вторую.
+  const trialEnrollmentsQuery = useMemo(
+    () => (db && open && student?.id ? query(collection(db, 'enrollments'), where('studentId', '==', student.id), where('isArchived', '==', false)) : null),
+    [open, student?.id],
+  );
+  const { data: studentEnrollments } = useCollection(trialEnrollmentsQuery);
+  const existingTrial = studentEnrollments.find((e) => e.status === 'trial') ?? null;
+
   const [groupId, setGroupId] = useState('');
   const [status, setStatus] = useState('trial');
   const [price, setPrice] = useState('');
@@ -55,6 +64,14 @@ export function AddToGroupModal({ open, student, onClose }) {
       setActivatedAt(format(new Date(), 'yyyy-MM-dd'));
     }
   }, [open]);
+
+  // Группа и цена уже записанного пробного подставляются сами.
+  useEffect(() => {
+    if (!open || !existingTrial) return;
+    setGroupId(existingTrial.groupId);
+    setPrice(String(existingTrial.price ?? ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, existingTrial?.id]);
 
   const group = groups.find((g) => g.id === groupId);
   // Активного без фамилии не создаём — тот же порог, что и в
@@ -77,7 +94,7 @@ export function AddToGroupModal({ open, student, onClose }) {
       const now = serverTimestamp();
       const activatedAtTs = status === 'active' ? Timestamp.fromDate(new Date(`${activatedAt}T00:00:00`)) : null;
 
-      const enrollmentRef = await addDoc(collection(db, 'enrollments'), {
+      const enrollmentFields = {
         branchId: activeBranchId,
         studentId: student.id,
         studentName: student.fullName,
@@ -91,21 +108,34 @@ export function AddToGroupModal({ open, student, onClose }) {
         price: priceNum,
         discountPercent,
         discountReason: '',
-        addedAt: now,
         activatedAt: activatedAtTs,
-        pausedFrom: null,
-        pausedTo: null,
-        leftAt: null,
-        leftReason: null,
-        lastChargedMonth: null,
-        isArchived: false,
-        createdAt: now,
-        createdBy: user.uid,
-        updatedAt: now,
-        updatedBy: user.uid,
-      });
-
-      await updateDoc(doc(db, 'groups', group.id), { studentsCount: increment(1) });
+      };
+      let enrollmentRef;
+      if (existingTrial) {
+        // Переводим уже существующую запись пробного (при смене группы — переносим счётчики групп).
+        enrollmentRef = doc(db, 'enrollments', existingTrial.id);
+        await updateDoc(enrollmentRef, { ...enrollmentFields, updatedAt: now, updatedBy: user.uid });
+        if (existingTrial.groupId !== group.id) {
+          await updateDoc(doc(db, 'groups', existingTrial.groupId), { studentsCount: increment(-1) });
+          await updateDoc(doc(db, 'groups', group.id), { studentsCount: increment(1) });
+        }
+      } else {
+        enrollmentRef = await addDoc(collection(db, 'enrollments'), {
+          ...enrollmentFields,
+          addedAt: now,
+          pausedFrom: null,
+          pausedTo: null,
+          leftAt: null,
+          leftReason: null,
+          lastChargedMonth: null,
+          isArchived: false,
+          createdAt: now,
+          createdBy: user.uid,
+          updatedAt: now,
+          updatedBy: user.uid,
+        });
+        await updateDoc(doc(db, 'groups', group.id), { studentsCount: increment(1) });
+      }
       await recomputeStudentAggregates(db, student.id);
 
       // Лид, добавленный в группу напрямую, иначе навсегда зависает
@@ -133,11 +163,13 @@ export function AddToGroupModal({ open, student, onClose }) {
         }
       }
 
-      await logActivity(
-        db,
-        { entityType: 'group', entityId: group.id, action: 'enrollment_added', field: 'studentsCount', after: student.fullName },
-        { uid: user.uid, fullName: staff?.fullName ?? '' },
-      );
+      if (!existingTrial) {
+        await logActivity(
+          db,
+          { entityType: 'group', entityId: group.id, action: 'enrollment_added', field: 'studentsCount', after: student.fullName },
+          { uid: user.uid, fullName: staff?.fullName ?? '' },
+        );
+      }
 
       if (status === 'active') {
         await chargePartialMonth(

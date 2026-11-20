@@ -18,8 +18,9 @@ export const SORT_OPTIONS = [
  * @param {number} props.index номер в списке
  * @param {Object} props.enrollment
  * @param {Object} [props.student]
+ * @param {boolean} [props.removed] удалён из группы/архив — имя серое и зачёркнуто
  */
-export function RosterStudentCell({ index, enrollment, student }) {
+export function RosterStudentCell({ index, enrollment, student, removed = false }) {
   const navigate = useNavigate();
   const { isTeacher } = useRole();
   const balance = student?.balance ?? 0;
@@ -27,7 +28,9 @@ export function RosterStudentCell({ index, enrollment, student }) {
   const isPaused = enrollment.status === 'paused';
 
   return (
-    <div className="flex min-w-0 items-center gap-2 text-control text-text">
+    <div className={`flex min-w-0 items-center gap-2 text-control ${removed ? 'text-muted line-through' : 'text-text'}`}
+      title={removed ? 'Удалён из группы' : undefined}
+    >
       <span className="w-5 shrink-0 text-right text-muted">{index}.</span>
       {isTrial || isPaused ? (
         <span className="min-w-0 flex-1 truncate">
@@ -74,6 +77,10 @@ export function RosterPhone({ student }) {
 /** Меню «⋮» студента: открыть карточку, активировать пробного, заморозить, перевести, убрать из группы. */
 export function RosterMenuCell({ enrollment, student, onFreeze, onLeave, onActivate, onTransfer }) {
   const navigate = useNavigate();
+  // Удалённому из группы доступна только карточка — заморозка/перевод/активация к нему уже не относятся.
+  if (enrollment.status === 'left' || enrollment.status === 'archived' || enrollment.isArchived) {
+    return <DropdownMenu items={[{ label: 'Открыть карточку', onClick: () => navigate(`/students/${enrollment.studentId}`) }]} />;
+  }
   const isTrial = enrollment.status === 'trial';
   const isPaused = enrollment.status === 'paused';
   const canFreeze = canFreezeStudent(student);

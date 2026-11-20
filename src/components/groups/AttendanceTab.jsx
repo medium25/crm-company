@@ -145,11 +145,9 @@ export function AttendanceTab({ group, rosterActions, sort, onSortChange, showAr
   const { data: lessons, loading: lessonsLoading } = useCollection(lessonsQuery);
 
   const enrollmentsQuery = useMemo(
-    () =>
-      db
-        ? query(collection(db, 'enrollments'), where('groupId', '==', group.id), ...(showArchived ? [] : [where('isArchived', '==', false)]))
-        : null,
-    [group.id, showArchived],
+    // Архивные записи тоже читаем: пробный, посетивший занятие в этом месяце и затем удалённый, остаётся в списке.
+    () => (db ? query(collection(db, 'enrollments'), where('groupId', '==', group.id)) : null),
+    [group.id],
   );
   const { data: rawEnrollments, loading: enrollmentsLoading } = useCollection(enrollmentsQuery);
 
@@ -403,11 +401,14 @@ export function AttendanceTab({ group, rosterActions, sort, onSortChange, showAr
   }
 
   // Строки — весь состав группы (как раньше в списке слева), а не только те, у кого есть дни в месяце: пробный или
-  // замороженный студент без отметок тоже виден. Вышедшие и архивные — только по «Показать архивных студентов».
+  // замороженный студент без отметок тоже виден. Вышедшие и архивные — только по «Показать архивных студентов»,
+  // кроме пробного, который посетил занятие в текущем месяце и был удалён: он остаётся в списке посетивших.
+  const isRemoved = (en) => en.status === 'left' || en.status === 'archived' || Boolean(en.isArchived) || Boolean(studentsById.get(en.studentId)?.isArchived);
+  const attendedTrialThisMonth = (en) =>
+    isCurrentMonth && !en.activatedAt && lessons.some((l) => getStatus(l.id, en.studentId) === 'present');
   const visibleEnrollments = enrollments
     .filter((en) => {
-      if (studentsById.get(en.studentId)?.isArchived && !showArchived) return false;
-      if (en.status === 'left' && !showArchived) return false;
+      if (isRemoved(en) && !showArchived && !attendedTrialThisMonth(en)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -498,7 +499,7 @@ export function AttendanceTab({ group, rosterActions, sort, onSortChange, showAr
                     key={enrollment.id}
                     className="grid h-11 grid-cols-[minmax(0,2.3fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.4fr)_2rem] items-center gap-2 bg-surface px-3"
                   >
-                    <RosterStudentCell index={i + 1} enrollment={enrollment} student={student} />
+                    <RosterStudentCell index={i + 1} enrollment={enrollment} student={student} removed={isRemoved(enrollment)} />
                     {/* Сумму баланса учителю не показываем (он видит только цвет кружка у имени). */}
                     <span className={`truncate text-small font-bold ${isTeacher || !student ? 'text-muted' : balance >= 0 ? 'text-success' : 'text-danger'}`}>
                       {isTeacher || !student ? '—' : `${balance > 0 ? '+' : ''}${formatMoney(balance)}`}

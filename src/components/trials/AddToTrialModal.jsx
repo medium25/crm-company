@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, deleteField, doc, increment, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteField, doc, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { format, startOfDay } from 'date-fns';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -12,8 +12,7 @@ import { Select } from '../ui/Select.jsx';
 import { GroupOptions } from '../ui/GroupOptions.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
 import { advanceStage, trialConfirmDueAt, NON_TERMINAL_STAGES } from '../../lib/leadFunnel.js';
-import { recomputeStudentAggregates } from '../../lib/students.js';
-import { logActivity } from '../../lib/activityLog.js';
+import { enrollOnTrial } from '../../lib/trialEnrollment.js';
 
 /** Нужно ли этому человеку двигать воронку: лид на стадии или отказавшийся (в т.ч. архивный). Бывший студент (won) — нет. */
 const needsFunnelMove = (s) => NON_TERMINAL_STAGES.includes(s.funnelStage) || s.funnelStage === 'lost';
@@ -64,34 +63,7 @@ export function AddToTrialModal({ student, onClose }) {
       const upcoming = startOfDay(trialDateJs) >= startOfDay(new Date());
       const now = serverTimestamp();
 
-      await addDoc(collection(db, 'enrollments'), {
-        branchId: activeBranchId,
-        studentId: student.id,
-        studentName: student.fullName,
-        groupId: group.id,
-        groupCode: group.code,
-        courseName: group.courseName,
-        teacherId: group.teacherId,
-        teacherName: group.teacherName,
-        status: 'trial',
-        statusLabel: 'Пробный урок',
-        price: group.price,
-        discountPercent: 0,
-        discountReason: '',
-        addedAt: now,
-        activatedAt: null,
-        pausedFrom: null,
-        pausedTo: null,
-        leftAt: null,
-        leftReason: null,
-        lastChargedMonth: null,
-        isArchived: false,
-        createdAt: now,
-        createdBy: user.uid,
-        updatedAt: now,
-        updatedBy: user.uid,
-      });
-      await updateDoc(doc(db, 'groups', group.id), { studentsCount: increment(1) });
+      await enrollOnTrial(db, { student, group, branchId: activeBranchId, user, staff });
 
       const trialFields = {
         status: 'trial',
@@ -125,12 +97,6 @@ export function AddToTrialModal({ student, onClose }) {
       } else {
         await updateDoc(doc(db, 'students', student.id), { ...trialFields, updatedAt: now, updatedBy: user.uid });
       }
-      await recomputeStudentAggregates(db, student.id);
-      await logActivity(
-        db,
-        { entityType: 'group', entityId: group.id, action: 'enrollment_added', field: 'studentsCount', after: student.fullName },
-        { uid: user.uid, fullName: staff?.fullName ?? '' },
-      );
 
       showToast(`${student.fullName}: добавлен в пробный.`);
       onClose();

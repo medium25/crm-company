@@ -19,12 +19,15 @@ import { ru } from 'date-fns/locale';
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '../../firebase.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { useBranch } from '../../hooks/useBranch.js';
 import { useCollection } from '../../hooks/useCollection.js';
 import { useToast } from '../ui/Toast.jsx';
 import { advanceStage, trialConfirmDueAt } from '../../lib/leadFunnel.js';
 import { Modal } from '../ui/Modal.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Select.jsx';
+import { GroupOptions } from '../ui/GroupOptions.jsx';
+import { enrollOnTrial } from '../../lib/trialEnrollment.js';
 import { Input } from '../ui/Input.jsx';
 import { DatePicker } from '../ui/DatePicker.jsx';
 
@@ -186,8 +189,10 @@ function TrialCalendar({ value, onChange }) {
  * @param {() => void} props.onClose
  */
 export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose }) {
-  const { user } = useAuth();
+  const { user, staff } = useAuth();
+  const { activeBranchId } = useBranch();
   const { showToast } = useToast();
+  const [groupId, setGroupId] = useState('');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [time, setTime] = useState(timeSlots[0] ?? DEFAULT_TIME_SLOTS[0]);
   const [courseId, setCourseId] = useState('');
@@ -200,12 +205,19 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
   const coursesQuery = useMemo(() => (db ? query(collection(db, 'courses'), where('isArchived', '==', false)) : null), []);
   const { data: coursesRaw } = useCollection(coursesQuery);
   const courses = useMemo(() => [...coursesRaw].sort((a, b) => a.name.localeCompare(b.name)), [coursesRaw]);
+  // Назначение пробного (mode 'schedule') без группы и учителя невозможно: группа обязательна, учитель берётся из неё.
+  const groupsQuery = useMemo(
+    () => (db && activeBranchId ? query(collection(db, 'groups'), where('branchId', '==', activeBranchId), where('isArchived', '==', false)) : null),
+    [activeBranchId],
+  );
+  const { data: groups } = useCollection(groupsQuery);
 
   useEffect(() => {
     if (!target) return;
     setDate(format(new Date(), 'yyyy-MM-dd'));
     setTime(timeSlots[0] ?? DEFAULT_TIME_SLOTS[0]);
     setCourseId(target.lead.trialCourseId ?? '');
+    setGroupId('');
     setTelegramReminderSent(false);
     setConfirmDate('');
     setConfirmTime('');
@@ -215,6 +227,10 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
 
   if (!target) return null;
   const { lead, mode } = target;
+  const needsGroup = mode === 'schedule';
+  const selectedGroup = groups.find((g) => g.id === groupId);
+  const effectiveCourseId = needsGroup ? (selectedGroup?.courseId ?? '') : courseId;
+  const step1Ready = needsGroup ? Boolean(selectedGroup) : Boolean(courseId);
 
   // Дедлайн звонка-предупреждения обязателен — без него на 2-й шаг не
   // попасть (см. goToStep2), но проверяем ещё раз перед сохранением на
@@ -229,19 +245,19 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!courseId || !confirmDate || !confirmTime) return;
+    if (!step1Ready || !confirmDate || !confirmTime) return;
     setSaving(true);
     try {
       const trialDateJs = new Date(`${date}T${time}:00`);
       const trialDate = Timestamp.fromDate(trialDateJs);
-      const course = courses.find((c) => c.id === courseId);
+      const course = needsGroup ? { name: selectedGroup.courseName } : courses.find((c) => c.id === courseId);
       // Перенос тоже пересчитывает confirmDueAt и обнуляет попытки — старые
       // попытки дозвона относились к прежней дате пробного (спец «Перенос
       // пробного сбрасывает цикл подтверждения»).
       const confirmDueAt = Timestamp.fromDate(new Date(`${confirmDate}T${confirmTime}:00`));
       const trialFields = {
         trialDate,
-        trialCourseId: courseId || null,
+        trialCourseId: effectiveCourseId || null,
         trialCourseName: course?.name ?? null,
         trialConfirmDueAt: confirmDueAt,
         trialConfirmAttempts: [],
@@ -252,6 +268,8 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
         unreachableNextCallDueAt: null,
       };
       if (mode === 'schedule') {
+        // Сначала запись в группу (учитель из группы), потом стадия: пробный без группы и учителя не появляется.
+        await enrollOnTrial(db, { student: lead, group: selectedGroup, branchId: lead.branchId ?? activeBranchId, user, staff });
         await advanceStage(db, lead, 'trial_scheduled', { status: 'trial', trialAt: serverTimestamp(), ...trialFields }, user);
         showToast(`${lead.fullName}: пробный назначен.`);
       } else {
@@ -283,7 +301,7 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
             <Button variant="secondary" onClick={onClose}>
               Отмена
             </Button>
-            <Button onClick={goToStep2} disabled={!courseId}>
+            <Button onClick={goToStep2} disabled={!step1Ready}>
               Далее
             </Button>
           </>
@@ -302,13 +320,26 @@ export function TrialFormModal({ target, timeSlots = DEFAULT_TIME_SLOTS, onClose
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {step === 1 ? (
           <>
-            <Select
-              label="Курс"
-              required
-              options={[{ value: '', label: 'Не выбран' }, ...courses.map((c) => ({ value: c.id, label: c.name }))]}
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-            />
+            {needsGroup ? (
+              <>
+                <Select label="Группа" required value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+                  <GroupOptions items={groups} placeholder="Не выбрана" />
+                </Select>
+                {selectedGroup && (
+                  <p className="-mt-2 text-[12px] text-muted">
+                    Учитель: {selectedGroup.teacherName} · курс: {selectedGroup.courseName}
+                  </p>
+                )}
+              </>
+            ) : (
+              <Select
+                label="Курс"
+                required
+                options={[{ value: '', label: 'Не выбран' }, ...courses.map((c) => ({ value: c.id, label: c.name }))]}
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+              />
+            )}
             <label className="block">
               <span className="mb-1 block text-[13px] text-muted">Дата</span>
               <TrialCalendar value={date} onChange={setDate} />
